@@ -1,5 +1,7 @@
 use super::netid::AmsNetId;
+use crate::errors::ParseAmsAddrError;
 use std::fmt;
+use std::str::FromStr;
 
 pub type AmsPort = u16;
 
@@ -30,5 +32,32 @@ impl AmsAddr {
 impl fmt::Display for AmsAddr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}:{}", self.net_id, self.port)
+    }
+}
+
+impl FromStr for AmsAddr {
+    type Err = ParseAmsAddrError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (netid_str, port_str) = s.rsplit_once(':').ok_or(ParseAmsAddrError::Format)?;
+
+        let net_id = AmsNetId::from_str(netid_str).map_err(ParseAmsAddrError::NetId)?;
+        let port = port_str
+            .parse::<AmsPort>()
+            .map_err(ParseAmsAddrError::Port)?;
+
+        Ok(Self { net_id, port })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_addr() {
+        let addr: AmsAddr = "5.1.2.3.1.1:851".parse().unwrap();
+        assert_eq!(addr.port(), 851);
+        assert_eq!(addr.net_id().0, [5, 1, 2, 3, 1, 1]);
     }
 }
