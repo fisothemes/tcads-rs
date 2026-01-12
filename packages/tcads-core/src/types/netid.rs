@@ -8,7 +8,7 @@ use std::str::FromStr;
 ///
 /// The **AMS Net Id** is purely logical and usually has no relation to the IP address.
 /// It is configured at the target system. At the PC for this the TwinCAT System Control is used.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct AmsNetId(pub [u8; 6]);
 
 impl fmt::Display for AmsNetId {
@@ -18,6 +18,12 @@ impl fmt::Display for AmsNetId {
             "{}.{}.{}.{}.{}.{}",
             self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5]
         )
+    }
+}
+
+impl fmt::Debug for AmsNetId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
     }
 }
 
@@ -36,5 +42,18 @@ impl FromStr for AmsNetId {
         }
 
         Ok(Self(bytes))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_netid() {
+        assert_eq!(
+            AmsNetId::from_str("172.16.17.32.1.1").unwrap(),
+            AmsNetId([172, 16, 17, 32, 1, 1])
+        );
     }
 }
