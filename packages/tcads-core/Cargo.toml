@@ -12,3 +12,4 @@ readme = "README.md"
 
 [dependencies]
 thiserror = { workspace = true }
+byteorder = { workspace = true }
