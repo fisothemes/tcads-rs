@@ -1,3 +1,5 @@
+//! Structures and implementations for representing and handling ADS network identifiers.
+
 use crate::errors::ParseNetIdError;
 use std::fmt;
 use std::str::FromStr;
@@ -45,6 +47,18 @@ impl FromStr for AmsNetId {
     }
 }
 
+impl From<[u8; 6]> for AmsNetId {
+    fn from(value: [u8; 6]) -> Self {
+        Self(value)
+    }
+}
+
+impl From<AmsNetId> for [u8; 6] {
+    fn from(value: AmsNetId) -> Self {
+        value.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -55,5 +69,17 @@ mod tests {
             AmsNetId::from_str("172.16.17.32.1.1").unwrap(),
             AmsNetId([172, 16, 17, 32, 1, 1])
         );
+    }
+
+    #[test]
+    fn test_amsnetid_to_array_conversion() {
+        let array: [u8; 6] = AmsNetId([172, 16, 17, 32, 1, 1]).into();
+        assert_eq!(array, [172, 16, 17, 32, 1, 1]);
+    }
+
+    #[test]
+    fn test_amsnetid_from_array_conversion() {
+        let netid: AmsNetId = [172, 16, 17, 32, 1, 1].into();
+        assert_eq!(netid, AmsNetId([172, 16, 17, 32, 1, 1]));
     }
 }
