@@ -1,6 +1,6 @@
+use crate::errors::ParseNetIdError;
 use std::fmt;
 use std::str::FromStr;
-use crate::errors::ParseNetIdError;
 
 /// A 6-byte identifier for an ADS device (e.g. `172.16.17.10.1.1`).
 ///
