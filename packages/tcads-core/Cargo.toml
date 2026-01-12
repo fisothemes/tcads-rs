@@ -5,6 +5,10 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Shared data structures, constants, and serialization logic for the TwinCAT ADS protocol"
+keywords = ["twincat", "beckhoff", "ads"]
+categories = ["api-bindings", "network-programming"]
+readme = "README.md"
 
 [dependencies]
 thiserror = { workspace = true }
