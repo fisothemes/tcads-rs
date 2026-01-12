@@ -90,14 +90,12 @@ impl ReservedIndexGroup {
 
     /// Checks if this is a PLC-specific range (0x1000 - 0xEFFF).
     pub fn is_plc_range(&self) -> bool {
-        let val: u32 = (*self).into();
-        val >= 0x1000 && val <= 0xEFFF
+        (0x1000..=0xEFFF).contains(&u32::from(*self))
     }
 
     /// Checks if this is a System Service (0xF000 - 0xFFFF).
     pub fn is_system_service(&self) -> bool {
-        let val: u32 = (*self).into();
-        val >= 0xF000 && val <= 0xFFFF
+        (0xF000..=0xFFFF).contains(&u32::from(*self))
     }
 }
 
