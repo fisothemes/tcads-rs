@@ -17,7 +17,7 @@ pub struct AmsAddr {
 
 impl AmsAddr {
     /// Creates a new ADS address.
-    pub fn new(net_id: AmsNetId, port: AmsPort) -> Self {
+    pub const fn new(net_id: AmsNetId, port: AmsPort) -> Self {
         Self { net_id, port }
     }
 
