@@ -1,0 +1,18 @@
+[workspace]
+resolver = "3"
+members = [
+    "packages/tcads",
+    "packages/tcads-core",
+    "packages/tcads-client",
+    "packages/tcads-server",
+]
+
+[workspace.package]
+authors = ["Goodwill Mzumala <fisothemes@egmail.com>"]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/fisothemes/tcads-rs"
+
+[workspace.dependencies]
+# Error handling
+thiserror = "2"

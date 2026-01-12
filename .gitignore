@@ -1,0 +1,63 @@
+# Personal
+.sandbox/
+
+# Rust
+target/
+
+# TwinCAT
+*.~u
+*.compileinfo
+*.tmc
+*.tmcRefac
+*.tclrs
+*.occ
+*.tmy
+*.tpy
+*.tsproj.bak
+LineIDs.dbg
+LineIDs.dbg.bak
+
+_Boot/
+_CompileInfo/
+
+# Twinpack
+.Zeugwerk/
+
+# Python
+__pycache__/
+*.pyc
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+[Bb]uilds/
+x64/
+x86/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+
+# Visual Studio
+.vs/
+
+## Visual Studio profiler
+*.psess
+*.vsp
+*.vspx
+*.sap
+
+## Visual Studio cache files
+## files ending in .cache can be ignored
+*.[Cc]ache
+## but keep track of directories ending in .cache
+!*.[Cc]ache/
+
+# Node.js
+node_modules/
+
+# SQL Server files
+*.mdf
+*.ldf
