@@ -1,3 +1,6 @@
+//! Structures and implementations for representing and handling ADS network addresses.
+//! An ADS network address consists of an AMS Net ID and an AMS port number.
+
 use super::netid::AmsNetId;
 use crate::errors::ParseAmsAddrError;
 use std::fmt;
@@ -50,6 +53,18 @@ impl FromStr for AmsAddr {
     }
 }
 
+impl From<(AmsNetId, AmsPort)> for AmsAddr {
+    fn from((net_id, port): (AmsNetId, AmsPort)) -> Self {
+        Self::new(net_id, port)
+    }
+}
+
+impl From<AmsAddr> for (AmsNetId, AmsPort) {
+    fn from(addr: AmsAddr) -> Self {
+        (addr.net_id(), addr.port())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -59,5 +74,18 @@ mod tests {
         let addr: AmsAddr = "5.1.2.3.1.1:851".parse().unwrap();
         assert_eq!(addr.port(), 851);
         assert_eq!(addr.net_id().0, [5, 1, 2, 3, 1, 1]);
+    }
+
+    #[test]
+    fn test_amsaddr_to_tuple_conversion() {
+        let tuple: (AmsNetId, AmsPort) =
+            AmsAddr::new(AmsNetId([172, 16, 17, 32, 1, 1]), 851).into();
+        assert_eq!(tuple, (AmsNetId([172, 16, 17, 32, 1, 1]), 851));
+    }
+
+    #[test]
+    fn test_amsaddr_from_tuple_conversion() {
+        let addr: AmsAddr = (AmsNetId([172, 16, 17, 32, 1, 1]), 851).into();
+        assert_eq!(addr, AmsAddr::new(AmsNetId([172, 16, 17, 32, 1, 1]), 851));
     }
 }
