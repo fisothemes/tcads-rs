@@ -47,9 +47,10 @@ impl AmsTcpHeader {
     }
 
     /// Writes the 6 bytes to a writer (Little Endian).
-    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
+    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<usize> {
         w.write_all(&self.reserved.to_le_bytes())?;
-        w.write_all(&self.length.to_le_bytes())
+        w.write_all(&self.length.to_le_bytes())?;
+        Ok(AMS_TCP_HEADER_LEN)
     }
 }
 
@@ -124,7 +125,7 @@ impl AmsHeader {
 
         w.write_all(&self.invoke_id.to_le_bytes())?;
 
-        Ok(32)
+        Ok(AMS_HEADER_LEN)
     }
 
     /// The AMSNetId of the station, for which the packet is intended.
