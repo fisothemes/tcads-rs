@@ -15,4 +15,3 @@ repository = "https://github.com/fisothemes/tcads-rs"
 
 [workspace.dependencies]
 thiserror = "2"
-byteorder = "1.5"
