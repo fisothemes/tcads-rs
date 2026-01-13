@@ -61,6 +61,14 @@ impl From<AmsNetId> for [u8; 6] {
     }
 }
 
+impl TryFrom<&[u8]> for AmsNetId {
+    type Error = ParseNetIdError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        Ok(Self(value.try_into().map_err(|_| ParseNetIdError)?))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
