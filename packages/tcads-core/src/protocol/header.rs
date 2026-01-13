@@ -152,6 +152,11 @@ impl AmsHeader {
         self.length
     }
 
+    /// Sets the size of the data range in bytes.
+    pub fn set_length(&mut self, length: u32) {
+        self.length = length;
+    }
+
     /// AMS error number. See ADS Return Codes.
     pub fn error_code(&self) -> AdsReturnCode {
         self.error_code
