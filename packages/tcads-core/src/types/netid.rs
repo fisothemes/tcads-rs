@@ -4,6 +4,8 @@ use crate::errors::ParseNetIdError;
 use std::fmt;
 use std::str::FromStr;
 
+pub type AmsNetIdBytes = [u8; 6];
+
 /// A 6-byte identifier for an ADS device (e.g. `172.16.17.10.1.1`).
 ///
 /// # Notes
