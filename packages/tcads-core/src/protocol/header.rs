@@ -72,6 +72,15 @@ impl TryFrom<&[u8]> for AmsTcpHeader {
     }
 }
 
+impl From<&[u8; AMS_TCP_HEADER_LEN]> for AmsTcpHeader {
+    fn from(value: &[u8; AMS_TCP_HEADER_LEN]) -> Self {
+        Self {
+            reserved: u16::from_le_bytes(value[0..2].try_into().unwrap()),
+            length: u32::from_le_bytes(value[2..6].try_into().unwrap()),
+        }
+    }
+}
+
 /// The AMS Packet Header structure (32 bytes).
 ///
 /// Contains routing information, command IDs, flags, and error codes.
