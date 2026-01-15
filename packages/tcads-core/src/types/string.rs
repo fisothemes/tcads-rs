@@ -52,6 +52,12 @@ impl<const N: usize> AdsString<N> {
     }
 }
 
+impl<const N: usize> From<[u8; N]> for AdsString<N> {
+    fn from(bytes: [u8; N]) -> Self {
+        Self(bytes)
+    }
+}
+
 impl<const N: usize> TryFrom<&str> for AdsString<N> {
     type Error = AdsStringError;
 
