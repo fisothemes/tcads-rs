@@ -9,6 +9,8 @@ pub enum AdsError {
     MalformedPacket(&'static str),
     #[error("String Decoding Error")]
     StringDecode,
+    #[error("Error handling ADS string: {0}")]
+    AdsString(#[from] AdsStringError),
     #[error("Invalid Command ID: {0}")]
     InvalidCommandId(u16),
     #[error("Invalid NetID: {0}")]
@@ -24,6 +26,19 @@ pub enum AdsError {
 #[derive(Error, Debug, Clone, Copy, Hash)]
 #[error("Invalid AmsNetId format: expected 6 numbers separated by dots (e.g. '5.1.2.3.1.1')")]
 pub struct ParseNetIdError;
+
+/// Error returned when parsing an AdsString fails.
+#[derive(Error, Debug, Clone)]
+pub enum AdsStringError {
+    #[error("Invalid length: expected {expected} bytes, got {got}")]
+    TooLong { expected: usize, got: usize },
+    #[error("String contains characters not supported by Windows-1252 encoding")]
+    EncodingError,
+    #[error("Invalid UTF-8: {0}")]
+    InvalidUtf8(#[from] std::str::Utf8Error),
+    #[error("Invalid ADS string: {0}")]
+    Other(String),
+}
 
 /// Error returned when parsing an AmsAddr string fails.
 #[derive(Error, Debug, Clone)]

@@ -15,3 +15,4 @@ repository = "https://github.com/fisothemes/tcads-rs"
 
 [workspace.dependencies]
 thiserror = "2"
+encoding_rs = "0.8"

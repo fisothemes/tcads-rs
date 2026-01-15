@@ -12,3 +12,4 @@ readme = "README.md"
 
 [dependencies]
 thiserror = { workspace = true }
+encoding_rs = { workspace = true }
