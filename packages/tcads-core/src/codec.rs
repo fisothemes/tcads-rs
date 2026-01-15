@@ -9,7 +9,7 @@ use std::io::{Read, Write};
 /// The AMS Codec handles this framing logic:
 /// - **Writing:** Calculates the length, prepends the TCP header, and serializes the packet.
 /// - **Reading:** Reads the TCP header first to determine how many bytes to read next, ensuring a
-/// complete message is parsed.
+///   complete message is parsed.
 pub struct AmsCodec;
 
 impl AmsCodec {
