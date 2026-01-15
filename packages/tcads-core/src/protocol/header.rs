@@ -1,6 +1,12 @@
 use super::commands::CommandId;
 use super::state_flags::StateFlag;
-use crate::constants::{AMS_HEADER_LEN, AMS_TCP_HEADER_LEN};
+use crate::constants::{
+    AMS_HEADER_COMMAND_ID_RANGE, AMS_HEADER_ERROR_CODE_RANGE, AMS_HEADER_INVOKE_ID_RANGE,
+    AMS_HEADER_LEN, AMS_HEADER_LENGTH_RANGE, AMS_HEADER_SOURCE_NETID_RANGE,
+    AMS_HEADER_SOURCE_PORT_RANGE, AMS_HEADER_STATE_FLAGS_RANGE, AMS_HEADER_TARGET_NETID_RANGE,
+    AMS_HEADER_TARGET_PORT_RANGE, AMS_TCP_HEADER_LEN, AMS_TCP_HEADER_LENGTH_RANGE,
+    AMS_TCP_HEADER_RESERVED_RANGE,
+};
 use crate::errors::{AdsError, AdsReturnCode};
 use crate::types::addr::{AmsAddr, AmsPort};
 use crate::types::netid::AmsNetId;
@@ -65,8 +71,10 @@ impl TryFrom<&[u8]> for AmsTcpHeader {
         Ok(
             // Safely unwraps because length was checked.
             Self {
-                reserved: u16::from_le_bytes(value[0..2].try_into().unwrap()),
-                length: u32::from_le_bytes(value[2..6].try_into().unwrap()),
+                reserved: u16::from_le_bytes(
+                    value[AMS_TCP_HEADER_RESERVED_RANGE].try_into().unwrap(),
+                ),
+                length: u32::from_le_bytes(value[AMS_TCP_HEADER_LENGTH_RANGE].try_into().unwrap()),
             },
         )
     }
@@ -75,8 +83,8 @@ impl TryFrom<&[u8]> for AmsTcpHeader {
 impl From<&[u8; AMS_TCP_HEADER_LEN]> for AmsTcpHeader {
     fn from(value: &[u8; AMS_TCP_HEADER_LEN]) -> Self {
         Self {
-            reserved: u16::from_le_bytes(value[0..2].try_into().unwrap()),
-            length: u32::from_le_bytes(value[2..6].try_into().unwrap()),
+            reserved: u16::from_le_bytes(value[AMS_TCP_HEADER_RESERVED_RANGE].try_into().unwrap()),
+            length: u32::from_le_bytes(value[AMS_TCP_HEADER_LENGTH_RANGE].try_into().unwrap()),
         }
     }
 }
@@ -191,18 +199,24 @@ impl TryFrom<&[u8]> for AmsHeader {
 
         Ok(Self {
             target: AmsAddr::new(
-                AmsNetId::try_from(&value[0..6])?,
-                AmsPort::from_le_bytes(value[6..8].try_into().unwrap()),
+                AmsNetId::try_from(&value[AMS_HEADER_TARGET_NETID_RANGE])?,
+                AmsPort::from_le_bytes(value[AMS_HEADER_TARGET_PORT_RANGE].try_into().unwrap()),
             ),
             source: AmsAddr::new(
-                AmsNetId::try_from(&value[8..14])?,
-                AmsPort::from_le_bytes(value[14..16].try_into().unwrap()),
+                AmsNetId::try_from(&value[AMS_HEADER_SOURCE_NETID_RANGE])?,
+                AmsPort::from_le_bytes(value[AMS_HEADER_SOURCE_PORT_RANGE].try_into().unwrap()),
             ),
-            command_id: CommandId::from(u16::from_le_bytes(value[16..18].try_into().unwrap())),
-            state_flags: StateFlag::from(u16::from_le_bytes(value[18..20].try_into().unwrap())),
-            length: u32::from_le_bytes(value[20..24].try_into().unwrap()),
-            error_code: AdsReturnCode::from(u32::from_le_bytes(value[24..28].try_into().unwrap())),
-            invoke_id: u32::from_le_bytes(value[28..32].try_into().unwrap()),
+            command_id: CommandId::from(u16::from_le_bytes(
+                value[AMS_HEADER_COMMAND_ID_RANGE].try_into().unwrap(),
+            )),
+            state_flags: StateFlag::from(u16::from_le_bytes(
+                value[AMS_HEADER_STATE_FLAGS_RANGE].try_into().unwrap(),
+            )),
+            length: u32::from_le_bytes(value[AMS_HEADER_LENGTH_RANGE].try_into().unwrap()),
+            error_code: AdsReturnCode::from(u32::from_le_bytes(
+                value[AMS_HEADER_ERROR_CODE_RANGE].try_into().unwrap(),
+            )),
+            invoke_id: u32::from_le_bytes(value[AMS_HEADER_INVOKE_ID_RANGE].try_into().unwrap()),
         })
     }
 }
@@ -211,17 +225,26 @@ impl From<&AmsHeader> for [u8; AMS_HEADER_LEN] {
     fn from(value: &AmsHeader) -> Self {
         let mut buf = [0u8; AMS_HEADER_LEN];
 
-        buf[0..6].copy_from_slice(&value.target.net_id().0);
-        buf[6..8].copy_from_slice(&value.target.port().to_le_bytes());
-        buf[8..14].copy_from_slice(&value.source.net_id().0);
-        buf[14..16].copy_from_slice(&value.source.port().to_le_bytes());
-        buf[16..18].copy_from_slice(&u16::from(value.command_id).to_le_bytes());
-        buf[18..20].copy_from_slice(&u16::from(value.state_flags).to_le_bytes());
-        buf[20..24].copy_from_slice(&value.length.to_le_bytes());
-        buf[24..28].copy_from_slice(&u32::from(value.error_code).to_le_bytes());
-        buf[28..32].copy_from_slice(&value.invoke_id.to_le_bytes());
+        buf[AMS_HEADER_TARGET_NETID_RANGE].copy_from_slice(&value.target.net_id().0);
+        buf[AMS_HEADER_TARGET_PORT_RANGE].copy_from_slice(&value.target.port().to_le_bytes());
+        buf[AMS_HEADER_SOURCE_NETID_RANGE].copy_from_slice(&value.source.net_id().0);
+        buf[AMS_HEADER_SOURCE_PORT_RANGE].copy_from_slice(&value.source.port().to_le_bytes());
+        buf[AMS_HEADER_COMMAND_ID_RANGE]
+            .copy_from_slice(&u16::from(value.command_id).to_le_bytes());
+        buf[AMS_HEADER_STATE_FLAGS_RANGE]
+            .copy_from_slice(&u16::from(value.state_flags).to_le_bytes());
+        buf[AMS_HEADER_LENGTH_RANGE].copy_from_slice(&value.length.to_le_bytes());
+        buf[AMS_HEADER_ERROR_CODE_RANGE]
+            .copy_from_slice(&u32::from(value.error_code).to_le_bytes());
+        buf[AMS_HEADER_INVOKE_ID_RANGE].copy_from_slice(&value.invoke_id.to_le_bytes());
 
         buf
+    }
+}
+
+impl From<AmsHeader> for [u8; AMS_HEADER_LEN] {
+    fn from(value: AmsHeader) -> Self {
+        (&value).into()
     }
 }
 
@@ -229,6 +252,12 @@ impl From<&AmsHeader> for Vec<u8> {
     fn from(value: &AmsHeader) -> Self {
         let bytes: [u8; AMS_HEADER_LEN] = value.into();
         bytes.to_vec()
+    }
+}
+
+impl From<AmsHeader> for Vec<u8> {
+    fn from(value: AmsHeader) -> Self {
+        (&value).into()
     }
 }
 
@@ -262,7 +291,7 @@ mod tests {
 
         header.write_to(&mut buffer).expect("Write failed");
 
-        assert_eq!(buffer.len(), 6);
+        assert_eq!(buffer.len(), AMS_TCP_HEADER_LEN);
         // Reserved (0) + Length (100 = 0x64)
         assert_eq!(buffer, vec![0x00, 0x00, 0x64, 0x00, 0x00, 0x00]);
 
@@ -275,32 +304,41 @@ mod tests {
     fn test_header_serialization_endianness() {
         let header = create_test_header();
 
-        let bytes: [u8; 32] = (&header).into();
+        let bytes: [u8; AMS_HEADER_LEN] = (&header).into();
 
         // 1. Target NetId (6 bytes)
-        assert_eq!(&bytes[0..6], &[127, 0, 0, 1, 1, 1]);
+        assert_eq!(&bytes[AMS_HEADER_TARGET_NETID_RANGE], &[127, 0, 0, 1, 1, 1]);
         // 2. Target Port (2 bytes LE) - 851 = 0x0353
-        assert_eq!(&bytes[6..8], &[0x53, 0x03]);
+        assert_eq!(&bytes[AMS_HEADER_TARGET_PORT_RANGE], &[0x53, 0x03]);
 
         // 3. Source NetId (6 bytes)
-        assert_eq!(&bytes[8..14], &[192, 168, 0, 2, 1, 1]);
+        assert_eq!(
+            &bytes[AMS_HEADER_SOURCE_NETID_RANGE],
+            &[192, 168, 0, 2, 1, 1]
+        );
         // 4. Source Port (2 bytes LE) - 40,000 = 0x9C40
-        assert_eq!(&bytes[14..16], &[0x40, 0x9C]);
+        assert_eq!(&bytes[AMS_HEADER_SOURCE_PORT_RANGE], &[0x40, 0x9C]);
 
         // 5. Command ID (2 bytes LE) - AdsRead (2)
-        assert_eq!(&bytes[16..18], &[0x02, 0x00]);
+        assert_eq!(&bytes[AMS_HEADER_COMMAND_ID_RANGE], &[0x02, 0x00]);
 
         // 6. State Flags (2 bytes LE) - 1
-        assert_eq!(&bytes[18..20], &[0x05, 0x00]);
+        assert_eq!(&bytes[AMS_HEADER_STATE_FLAGS_RANGE], &[0x05, 0x00]);
 
         // 7. Length (4 bytes LE) - 4
-        assert_eq!(&bytes[20..24], &[0x04, 0x00, 0x00, 0x00]);
+        assert_eq!(&bytes[AMS_HEADER_LENGTH_RANGE], &[0x04, 0x00, 0x00, 0x00]);
 
         // 8. Error Code (4 bytes LE) - 0
-        assert_eq!(&bytes[24..28], &[0x00, 0x00, 0x00, 0x00]);
+        assert_eq!(
+            &bytes[AMS_HEADER_ERROR_CODE_RANGE],
+            &[0x00, 0x00, 0x00, 0x00]
+        );
 
         // 9. Invoke ID (4 bytes LE) - 12,345 = 0x00003039
-        assert_eq!(&bytes[28..32], &[0x39, 0x30, 0x00, 0x00]);
+        assert_eq!(
+            &bytes[AMS_HEADER_INVOKE_ID_RANGE],
+            &[0x39, 0x30, 0x00, 0x00]
+        );
     }
 
     #[test]
@@ -324,7 +362,7 @@ mod tests {
         let header = create_test_header();
         let mut writer_buf = Vec::new();
         header.write_to(&mut writer_buf).unwrap();
-        let array_buf: [u8; 32] = (&header).into();
+        let array_buf: [u8; AMS_HEADER_LEN] = (&header).into();
         assert_eq!(writer_buf, array_buf.to_vec());
     }
 }

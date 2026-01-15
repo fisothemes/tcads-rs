@@ -1,10 +1,12 @@
 //! Structures and implementations for representing and handling ADS network identifiers.
 
+use crate::constants::AMS_NETID_LEN;
 use crate::errors::ParseNetIdError;
+
 use std::fmt;
 use std::str::FromStr;
 
-pub type AmsNetIdBytes = [u8; 6];
+pub type AmsNetIdBytes = [u8; AMS_NETID_LEN];
 
 /// A 6-byte identifier for an ADS device (e.g. `172.16.17.10.1.1`).
 ///
@@ -13,7 +15,7 @@ pub type AmsNetIdBytes = [u8; 6];
 /// The **AMS Net Id** is purely logical and usually has no relation to the IP address.
 /// It is configured at the target system. At the PC for this the TwinCAT System Control is used.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct AmsNetId(pub [u8; 6]);
+pub struct AmsNetId(pub [u8; AMS_NETID_LEN]);
 
 impl fmt::Display for AmsNetId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -36,11 +38,11 @@ impl FromStr for AmsNetId {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parts: Vec<&str> = s.split('.').collect();
-        if parts.len() != 6 {
+        if parts.len() != AMS_NETID_LEN {
             return Err(ParseNetIdError);
         }
 
-        let mut bytes = [0u8; 6];
+        let mut bytes = [0u8; AMS_NETID_LEN];
         for (i, part) in parts.iter().enumerate() {
             bytes[i] = part.parse().map_err(|_| ParseNetIdError)?;
         }
@@ -50,12 +52,12 @@ impl FromStr for AmsNetId {
 }
 
 impl From<[u8; 6]> for AmsNetId {
-    fn from(value: [u8; 6]) -> Self {
+    fn from(value: [u8; AMS_NETID_LEN]) -> Self {
         Self(value)
     }
 }
 
-impl From<AmsNetId> for [u8; 6] {
+impl From<AmsNetId> for [u8; AMS_NETID_LEN] {
     fn from(value: AmsNetId) -> Self {
         value.0
     }
@@ -83,7 +85,7 @@ mod tests {
 
     #[test]
     fn test_amsnetid_to_array_conversion() {
-        let array: [u8; 6] = AmsNetId([172, 16, 17, 32, 1, 1]).into();
+        let array: [u8; AMS_NETID_LEN] = AmsNetId([172, 16, 17, 32, 1, 1]).into();
         assert_eq!(array, [172, 16, 17, 32, 1, 1]);
     }
 
