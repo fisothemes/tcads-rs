@@ -1,6 +1,4 @@
-use crate::constants::{AMS_HEADER_LEN, AMS_TCP_HEADER_LEN};
 use crate::errors::AdsError;
-use crate::protocol::header::{AmsHeader, AmsTcpHeader};
 use crate::protocol::packet::AmsPacket;
 use std::io::{Read, Write};
 
@@ -13,24 +11,25 @@ use std::io::{Read, Write};
 pub struct AmsCodec;
 
 impl AmsCodec {
-    /// Encodes a Packet into the Writer (e.g. TcpStream)
-    pub fn write<W: Write>(w: &mut W, packet: &AmsPacket<Vec<u8>>) -> Result<usize, AdsError> {
-        let content_len = packet.content().len();
-
-        let total_packet_len = (AMS_HEADER_LEN + content_len) as u32;
-        let tcp_header = AmsTcpHeader::new(total_packet_len);
-
-        tcp_header.write_to(w)?;
-        packet.header().write_to(w)?;
-        w.write_all(packet.content())?;
+    /// Encodes a Packet into the Writer (e.g. TcpStream).
+    ///
+    /// This is generic over `B`, so it works with `AmsPacket<Vec<u8>>`, `AmsPacket<&[u8]>`,
+    /// or any other type that can be viewed as a byte slice.
+    pub fn write<W: Write, B: AsRef<[u8]>>(
+        w: &mut W,
+        packet: &AmsPacket<B>,
+    ) -> Result<usize, AdsError> {
+        let bytes_written = packet.write_to(w)?;
         w.flush()?;
-
-        Ok(AMS_TCP_HEADER_LEN + AMS_HEADER_LEN + content_len)
+        Ok(bytes_written)
     }
 
-    /// Decodes a Packet from a Reader (e.g. TcpStream)
-    pub fn read<R: Read>(r: &mut R) -> Result<AmsPacket<Vec<u8>>, AdsError> {
-        todo!()
+    /// Decodes a Packet from a Reader (e.g. TcpStream).
+    ///
+    /// This is generic over `B`, allowing you to return `AmsPacket<Vec<u8>>` or
+    /// any other type that implements `From<Vec<u8>>`.
+    pub fn read<R: Read, B: From<Vec<u8>>>(r: &mut R) -> Result<AmsPacket<B>, AdsError> {
+        AmsPacket::read_from(r)
     }
 }
 
@@ -39,6 +38,7 @@ mod tests {
     use super::*;
     use crate::errors::AdsReturnCode;
     use crate::protocol::commands::CommandId;
+    use crate::protocol::header::AmsHeader;
     use crate::protocol::state_flags::StateFlag;
     use std::io::Cursor;
 
@@ -82,5 +82,25 @@ mod tests {
 
         // Check Payload at the end
         assert_eq!(&buffer[38..42], &[0xAA, 0xBB, 0xCC, 0xDD]);
+    }
+
+    #[test]
+    fn test_codec_read() {
+        let mut buffer = Vec::new();
+
+        let header = create_test_header();
+        let payload = vec![0x11, 0x22, 0x33, 0x44];
+        let packet = AmsPacket::new(header, payload.clone());
+
+        let mut writer = Cursor::new(&mut buffer);
+        AmsCodec::write(&mut writer, &packet).unwrap();
+
+        let mut reader = Cursor::new(&buffer);
+
+        let read_packet: AmsPacket<Vec<u8>> =
+            AmsCodec::read(&mut reader).expect("Codec read failed");
+
+        assert_eq!(read_packet.header().invoke_id(), 12_345);
+        assert_eq!(read_packet.content(), &payload);
     }
 }
