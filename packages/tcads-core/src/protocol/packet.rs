@@ -1,5 +1,5 @@
 use super::header::{AmsHeader, AmsTcpHeader};
-use crate::constants::{AMS_HEADER_LEN, AMS_TCP_HEADER_LEN};
+use crate::constants::{AMS_HEADER_LEN, AMS_PACKET_MAX_LEN, AMS_TCP_HEADER_LEN};
 use crate::errors::AdsError;
 use std::io::{self, Read, Write};
 
@@ -76,6 +76,12 @@ impl<B: From<Vec<u8>>> AmsPacket<B> {
             ));
         }
 
+        if total_len > AMS_PACKET_MAX_LEN {
+            return Err(AdsError::MalformedPacket(
+                "TCP length larger than maximum allowed packet size",
+            ));
+        }
+
         // Read AMS Header (32 bytes)
         let mut header_buf = [0u8; AMS_HEADER_LEN];
         r.read_exact(&mut header_buf)?;
@@ -113,8 +119,17 @@ impl<B: AsMut<[u8]> + AsRef<[u8]>> AmsPacket<B> {
         let tcp_header = AmsTcpHeader::from(&tcp_buf);
 
         let total_len = tcp_header.length() as usize;
+
         if total_len < AMS_HEADER_LEN {
-            return Err(AdsError::MalformedPacket("TCP length too short"));
+            return Err(AdsError::MalformedPacket(
+                "TCP length smaller than AMS Header",
+            ));
+        }
+
+        if total_len > AMS_PACKET_MAX_LEN {
+            return Err(AdsError::MalformedPacket(
+                "TCP length larger than maximum allowed packet size",
+            ));
         }
 
         // Read AMS Header (32 bytes)
