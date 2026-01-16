@@ -7,8 +7,8 @@ pub const PORT_AMS_TCP: u16 = 48898;
 /// Standard ADS UDP Port
 pub const PORT_AMS_UDP: u16 = 48899;
 
-/// Maximum allowed AMS Packet Size (1MB)
-pub const AMS_PACKET_MAX_LEN: usize = 1024 * 1024;
+/// Maximum allowed AMS Packet Size (64KB)
+pub const AMS_PACKET_MAX_LEN: usize = 65535 - AMS_TCP_HEADER_LEN;
 
 /// Length of the AMS NetId (6 bytes)
 pub const AMS_NETID_LEN: usize = 6;
