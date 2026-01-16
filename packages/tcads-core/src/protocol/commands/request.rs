@@ -6,6 +6,9 @@ use std::io::{self, Read, Write};
 ///
 /// Direction: Client -> Server
 ///
+/// A request to read data from an ADS device.
+/// The data is addressed by the Index Group and the Index Offset
+///
 /// # Layout
 /// - **Index Group:** 4 bytes
 /// - **Index Offset:** 4 bytes

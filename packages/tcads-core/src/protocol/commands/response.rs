@@ -8,6 +8,9 @@ use crate::errors::AdsReturnCode;
 ///
 /// Direction: Server -> Client
 ///
+/// A response from an ADS device to a read request.
+/// See [`AdsReadRequest`](super::AdsReadRequest) for more information.
+///
 /// # Layout
 /// - **Result:** 4 bytes (ADS Return Code)
 /// - **Length:** 4 bytes (Size of the data that follows)
