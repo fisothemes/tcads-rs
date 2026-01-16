@@ -66,3 +66,50 @@ impl AdsReadResponse {
         })
     }
 }
+
+/// Payload for [`CommandId::AdsWrite`](super::CommandId::AdsWrite) (Response).
+///
+/// Direction: Server -> Client
+///
+/// A response from an ADS device the write request was made to.
+/// See [`AdsWriteRequest`](super::AdsWriteRequest) for more information.
+///
+/// # Layout
+/// - **Result:** 4 bytes (ADS Return Code)
+///
+/// ```text
+/// [ Result (4) ]
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdsWriteResponse {
+    result: AdsReturnCode,
+}
+
+impl AdsWriteResponse {
+    /// Size of the fixed header of the response.
+    pub const SIZE: usize = 4;
+
+    pub fn new(result: AdsReturnCode) -> Self {
+        Self { result }
+    }
+
+    /// Returns ADS error code.
+    pub fn result(&self) -> AdsReturnCode {
+        self.result
+    }
+
+    /// Writes the fixed header of the response.
+    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
+        w.write_all(&u32::from(self.result).to_le_bytes())?;
+        Ok(())
+    }
+
+    /// Reads the fixed header of the response.
+    pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
+        let mut buf = [0u8; 4];
+        r.read_exact(&mut buf)?;
+        Ok(Self {
+            result: AdsReturnCode::from(u32::from_le_bytes(buf)),
+        })
+    }
+}

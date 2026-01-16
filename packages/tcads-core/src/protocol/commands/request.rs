@@ -71,3 +71,78 @@ impl AdsReadRequest {
         })
     }
 }
+
+/// Payload Header for [`CommandId::AdsWrite`](super::CommandId::AdsWrite).
+///
+/// Direction: Client -> Server
+///
+/// A request to write data to an ADS device.
+/// The data is addressed by the Index Group and the Index Offset
+///
+/// # Layout
+/// - **Index Group:** 4 bytes
+/// - **Index Offset:** 4 bytes
+/// - **Length:** 4 bytes (Size of the data to write)
+///
+/// # Usage
+/// This struct parses the *fixed header* of the request.
+/// The data to be written immediately follows this structure in the stream.
+///
+/// ```text
+/// [ Index Group (4) ] [ Index Offset (4) ] [ Length (4) ] [ Data (n bytes...) ]
+/// ^-----------------------------------------------------^
+///              AdsWriteRequest parses this
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdsWriteRequest {
+    index_group: u32,
+    index_offset: u32,
+    length: u32,
+}
+
+impl AdsWriteRequest {
+    /// Size of the fixed header of the request.
+    pub const SIZE: usize = 12;
+
+    pub fn new(index_group: u32, index_offset: u32, length: u32) -> Self {
+        Self {
+            index_group,
+            index_offset,
+            length,
+        }
+    }
+
+    /// Returns the Index Group in which the data should be written.
+    pub fn index_group(&self) -> u32 {
+        self.index_group
+    }
+
+    /// Returns the Index Offset in which the data should be written.
+    pub fn index_offset(&self) -> u32 {
+        self.index_offset
+    }
+
+    /// Returns the length of the data (in bytes) which are to be written.
+    pub fn length(&self) -> u32 {
+        self.length
+    }
+
+    /// Writes the fixed header of the request.
+    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
+        w.write_all(&self.index_group.to_le_bytes())?;
+        w.write_all(&self.index_offset.to_le_bytes())?;
+        w.write_all(&self.length.to_le_bytes())?;
+        Ok(())
+    }
+
+    /// Reads the fixed header of the request.
+    pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
+        let mut buf = [0u8; 12];
+        r.read_exact(&mut buf)?;
+        Ok(Self {
+            index_group: u32::from_le_bytes(buf[0..4].try_into().unwrap()),
+            index_offset: u32::from_le_bytes(buf[4..8].try_into().unwrap()),
+            length: u32::from_le_bytes(buf[8..12].try_into().unwrap()),
+        })
+    }
+}
