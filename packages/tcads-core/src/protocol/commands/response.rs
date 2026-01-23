@@ -113,3 +113,22 @@ impl AdsWriteResponse {
         })
     }
 }
+
+/// Payload Header for [`CommandId::AdsReadWrite`](super::CommandId::AdsReadWrite) (Response).
+///
+/// Direction: Server -> Client
+///
+/// # Layout
+/// - **Result:** 4 bytes (ADS Return Code)
+/// - **Length:** 4 bytes (Size of the read data that follows)
+///
+/// # Usage
+/// This struct parses the *fixed header* of the response.
+/// The actual read data immediately follows this structure.
+///
+/// ```text
+/// [ Result (4) ] [ Length (4) ] [ Read Data (n bytes...) ]
+/// ^---------------------------^
+/// AdsReadWriteResponse parses this
+/// ```
+pub type AdsReadWriteResponse = AdsReadResponse;
