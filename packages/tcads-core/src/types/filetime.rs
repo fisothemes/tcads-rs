@@ -72,3 +72,44 @@ impl From<SystemTime> for WindowsFiletime {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_unix_epoch_conversion() {
+        // The Unix Epoch (1970-01-01) is exactly 11,644,473,600 seconds after Windows Epoch (1601).
+        // Ticks = Seconds * 10 million
+        let unix_epoch_in_ticks = 11_644_473_600 * 10_000_000;
+
+        let ft = WindowsFiletime::new(unix_epoch_in_ticks);
+        let st: SystemTime = ft.into();
+
+        // This should equal SystemTime::UNIX_EPOCH
+        assert_eq!(
+            st.duration_since(UNIX_EPOCH).unwrap(),
+            Duration::from_secs(0)
+        );
+    }
+
+    #[test]
+    fn test_roundtrip_now() {
+        let now = SystemTime::now();
+
+        // Convert to Windows Filetime
+        let ft = WindowsFiletime::from(now);
+
+        // Convert back to SystemTime
+        let back: SystemTime = ft.into();
+
+        // Allow for tiny precision loss (100ns vs system clock precision)
+        // Usually a system clock is coarser than 100ns, so it should be exact or very close.
+        let diff = now
+            .duration_since(back)
+            .unwrap_or_else(|_| back.duration_since(now).unwrap());
+
+        // Assert difference is less than 1 microsecond
+        assert!(diff.as_micros() < 1, "Roundtrip drift too high: {:?}", diff);
+    }
+}

@@ -131,3 +131,26 @@ impl From<AdsState> for u16 {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ads_state_conversion() {
+        assert_eq!(AdsState::from(5), AdsState::Run);
+        assert_eq!(u16::from(AdsState::Run), 5);
+
+        assert_eq!(AdsState::from(100), AdsState::Unknown(100));
+        assert_eq!(u16::from(AdsState::Unknown(100)), 100);
+    }
+
+    #[test]
+    fn test_trans_mode_conversion() {
+        assert_eq!(AdsTransMode::from(1), AdsTransMode::ClientCycle);
+        assert_eq!(u32::from(AdsTransMode::ClientCycle), 1);
+
+        assert_eq!(AdsTransMode::from(99), AdsTransMode::Unknown(99));
+        assert_eq!(u32::from(AdsTransMode::Unknown(99)), 99);
+    }
+}
