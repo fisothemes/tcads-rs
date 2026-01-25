@@ -3,7 +3,7 @@
 use std::io::{self, Read, Write};
 
 use crate::errors::{AdsError, AdsReturnCode};
-use crate::types::AdsString;
+use crate::types::{AdsString, WindowsFiletime};
 
 use super::{AdsState, NotificationHandle};
 
@@ -398,3 +398,175 @@ impl AdsAddDeviceNotificationResponse {
 /// [ Result (4) ]
 /// ```
 pub type AdsDeleteDeviceNotificationResponse = AdsWriteResponse;
+
+/// Header for the [`CommandId::AdsDeviceNotification`](super::id::CommandId::AdsDeviceNotification) stream.
+///
+/// Direction: Server -> Client
+///
+/// This is the top-level container sent by the server. It contains one or more "Stamps" (Time snapshots).
+///
+/// # Layout
+/// - **Length:** 4 bytes (Size of the entire data stream in bytes)
+/// - **Stamps:** 4 bytes (Number of [`AdsStampHeader`] elements that follow)
+///
+/// ```text
+/// [ Length (4) ] [ Stamps (4) ] [ Stamp 1... ] [ Stamp 2... ]
+/// ^---------------------------^
+///  AdsDeviceNotificationStreamHeader parses this
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdsDeviceNotificationStreamHeader {
+    length: u32,
+    stamps: u32,
+}
+
+impl AdsDeviceNotificationStreamHeader {
+    /// Size of the header of the stream.
+    pub const SIZE: usize = 8;
+
+    pub fn new(length: u32, stamps: u32) -> Self {
+        Self { length, stamps }
+    }
+
+    /// Returns the length of the entire data stream in bytes.
+    pub fn length(&self) -> u32 {
+        self.length
+    }
+
+    /// Returns the number of [`AdsStampHeader`] elements that follow.
+    pub fn stamps(&self) -> u32 {
+        self.stamps
+    }
+
+    /// Writes the header of the stream.
+    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
+        w.write_all(&self.length.to_le_bytes())?;
+        w.write_all(&self.stamps.to_le_bytes())?;
+        Ok(())
+    }
+
+    /// Reads the header of the stream.
+    pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
+        let mut buf = [0u8; 8];
+        r.read_exact(&mut buf)?;
+        Ok(Self {
+            length: u32::from_le_bytes(buf[0..4].try_into().unwrap()),
+            stamps: u32::from_le_bytes(buf[4..8].try_into().unwrap()),
+        })
+    }
+}
+
+/// Header for a specific Timestamp within the notification stream.
+///
+/// Represents a snapshot in time. It contains one or more "Samples" (Variable updates)
+/// that occurred at this exact timestamp.
+///
+/// # Layout
+/// - **Timestamp:** 8 bytes (Windows FILETIME)
+/// - **Samples:** 4 bytes (Number of [`AdsNotificationSampleHeader`] elements that follow)
+///
+/// ```text
+/// [ Timestamp (8) ] [ Samples (4) ] [ Sample 1... ] [ Sample 2... ]
+/// ^-------------------------------^
+///    AdsStampHeader parses this
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdsStampHeader {
+    timestamp: WindowsFiletime,
+    samples: u32,
+}
+
+impl AdsStampHeader {
+    /// Size of the header of a single sample.
+    pub const SIZE: usize = 12;
+
+    pub fn new(timestamp: WindowsFiletime, samples: u32) -> Self {
+        Self { timestamp, samples }
+    }
+
+    /// Returns the timestamp of this sample.
+    pub fn timestamp(&self) -> WindowsFiletime {
+        self.timestamp
+    }
+
+    /// Returns the number of [`AdsNotificationSampleHeader`] elements that follow.
+    pub fn samples(&self) -> u32 {
+        self.samples
+    }
+
+    /// Writes the header of a single sample.
+    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
+        w.write_all(&self.timestamp.as_u64().to_le_bytes())?;
+        w.write_all(&self.samples.to_le_bytes())?;
+        Ok(())
+    }
+
+    /// Reads the header of a single sample.
+    pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
+        let mut buf = [0u8; 12];
+        r.read_exact(&mut buf)?;
+        Ok(Self {
+            timestamp: WindowsFiletime::new(u64::from_le_bytes(buf[0..8].try_into().unwrap())),
+            samples: u32::from_le_bytes(buf[8..12].try_into().unwrap()),
+        })
+    }
+}
+
+/// Header for a specific variable update (Sample).
+///
+/// Contains the handle identifying the variable and the size of the data.
+/// The data follows immediately after this header.
+///
+/// # Layout
+/// - **Handle:** 4 bytes
+/// - **Sample Size:** 4 bytes
+///
+/// ```text
+/// [ Handle (4) ] [ Size (4) ] [ Data (n bytes...) ]
+/// ^-------------------------^
+/// AdsNotificationSampleHeader parses this
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdsNotificationSampleHeader {
+    handle: NotificationHandle,
+    sample_size: u32,
+}
+
+impl AdsNotificationSampleHeader {
+    /// Size of the header of a single sample.
+    pub const SIZE: usize = 8;
+
+    pub fn new(handle: NotificationHandle, sample_size: u32) -> Self {
+        Self {
+            handle,
+            sample_size,
+        }
+    }
+
+    /// Returns the handle identifying the variable.
+    pub fn handle(&self) -> NotificationHandle {
+        self.handle
+    }
+
+    /// Returns the size of the data.
+    pub fn sample_size(&self) -> u32 {
+        self.sample_size
+    }
+
+    /// Writes the header of a single sample.
+    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
+        w.write_all(&self.handle.as_u32().to_le_bytes())?;
+        w.write_all(&self.sample_size.to_le_bytes())?;
+        Ok(())
+    }
+
+    /// Reads the header of a single sample.
+    pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
+        let mut buf = [0u8; 8];
+        r.read_exact(&mut buf)?;
+        Ok(Self {
+            handle: NotificationHandle::new(u32::from_le_bytes(buf[0..4].try_into().unwrap())),
+            sample_size: u32::from_le_bytes(buf[4..8].try_into().unwrap()),
+        })
+    }
+}
