@@ -2,6 +2,8 @@
 
 use std::io::{self, Read, Write};
 
+use crate::types::enums::AdsState;
+
 /// Payload for [`CommandId::AdsRead`](super::CommandId::AdsRead).
 ///
 /// Direction: Client -> Server
@@ -227,6 +229,76 @@ impl AdsReadWriteRequest {
             index_offset: u32::from_le_bytes(buf[4..8].try_into().unwrap()),
             read_length: u32::from_le_bytes(buf[8..12].try_into().unwrap()),
             write_length: u32::from_le_bytes(buf[12..16].try_into().unwrap()),
+        })
+    }
+}
+
+/// Payload for [`CommandId::AdsWriteControl`](super::CommandId::AdsWriteControl).
+///
+/// Direction: Client -> Server
+///
+/// Changes the ADS state and Device state of the target. Additionally, it is possible to
+/// send data to the target to transfer further information. These data were not analysed
+/// from the current ADS devices (PLC, NC, ...).
+///
+/// # Layout
+/// - **ADS State:** 2 bytes (The target state to switch to)
+/// - **Device State:** 2 bytes (Usually 0)
+/// - **Length:** 4 bytes (Size of additional data)
+///
+/// ```text
+/// [ AdsState (2) ] [ DevState (2) ] [ Length (4) ] [ Data... ]
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdsWriteControlRequest {
+    ads_state: AdsState,
+    device_state: u16,
+    length: u32,
+}
+
+impl AdsWriteControlRequest {
+    /// Size of the fixed header of the request.
+    pub const SIZE: usize = 8;
+
+    pub fn new(ads_state: AdsState, device_state: u16, length: u32) -> Self {
+        Self {
+            ads_state,
+            device_state,
+            length,
+        }
+    }
+
+    /// Returns the ADS state which should be set on the target.
+    pub fn ads_state(&self) -> AdsState {
+        self.ads_state
+    }
+
+    /// Returns the Device state which should be set on the target.
+    pub fn device_state(&self) -> u16 {
+        self.device_state
+    }
+
+    /// Returns the length of the additional data which should be sent to the target.
+    pub fn length(&self) -> u32 {
+        self.length
+    }
+
+    /// Writes the fixed header of the request.
+    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
+        w.write_all(&u16::from(self.ads_state).to_le_bytes())?;
+        w.write_all(&self.device_state.to_le_bytes())?;
+        w.write_all(&self.length.to_le_bytes())?;
+        Ok(())
+    }
+
+    /// Reads the fixed header of the request.
+    pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
+        let mut buf = [0u8; 8];
+        r.read_exact(&mut buf)?;
+        Ok(Self {
+            ads_state: AdsState::from(u16::from_le_bytes(buf[0..2].try_into().unwrap())),
+            device_state: u16::from_le_bytes(buf[2..4].try_into().unwrap()),
+            length: u32::from_le_bytes(buf[4..8].try_into().unwrap()),
         })
     }
 }
