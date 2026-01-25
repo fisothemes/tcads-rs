@@ -12,7 +12,7 @@ pub enum CommandId {
     AdsRead,
     /// Write data to the ADS device. The data is addressed by the Index Group and Index Offset (0x0003)
     AdsWrite,
-    // Read the ADS status and the device status of the ADS device (0x0004)
+    /// Read the ADS status and the device status of the ADS device (0x0004)
     AdsReadState,
     /// Change the ADS status and the device status of the ADS device. (0x0005)
     AdsWriteControl,
