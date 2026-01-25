@@ -1,8 +1,9 @@
 //! Definition of ADS Request Payloads
 
 use std::io::{self, Read, Write};
+use std::time::Duration;
 
-use crate::types::enums::AdsState;
+use super::{AdsState, AdsTransMode, NotificationHandle};
 
 /// Payload for [`CommandId::AdsRead`](super::CommandId::AdsRead).
 ///
@@ -248,6 +249,8 @@ impl AdsReadWriteRequest {
 ///
 /// ```text
 /// [ AdsState (2) ] [ DevState (2) ] [ Length (4) ] [ Data... ]
+/// ^----------------------------------------------^
+///       AdsWriteControlRequest parses this
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AdsWriteControlRequest {
@@ -299,6 +302,193 @@ impl AdsWriteControlRequest {
             ads_state: AdsState::from(u16::from_le_bytes(buf[0..2].try_into().unwrap())),
             device_state: u16::from_le_bytes(buf[2..4].try_into().unwrap()),
             length: u32::from_le_bytes(buf[4..8].try_into().unwrap()),
+        })
+    }
+}
+
+/// Payload for [`CommandId::AdsAddDeviceNotification`](super::CommandId::AdsAddDeviceNotification).
+///
+/// Direction: Client -> Server
+///
+/// A request to register a notification (subscription) on the ADS device.
+///
+/// # Layout
+/// - **Index Group:** 4 bytes
+/// - **Index Offset:** 4 bytes
+/// - **Length:** 4 bytes
+/// - **Transmission Mode:** 4 bytes
+/// - **Max Delay:** 4 bytes
+/// - **Cycle Time:** 4 bytes
+/// - **Reserved:** 16 bytes (Must be zero)
+///
+/// ```text
+/// [ Group (4) ] [ Offset (4) ] [ Len (4) ] [ Mode (4) ] [ Delay (4) ] [ Cycle (4) ] [ Reserved (16) ]
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdsAddDeviceNotificationRequest {
+    index_group: u32,
+    index_offset: u32,
+    length: u32,
+    transmission_mode: AdsTransMode,
+    max_delay: Duration,
+    cycle_time: Duration,
+    reserved: [u8; 16],
+}
+
+impl AdsAddDeviceNotificationRequest {
+    /// Size of the fixed header of the request.
+    pub const SIZE: usize = 40;
+
+    pub fn new(
+        index_group: u32,
+        index_offset: u32,
+        length: u32,
+        transmission_mode: AdsTransMode,
+        max_delay: Duration,
+        cycle_time: Duration,
+    ) -> Self {
+        Self {
+            index_group,
+            index_offset,
+            length,
+            transmission_mode,
+            max_delay,
+            cycle_time,
+            reserved: [0; 16],
+        }
+    }
+
+    /// Creates a new AdsAddDeviceNotificationRequest with reserved values.
+    pub fn with_reserve(
+        index_group: u32,
+        index_offset: u32,
+        length: u32,
+        transmission_mode: AdsTransMode,
+        max_delay: Duration,
+        cycle_time: Duration,
+        reserved: [u8; 16],
+    ) -> Self {
+        Self {
+            index_group,
+            index_offset,
+            length,
+            transmission_mode,
+            max_delay,
+            cycle_time,
+            reserved,
+        }
+    }
+
+    /// Returns the Index Group of the data which should be monitored.
+    pub fn index_group(&self) -> u32 {
+        self.index_group
+    }
+
+    /// Returns the Index Offset of the data which should be monitored.
+    pub fn index_offset(&self) -> u32 {
+        self.index_offset
+    }
+
+    /// Returns the length of the data (in bytes) which should be monitored.
+    pub fn length(&self) -> u32 {
+        self.length
+    }
+
+    /// Returns the transmission mode of the notification.
+    pub fn transmission_mode(&self) -> AdsTransMode {
+        self.transmission_mode
+    }
+
+    /// Returns the maximum delay before notification is sent (converted to 100ns ticks).
+    pub fn max_delay(&self) -> Duration {
+        self.max_delay
+    }
+
+    /// Returns the cycle time to check for changes (converted to 100ns ticks).
+    pub fn cycle_time(&self) -> Duration {
+        self.cycle_time
+    }
+
+    /// Writes the fixed header of the request.
+    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
+        w.write_all(&self.index_group.to_le_bytes())?;
+        w.write_all(&self.index_offset.to_le_bytes())?;
+        w.write_all(&self.length.to_le_bytes())?;
+        w.write_all(&u32::from(self.transmission_mode).to_le_bytes())?;
+
+        let delay_ticks = (self.max_delay.as_nanos() / 100) as u32;
+        w.write_all(&delay_ticks.to_le_bytes())?;
+
+        let cycle_ticks = (self.cycle_time.as_nanos() / 100) as u32;
+        w.write_all(&cycle_ticks.to_le_bytes())?;
+
+        w.write_all(&self.reserved)?;
+        Ok(())
+    }
+
+    /// Reads the fixed header of the request.
+    pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
+        let mut buf = [0u8; 40];
+        r.read_exact(&mut buf)?;
+
+        let delay_ticks = u32::from_le_bytes(buf[16..20].try_into().unwrap());
+        let cycle_ticks = u32::from_le_bytes(buf[20..24].try_into().unwrap());
+
+        Ok(Self {
+            index_group: u32::from_le_bytes(buf[0..4].try_into().unwrap()),
+            index_offset: u32::from_le_bytes(buf[4..8].try_into().unwrap()),
+            length: u32::from_le_bytes(buf[8..12].try_into().unwrap()),
+            transmission_mode: AdsTransMode::from(u32::from_le_bytes(
+                buf[12..16].try_into().unwrap(),
+            )),
+            max_delay: Duration::from_nanos(delay_ticks as u64 * 100),
+            cycle_time: Duration::from_nanos(cycle_ticks as u64 * 100),
+            reserved: buf[24..40].try_into().unwrap(),
+        })
+    }
+}
+
+/// Payload for [`CommandId::AdsDeleteDeviceNotification`](super::CommandId::AdsDeleteDeviceNotification).
+///
+/// Direction: Client -> Server
+///
+/// A request to stop a previously registered notification.
+///
+/// # Layout
+/// - **Notification Handle:** 4 bytes
+///
+/// ```text
+/// [ Handle (4) ]
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdsDeleteDeviceNotificationRequest {
+    handle: NotificationHandle,
+}
+
+impl AdsDeleteDeviceNotificationRequest {
+    /// Size of the fixed header of the request.
+    pub const SIZE: usize = 4;
+
+    pub fn new(handle: NotificationHandle) -> Self {
+        Self { handle }
+    }
+
+    /// Returns the notification handle of the notification to delete.
+    pub fn handle(&self) -> NotificationHandle {
+        self.handle
+    }
+
+    /// Writes the fixed header of the request.
+    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
+        w.write_all(&self.handle.as_u32().to_le_bytes())
+    }
+
+    /// Reads the fixed header of the request.
+    pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
+        let mut buf = [0u8; 4];
+        r.read_exact(&mut buf)?;
+        Ok(Self {
+            handle: NotificationHandle::new(u32::from_le_bytes(buf)),
         })
     }
 }
