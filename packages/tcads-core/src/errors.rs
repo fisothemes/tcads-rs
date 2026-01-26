@@ -1,4 +1,5 @@
 use std::io;
+use std::sync::Arc;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -6,7 +7,7 @@ pub enum AdsError {
     #[error("IO Error: {0}")]
     Io(#[from] io::Error),
     #[error("Malformed Packet: {0}")]
-    MalformedPacket(&'static str),
+    MalformedPacket(Arc<str>),
     #[error("String Decoding Error")]
     StringDecode,
     #[error("Error handling ADS string: {0}")]

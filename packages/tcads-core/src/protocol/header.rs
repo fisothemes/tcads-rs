@@ -1,5 +1,6 @@
-use super::commands::CommandId;
-use super::state_flags::StateFlag;
+use std::io::{self, Write};
+use std::sync::Arc;
+
 use crate::constants::{
     AMS_HEADER_COMMAND_ID_RANGE, AMS_HEADER_ERROR_CODE_RANGE, AMS_HEADER_INVOKE_ID_RANGE,
     AMS_HEADER_LEN, AMS_HEADER_LENGTH_RANGE, AMS_HEADER_SOURCE_NETID_RANGE,
@@ -10,7 +11,9 @@ use crate::constants::{
 use crate::errors::{AdsError, AdsReturnCode};
 use crate::types::addr::{AmsAddr, AmsPort};
 use crate::types::netid::AmsNetId;
-use std::io::{self, Write};
+
+use super::commands::CommandId;
+use super::state_flags::StateFlag;
 
 /// The 6-byte prefix for TCP communication.
 ///
@@ -65,7 +68,10 @@ impl TryFrom<&[u8]> for AmsTcpHeader {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() < AMS_TCP_HEADER_LEN {
-            return Err(AdsError::MalformedPacket("TCP Header data too short"));
+            return Err(AdsError::MalformedPacket(Arc::from(format!(
+                "TCP Header data too short. Received {} bytes, expected {AMS_TCP_HEADER_LEN} bytes.",
+                value.len()
+            ))));
         }
 
         Ok(
@@ -192,9 +198,9 @@ impl TryFrom<&[u8]> for AmsHeader {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() < AMS_HEADER_LEN {
-            return Err(AdsError::MalformedPacket(
-                "AMS Header data too short (expected 32 bytes)",
-            ));
+            return Err(AdsError::MalformedPacket(Arc::from(
+                "AMS Header data too short (expected {AMS_HEADER_LEN} bytes)",
+            )));
         }
 
         Ok(Self {

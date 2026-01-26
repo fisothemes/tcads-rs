@@ -1,7 +1,10 @@
-use super::header::{AmsHeader, AmsTcpHeader};
+use std::io::{self, Read, Write};
+use std::sync::Arc;
+
 use crate::constants::{AMS_HEADER_LEN, AMS_PACKET_MAX_LEN, AMS_TCP_HEADER_LEN};
 use crate::errors::AdsError;
-use std::io::{self, Read, Write};
+
+use super::header::{AmsHeader, AmsTcpHeader};
 
 /// An ADS/AMS Packet.
 ///
@@ -71,15 +74,15 @@ impl<B: From<Vec<u8>>> AmsPacket<B> {
         let total_len = tcp_header.length() as usize;
 
         if total_len < AMS_HEADER_LEN {
-            return Err(AdsError::MalformedPacket(
-                "TCP length smaller than AMS Header",
-            ));
+            return Err(AdsError::MalformedPacket(Arc::from(format!(
+                "TCP length smaller than AMS Header of {AMS_HEADER_LEN} bytes"
+            ))));
         }
 
         if total_len > AMS_PACKET_MAX_LEN {
-            return Err(AdsError::MalformedPacket(
-                "TCP length larger than maximum allowed packet size",
-            ));
+            return Err(AdsError::MalformedPacket(Arc::from(format!(
+                "TCP length larger than maximum allowed packet size of {AMS_PACKET_MAX_LEN} bytes ({total_len} bytes received)"
+            ))));
         }
 
         // Read AMS Header (32 bytes)
@@ -92,9 +95,10 @@ impl<B: From<Vec<u8>>> AmsPacket<B> {
 
         // Sanity Check: TCP Frame vs AMS Header
         if (content_len as u32) != header.length() {
-            return Err(AdsError::MalformedPacket(
-                "TCP length doesn't match AMS Header length",
-            ))?;
+            return Err(AdsError::MalformedPacket(Arc::from(format!(
+                "TCP length ({content_len} bytes) doesn't match AMS Header length ({} bytes)",
+                header.length()
+            ))))?;
         }
 
         // Read Content (Remaining bytes)
@@ -121,15 +125,15 @@ impl<B: AsMut<[u8]> + AsRef<[u8]>> AmsPacket<B> {
         let total_len = tcp_header.length() as usize;
 
         if total_len < AMS_HEADER_LEN {
-            return Err(AdsError::MalformedPacket(
+            return Err(AdsError::MalformedPacket(Arc::from(
                 "TCP length smaller than AMS Header",
-            ));
+            )));
         }
 
         if total_len > AMS_PACKET_MAX_LEN {
-            return Err(AdsError::MalformedPacket(
-                "TCP length larger than maximum allowed packet size",
-            ));
+            return Err(AdsError::MalformedPacket(Arc::from(format!(
+                "TCP length larger than maximum allowed packet size of {AMS_PACKET_MAX_LEN} bytes"
+            ))));
         }
 
         // Read AMS Header (32 bytes)
@@ -143,12 +147,17 @@ impl<B: AsMut<[u8]> + AsRef<[u8]>> AmsPacket<B> {
 
         // Sanity Check: TCP Frame vs AMS Header
         if (content_len as u32) != self.header.length() {
-            return Err(AdsError::MalformedPacket("Length Mismatch"));
+            return Err(AdsError::MalformedPacket(Arc::from(format!(
+                "Payload/content length ({content_len} bytes) and TCP frame header length ({} bytes) Mismatch",
+                self.header.length()
+            ))));
         }
 
         // Buffer Capacity Check
         if content_len > self.content.as_ref().len() {
-            return Err(AdsError::MalformedPacket("Packet too large for buffer"));
+            return Err(AdsError::MalformedPacket(Arc::from(
+                "Packet too large for buffer",
+            )));
         }
 
         // Read content and write into the slice range that corresponds to the payload
