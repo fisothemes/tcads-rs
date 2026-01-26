@@ -20,26 +20,9 @@ This library provides the **Data Structures**, **Serialization**, and **Deserial
     * Device Status (ReadState / WriteControl)
     * Device Notifications (Add / Delete / Stream)
 
-## Modules
+## Documentation
 
-### `protocol`
-Contains the wire-format structures.
-* **`packet::AmsPacket`**: The main container (Header + Payload).
-* **`header::AmsHeader`**: The 32-byte routing header (Target NetId, Source NetId, Command ID, etc.).
-* **`codec::AmsCodec`**: A stateless helper to encode/decode packets to/from `std::io::Read` and `std::io::Write` streams (handles TCP framing).
-
-### `commands`
-Payload definitions for standard ADS commands.
-* `AdsReadRequest` / `AdsReadResponse`
-* `AdsWriteRequest` / `AdsWriteResponse`
-* `AdsAddDeviceNotificationRequest` / `AdsDeviceNotificationStreamHeader`
-* ...and more.
-
-### `types`
-Rust types mapping to ADS common data types.
-* **`AdsString<N>`**: Maps to `STRING(N-1)` in PLC. Handles CP1252 <-> UTF-8.
-* **`AmsNetId`**: The 6-byte identifier (e.g., `172.16.17.20.1.1`).
-* **`WindowsFiletime`**: 64-bit timestamp (100ns ticks since 1601).
+Generate documentation with `cargo doc --open` and explore the API reference.
 
 ## Usage Examples
 
@@ -71,7 +54,7 @@ fn main() {
         StateFlag::tcp_ads_request(),
         payload.len() as u32,
         AdsReturnCode::Ok,
-        1, // Invoke ID
+        0, // Invoke ID
     );
 
     // 4. Create Packet

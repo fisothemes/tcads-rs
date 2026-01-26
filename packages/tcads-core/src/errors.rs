@@ -1,3 +1,35 @@
+//! Error types and ADS return codes.
+//!
+//! This module defines the error handling primitives for the library. It distinguishes between:
+//!
+//! * **Transport/Library Errors**: Represented by `AdsError`, these include I/O failures, packet parsing issues, or invalid arguments.
+//! * **Device Errors**: Represented by `AdsReturnCode`, these are the explicit error codes returned by the ADS device (e.g. "Device Not Ready", "Symbol Not Found").
+//!
+//! Most operations in this crate return `Result<T, AdsError>`. If the ADS device itself reports an error, it will be wrapped in `AdsError::Ads(code)`.
+//!
+//! # Example
+//!
+//! Matching against specific device errors:
+//!
+//! ```rust
+//! use tcads_core::errors::{AdsError, AdsReturnCode};
+//!
+//! fn handle_error(err: AdsError) {
+//!     match err {
+//!         // Handle specific ADS device errors (e.g. Symbol Not Found)
+//!         AdsError::Ads(AdsReturnCode::AdsErrDeviceSymbolNotFound) => {
+//!             eprintln!("Error: The requested symbol does not exist.");
+//!         }
+//!         // Handle Network/IO errors
+//!         AdsError::Io(io_err) => {
+//!             eprintln!("Connection lost: {}", io_err);
+//!         }
+//!         // Catch-all
+//!         _ => eprintln!("Operation failed: {}", err),
+//!     }
+//! }
+//! ```
+
 use std::io;
 use std::sync::Arc;
 use thiserror::Error;

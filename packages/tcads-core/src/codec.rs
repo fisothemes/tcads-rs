@@ -1,3 +1,37 @@
+//! AMS/TCP framing and stream handling.
+//!
+//! This module provides the `AmsCodec` utility, which handles the low-level framing of AMS packets
+//! over TCP. It manages the 6-byte TCP header defined by the ADS specification, ensuring that
+//! packets are correctly length-prefixed during transmission and accurately delimited during reception.
+//!
+//! This abstraction allows higher-level clients to operate on full [`AmsPacket`](crate::protocol::packet::AmsPacket)
+//! structures without manually managing byte buffers or TCP stream fragmentation.
+//!
+//! # Example
+//!
+//! How a client might use `AmsCodec` to implement a synchronous `send_request` method:
+//!
+//! ```rust
+//! use tcads_core::codec::AmsCodec;
+//! use tcads_core::protocol::packet::AmsPacket;
+//! use tcads_core::errors::AdsError;
+//! use std::io::{Read, Write};
+//!
+//! // A hypothetical client helper to send a packet and await the response.
+//! fn send_and_receive<S>(stream: &mut S, request: &AmsPacket) -> Result<AmsPacket, AdsError>
+//! where
+//!     S: Read + Write,
+//! {
+//!     // 1. Encode and send the packet (writes TCP Header + AMS Header + Payload)
+//!     AmsCodec::write(stream, request)?;
+//!
+//!     // 2. Block until the full response is received (reads TCP Header -> determines length -> reads Body)
+//!     let response = AmsCodec::read(stream)?;
+//!
+//!     Ok(response)
+//! }
+//! ```
+
 use crate::errors::AdsError;
 use crate::protocol::packet::AmsPacket;
 use std::io::{Read, Write};
