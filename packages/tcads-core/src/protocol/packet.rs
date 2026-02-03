@@ -6,23 +6,29 @@ use crate::errors::AdsError;
 
 use super::header::{AmsHeader, AmsTcpHeader};
 
-/// An ADS/AMS Packet.
+/// An **AMS + ADS logical packet**.
 ///
-/// This struct represents the logical packet:
-/// - **AMS Header** (Routing, Command ID, Error Code)
-/// - **Content** (The payload/data)
+/// This type represents the protocol-level packet that lives inside an
+/// AMS/TCP frame:
 ///
-/// # Note
+/// - **AMS Header (32 bytes)**
+///   Routing information, ADS command, state flags, payload length, invoke ID
 ///
-/// When serialized via `write_to`, you must automatically prepend the 6-byte
-/// **AMS/TCP Header** required for network transmission.
+/// - **ADS Payload (N bytes)**
+///   Command-specific request or response data
+///
+/// ## Important
+///
+/// This type does **not** represent the AMS/TCP router frame itself.
+/// When written to a stream via [`write_to`](AmsAdsPacket::write_to), the required **6-byte AMS/TCP
+/// header** is automatically emitted before the AMS header and payload.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AmsPacket<B = Vec<u8>> {
+pub struct AmsAdsPacket<B = Vec<u8>> {
     header: AmsHeader,
     content: B,
 }
 
-impl<B> AmsPacket<B> {
+impl<B> AmsAdsPacket<B> {
     /// Creates a new packet.
     pub fn new(header: AmsHeader, content: B) -> Self {
         Self { header, content }
@@ -44,8 +50,16 @@ impl<B> AmsPacket<B> {
     }
 }
 
-impl<B: AsRef<[u8]>> AmsPacket<B> {
-    /// Writes the full wire format: TCP Header + AMS Header + Content.
+impl<B: AsRef<[u8]>> AmsAdsPacket<B> {
+    /// Writes the full **wire format** to the stream:
+    ///
+    /// ```text
+    /// [ AMS/TCP Header  (6) ]
+    /// [ AMS Header     (32) ]
+    /// [ ADS Payload     (N) ]
+    /// ```
+    ///
+    /// The AMS/TCP header is generated automatically from the payload size
     pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<usize> {
         let content = self.content.as_ref();
 
@@ -60,11 +74,19 @@ impl<B: AsRef<[u8]>> AmsPacket<B> {
     }
 }
 
-impl<B: From<Vec<u8>>> AmsPacket<B> {
-    /// Decodes a byte stream into a new `AmsPacket`.
+impl<B: From<Vec<u8>>> AmsAdsPacket<B> {
+    /// Reads and decodes a full **AMS/TCP framed ADS packet** from the stream.
     ///
-    /// This method allocates a new vector sized exactly to the incoming payload,
-    /// then converts it into the type `B`.
+    /// Expected wire format:
+    ///
+    /// ```text
+    /// [ AMS/TCP Header  (6) ]
+    /// [ AMS Header     (32) ]
+    /// [ ADS Payload     (N) ]
+    /// ```
+    ///
+    /// This variant allocates a new buffer sized exactly to the incoming
+    /// ADS payload and converts it into `B`.
     pub fn read_from<R: Read>(r: &mut R) -> Result<Self, AdsError> {
         // Read TCP Header (6 bytes)
         let mut tcp_buf = [0u8; AMS_TCP_HEADER_LEN];
@@ -96,7 +118,7 @@ impl<B: From<Vec<u8>>> AmsPacket<B> {
         // Sanity Check: TCP Frame vs AMS Header
         if (content_len as u32) != header.length() {
             return Err(AdsError::MalformedPacket(Arc::from(format!(
-                "TCP length ({content_len} bytes) doesn't match AMS Header length ({} bytes)",
+                "Payload length ({content_len} bytes) does not match length declared in AMS header ({} bytes)",
                 header.length()
             ))))?;
         }
@@ -112,12 +134,12 @@ impl<B: From<Vec<u8>>> AmsPacket<B> {
     }
 }
 
-impl<B: AsMut<[u8]> + AsRef<[u8]>> AmsPacket<B> {
-    /// Reads a packet from the stream into the existing content buffer.
+impl<B: AsMut<[u8]> + AsRef<[u8]>> AmsAdsPacket<B> {
+    /// Reads a full **AMS/TCP framed ADS packet** into an existing buffer.
     ///
-    /// Returns `Ok(payload_len)` indicating how many bytes of the buffer were used.
+    /// Returns the number of payload bytes written into the buffer.
     pub fn read_into<R: Read>(&mut self, r: &mut R) -> Result<usize, AdsError> {
-        // Read TCP Header (6 bytes)
+        // Read AMS/TCP Header (6 bytes)
         let mut tcp_buf = [0u8; AMS_TCP_HEADER_LEN];
         r.read_exact(&mut tcp_buf)?;
         let tcp_header = AmsTcpHeader::from(&tcp_buf);
@@ -192,12 +214,13 @@ mod tests {
     fn test_packet_roundtrip_with_read_from() {
         let header = create_test_header();
         let content = vec![1, 2, 3, 4];
-        let packet = AmsPacket::new(header, content.clone());
+        let packet = AmsAdsPacket::new(header, content.clone());
 
         let mut buffer = Vec::new();
         packet.write_to(&mut buffer).unwrap();
 
-        let parsed: AmsPacket<Vec<u8>> = AmsPacket::read_from(&mut buffer.as_slice()).unwrap();
+        let parsed: AmsAdsPacket<Vec<u8>> =
+            AmsAdsPacket::read_from(&mut buffer.as_slice()).unwrap();
         assert_eq!(parsed.header(), packet.header());
         assert_eq!(parsed.content(), &content);
     }
@@ -216,8 +239,8 @@ mod tests {
         stream.extend_from_slice(&payload);
 
         let mut reader = &stream[..];
-        let packet: AmsPacket<Vec<u8>> =
-            AmsPacket::read_from(&mut reader).expect("Should read successfully");
+        let packet: AmsAdsPacket<Vec<u8>> =
+            AmsAdsPacket::read_from(&mut reader).expect("Should read successfully");
 
         assert_eq!(packet.header().command_id(), CommandId::AdsRead);
         assert_eq!(packet.content(), &payload);
@@ -244,7 +267,7 @@ mod tests {
         let mut raw_buffer = [0u8; 128];
 
         let dummy_header = create_test_header();
-        let mut packet = AmsPacket::new(dummy_header, &mut raw_buffer[..]);
+        let mut packet = AmsAdsPacket::new(dummy_header, &mut raw_buffer[..]);
 
         let mut reader = &stream[..];
         let bytes_read = packet

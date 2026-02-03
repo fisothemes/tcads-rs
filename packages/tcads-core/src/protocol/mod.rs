@@ -15,7 +15,7 @@
 //!
 //! ```rust
 //! use tcads_core::protocol::{
-//!     packet::AmsPacket,
+//!     packet::AmsAdsPacket,
 //!     header::AmsHeader,
 //!     commands::{CommandId, AdsReadRequest},
 //!     state_flags::StateFlag,
@@ -41,7 +41,7 @@
 //! );
 //!
 //! // 3. Assemble the Packet
-//! let packet = AmsPacket::new(header, payload);
+//! let packet = AmsAdsPacket::new(header, payload);
 //! ```
 
 /// Payload structures for standard ADS commands (Read, Write, Device Info, etc.).
@@ -53,7 +53,7 @@ pub mod header;
 /// Reserved Index Groups for accessing system services and PLC memory areas.
 pub mod index_groups;
 
-/// The [`AmsPacket`](packet::AmsPacket) container, combining headers with the command payload.
+/// The [`AmsAdsPacket`](packet::AmsAdsPacket) container, combining headers with the command payload.
 pub mod packet;
 
 /// Bitflags indicating the nature of the message (Request/Response) and transport attributes.

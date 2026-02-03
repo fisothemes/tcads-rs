@@ -4,7 +4,7 @@
 //! over TCP. It manages the 6-byte TCP header defined by the ADS specification, ensuring that
 //! packets are correctly length-prefixed during transmission and accurately delimited during reception.
 //!
-//! This abstraction allows higher-level clients to operate on full [`AmsPacket`](crate::protocol::packet::AmsPacket)
+//! This abstraction allows higher-level clients to operate on full [`AmsPacket`](crate::protocol::packet::AmsAdsPacket)
 //! structures without manually managing byte buffers or TCP stream fragmentation.
 //!
 //! # Example
@@ -13,12 +13,12 @@
 //!
 //! ```rust
 //! use tcads_core::codec::AmsCodec;
-//! use tcads_core::protocol::packet::AmsPacket;
+//! use tcads_core::protocol::packet::AmsAdsPacket;
 //! use tcads_core::errors::AdsError;
 //! use std::io::{Read, Write};
 //!
 //! // A hypothetical client helper to send a packet and await the response.
-//! fn send_and_receive<S>(stream: &mut S, request: &AmsPacket) -> Result<AmsPacket, AdsError>
+//! fn send_and_receive<S>(stream: &mut S, request: &AmsAdsPacket) -> Result<AmsAdsPacket, AdsError>
 //! where
 //!     S: Read + Write,
 //! {
@@ -33,7 +33,7 @@
 //! ```
 
 use crate::errors::AdsError;
-use crate::protocol::packet::AmsPacket;
+use crate::protocol::packet::AmsAdsPacket;
 use std::io::{Read, Write};
 
 /// Stateless Codec for reading and writing ADS Packets over a stream (e.g. TCP).
@@ -51,7 +51,7 @@ impl AmsCodec {
     /// or any other type that can be viewed as a byte slice.
     pub fn write<W: Write, B: AsRef<[u8]>>(
         w: &mut W,
-        packet: &AmsPacket<B>,
+        packet: &AmsAdsPacket<B>,
     ) -> Result<usize, AdsError> {
         let bytes_written = packet.write_to(w)?;
         w.flush()?;
@@ -62,8 +62,8 @@ impl AmsCodec {
     ///
     /// This is generic over `B`, allowing you to return `AmsPacket<Vec<u8>>` or
     /// any other type that implements `From<Vec<u8>>`.
-    pub fn read<R: Read, B: From<Vec<u8>>>(r: &mut R) -> Result<AmsPacket<B>, AdsError> {
-        AmsPacket::read_from(r)
+    pub fn read<R: Read, B: From<Vec<u8>>>(r: &mut R) -> Result<AmsAdsPacket<B>, AdsError> {
+        AmsAdsPacket::read_from(r)
     }
 }
 
@@ -92,7 +92,7 @@ mod tests {
     fn test_codec_write() {
         let payload = vec![0xAA, 0xBB, 0xCC, 0xDD];
         let header = create_test_header();
-        let packet = AmsPacket::new(header, payload);
+        let packet = AmsAdsPacket::new(header, payload);
 
         // Simulate TcpStream
         let mut buffer = Vec::new();
@@ -124,14 +124,14 @@ mod tests {
 
         let header = create_test_header();
         let payload = vec![0x11, 0x22, 0x33, 0x44];
-        let packet = AmsPacket::new(header, payload.clone());
+        let packet = AmsAdsPacket::new(header, payload.clone());
 
         let mut writer = Cursor::new(&mut buffer);
         AmsCodec::write(&mut writer, &packet).unwrap();
 
         let mut reader = Cursor::new(&buffer);
 
-        let read_packet: AmsPacket<Vec<u8>> =
+        let read_packet: AmsAdsPacket<Vec<u8>> =
             AmsCodec::read(&mut reader).expect("Codec read failed");
 
         assert_eq!(read_packet.header().invoke_id(), 12_345);

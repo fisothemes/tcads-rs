@@ -15,7 +15,7 @@ pub use crate::protocol::state_flags::StateFlag;
 
 // 3. Packet & Header (Essential for building messages)
 pub use crate::protocol::header::{AmsHeader, AmsTcpHeader};
-pub use crate::protocol::packet::AmsPacket;
+pub use crate::protocol::packet::AmsAdsPacket;
 
 // 4. Errors (You always need these)
 pub use crate::errors::{AdsError, AdsReturnCode};
