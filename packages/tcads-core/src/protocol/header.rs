@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::sync::Arc;
 
 use crate::constants::{
@@ -56,10 +56,16 @@ impl AmsTcpHeader {
     }
 
     /// Writes the 6 bytes to a writer (Little Endian).
-    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<usize> {
+    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
         w.write_all(&self.reserved.to_le_bytes())?;
-        w.write_all(&self.length.to_le_bytes())?;
-        Ok(AMS_TCP_HEADER_LEN)
+        w.write_all(&self.length.to_le_bytes())
+    }
+
+    /// Reads the 6 bytes from a reader (Little Endian).
+    pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
+        let mut buf = [0u8; AMS_TCP_HEADER_LEN];
+        r.read_exact(&mut buf)?;
+        Ok(Self::from(&buf))
     }
 }
 
@@ -131,7 +137,7 @@ impl AmsHeader {
     }
 
     /// Writes the 32 bytes to a writer using Little Endian.
-    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<usize> {
+    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
         w.write_all(&self.target.net_id().0)?;
         w.write_all(&self.target.port().to_le_bytes())?;
 
@@ -146,9 +152,14 @@ impl AmsHeader {
 
         w.write_all(&u32::from(self.error_code).to_le_bytes())?;
 
-        w.write_all(&self.invoke_id.to_le_bytes())?;
+        w.write_all(&self.invoke_id.to_le_bytes())
+    }
 
-        Ok(AMS_HEADER_LEN)
+    /// Reads the 32 bytes from a reader using Little Endian.
+    pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
+        let mut buf = [0u8; AMS_HEADER_LEN];
+        r.read_exact(&mut buf)?;
+        Self::try_from(&buf[..]).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
     }
 
     /// The AMSNetId of the station, for which the packet is intended.
