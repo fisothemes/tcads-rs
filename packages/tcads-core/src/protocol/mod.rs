@@ -15,11 +15,8 @@
 //!
 //! ```rust
 //! use tcads_core::protocol::{
-//!     packet::AmsAdsPacket,
-//!     header::AmsHeader,
-//!     commands::{CommandId, AdsReadRequest},
-//!     state_flags::StateFlag,
-//! };
+//!     //! //!     ads::{CommandId, AdsReadRequest},
+//!     //! };
 //! use tcads_core::types::{AmsAddr, AmsNetId};
 //! use tcads_core::errors::AdsReturnCode;
 //! use std::io::Write;
@@ -44,19 +41,5 @@
 //! let packet = AmsAdsPacket::new(header, payload);
 //! ```
 
-/// Payload structures for standard ADS commands (Read, Write, Device Info, etc.).
-pub mod commands;
-
-/// Definitions for the AMS/TCP framing and routing headers.
-pub mod header;
-
-/// Reserved Index Groups for accessing system services and PLC memory areas.
-pub mod index_groups;
-
-/// The [`AmsAdsPacket`](packet::AmsAdsPacket) container, combining headers with the command payload.
-pub mod packet;
-
-/// Bitflags indicating the nature of the message (Request/Response) and transport attributes.
-pub mod state_flags;
-
 pub mod router;
+pub mod tcp;

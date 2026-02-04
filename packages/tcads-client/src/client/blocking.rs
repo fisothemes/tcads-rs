@@ -1,8 +1,7 @@
+use crate::errors::Result;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
-use tcads_core::prelude::AmsNetId;
-
-use crate::errors::Result;
+use tcads_core::types::AmsNetId;
 
 struct InnerClient {}
 
@@ -23,7 +22,7 @@ impl Client {
     /// Connects to a specific AMS Router.
     ///
     /// # Arguments
-    /// * `addr` - The TCP address of the router (e.g. "192.168.0.10:48898").
+    /// * `addr` - The TCP address of the router (e.g. `"192.168.0.10:48898"`).
     /// * `source_id` - Optional. The NetID to use for this client.
     ///                 If `None`, the client asks the router to assign one.
     pub fn connect<A: ToSocketAddrs>(addr: A, source_id: Option<AmsNetId>) -> Result<Self> {

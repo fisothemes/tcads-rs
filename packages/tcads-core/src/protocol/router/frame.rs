@@ -2,10 +2,10 @@ use std::io;
 use std::io::{Read, Write};
 use std::sync::Arc;
 
-use crate::constants::{AMS_PACKET_MAX_LEN, AMS_TCP_HEADER_LEN};
-use crate::prelude::{AdsError, AmsTcpHeader};
-
 use super::AmsRouterCommand;
+use crate::constants::{AMS_PACKET_MAX_LEN, AMS_TCP_HEADER_LEN};
+use crate::errors::AdsError;
+use crate::protocol::tcp::AmsTcpHeader;
 
 /// A raw AMS Router frame (AMS/TCP header + router payload).
 ///
@@ -42,7 +42,7 @@ impl<B> AmsRouterFrame<B> {
 impl<B: AsRef<[u8]>> AmsRouterFrame<B> {
     /// Returns the AMS/TCP header for this router frame.
     pub fn tcp_header(&self) -> AmsTcpHeader {
-        AmsTcpHeader::with_reserved(u16::from(self.command), self.payload.as_ref().len() as u32)
+        AmsTcpHeader::new(self.command, self.payload.as_ref().len() as u32)
     }
 
     /// Writes the full wire format: AMS/TCP header + router payload.
@@ -61,8 +61,8 @@ impl<B: From<Vec<u8>>> AmsRouterFrame<B> {
         r.read_exact(&mut tcp_buf)?;
         let tcp = AmsTcpHeader::try_from(&tcp_buf[..])?;
 
-        let command = AmsRouterCommand::from(tcp.reserved());
-        let len = tcp.length() as usize;
+        let command = tcp.command;
+        let len = tcp.length as usize;
 
         if len > AMS_PACKET_MAX_LEN {
             return Err(AdsError::MalformedPacket(Arc::from(format!(
@@ -86,8 +86,8 @@ impl<B: AsMut<[u8]> + AsRef<[u8]>> AmsRouterFrame<B> {
         r.read_exact(&mut tcp_buf)?;
         let tcp = AmsTcpHeader::try_from(&tcp_buf[..])?;
 
-        let command = AmsRouterCommand::from(tcp.reserved());
-        let len = tcp.length() as usize;
+        let command = tcp.command;
+        let len = tcp.length as usize;
 
         if len > AMS_PACKET_MAX_LEN {
             return Err(AdsError::MalformedPacket(Arc::from(format!(

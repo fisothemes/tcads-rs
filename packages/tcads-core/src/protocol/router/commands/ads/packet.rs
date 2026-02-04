@@ -1,10 +1,11 @@
 use std::io::{self, Read, Write};
 use std::sync::Arc;
 
+use super::header::AmsHeader;
 use crate::constants::{AMS_HEADER_LEN, AMS_PACKET_MAX_LEN, AMS_TCP_HEADER_LEN};
 use crate::errors::AdsError;
-
-use super::header::{AmsHeader, AmsTcpHeader};
+use crate::protocol::router::AmsRouterCommand;
+use crate::protocol::tcp::AmsTcpHeader;
 
 /// An **AMS + ADS logical packet**.
 ///
@@ -64,7 +65,11 @@ impl<B: AsRef<[u8]>> AmsAdsPacket<B> {
         let content = self.content.as_ref();
 
         // Write TCP Header
-        AmsTcpHeader::new((AMS_HEADER_LEN + content.len()) as u32).write_to(w)?;
+        AmsTcpHeader::new(
+            AmsRouterCommand::AdsCommand,
+            (AMS_HEADER_LEN + content.len()) as u32,
+        )
+        .write_to(w)?;
         // Write AMS Header
         self.header.write_to(w)?;
         // Write Content
@@ -93,7 +98,7 @@ impl<B: From<Vec<u8>>> AmsAdsPacket<B> {
         r.read_exact(&mut tcp_buf)?;
         let tcp_header = AmsTcpHeader::from(&tcp_buf);
 
-        let total_len = tcp_header.length() as usize;
+        let total_len = tcp_header.length as usize;
 
         if total_len < AMS_HEADER_LEN {
             return Err(AdsError::MalformedPacket(Arc::from(format!(
@@ -144,7 +149,7 @@ impl<B: AsMut<[u8]> + AsRef<[u8]>> AmsAdsPacket<B> {
         r.read_exact(&mut tcp_buf)?;
         let tcp_header = AmsTcpHeader::from(&tcp_buf);
 
-        let total_len = tcp_header.length() as usize;
+        let total_len = tcp_header.length as usize;
 
         if total_len < AMS_HEADER_LEN {
             return Err(AdsError::MalformedPacket(Arc::from(
@@ -195,8 +200,8 @@ impl<B: AsMut<[u8]> + AsRef<[u8]>> AmsAdsPacket<B> {
 mod tests {
     use super::*;
     use crate::errors::AdsReturnCode;
-    use crate::protocol::commands::CommandId;
-    use crate::protocol::state_flags::StateFlag;
+    use crate::protocol::router::commands::ads::CommandId;
+    use crate::protocol::router::commands::ads::state_flags::StateFlag;
 
     fn create_test_header() -> AmsHeader {
         AmsHeader::new(

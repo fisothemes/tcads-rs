@@ -1,8 +1,7 @@
-use std::io::Read;
-
-use crate::prelude::{AdsError, AmsAddr, AmsNetId};
-
 use super::AmsRouterCommand;
+use crate::errors::AdsError;
+use crate::types::{AmsAddr, AmsNetId};
+use std::io::Read;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AmsPortConnectResponse {

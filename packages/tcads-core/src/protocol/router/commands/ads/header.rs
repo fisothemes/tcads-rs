@@ -12,94 +12,8 @@ use crate::errors::{AdsError, AdsReturnCode};
 use crate::types::addr::{AmsAddr, AmsPort};
 use crate::types::netid::AmsNetId;
 
-use super::commands::CommandId;
-use super::state_flags::StateFlag;
-
-/// The 6-byte prefix for TCP communication.
-///
-/// Contains the total length of the AMS packet (AMS Header + ADS Data).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct AmsTcpHeader {
-    reserved: u16,
-    length: u32,
-}
-
-impl AmsTcpHeader {
-    /// Creates a new TCP header.
-    ///
-    /// `length` is the size of the AMS Packet (AMS Header + ADS Data).
-    pub const fn new(length: u32) -> Self {
-        Self {
-            reserved: 0,
-            length,
-        }
-    }
-
-    /// Creates a new TCP header with the given reserved and length fields.
-    pub const fn with_reserved(reserved: u16, length: u32) -> Self {
-        Self { reserved, length }
-    }
-
-    /// The reserved field is currently unused and must be set to zero.
-    pub fn reserved(&self) -> u16 {
-        self.reserved
-    }
-
-    /// The size of the AMS Packet (AMS Header + ADS Data).
-    pub fn length(&self) -> u32 {
-        self.length
-    }
-
-    /// Sets the size of the AMS Packet (AMS Header + ADS Data).
-    pub fn set_length(&mut self, length: u32) {
-        self.length = length;
-    }
-
-    /// Writes the 6 bytes to a writer (Little Endian).
-    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        w.write_all(&self.reserved.to_le_bytes())?;
-        w.write_all(&self.length.to_le_bytes())
-    }
-
-    /// Reads the 6 bytes from a reader (Little Endian).
-    pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
-        let mut buf = [0u8; AMS_TCP_HEADER_LEN];
-        r.read_exact(&mut buf)?;
-        Ok(Self::from(&buf))
-    }
-}
-
-impl TryFrom<&[u8]> for AmsTcpHeader {
-    type Error = AdsError;
-
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        if value.len() < AMS_TCP_HEADER_LEN {
-            return Err(AdsError::MalformedPacket(Arc::from(format!(
-                "TCP Header data too short. Received {} bytes, expected {AMS_TCP_HEADER_LEN} bytes.",
-                value.len()
-            ))));
-        }
-
-        Ok(
-            // Safely unwraps because length was checked.
-            Self {
-                reserved: u16::from_le_bytes(
-                    value[AMS_TCP_HEADER_RESERVED_RANGE].try_into().unwrap(),
-                ),
-                length: u32::from_le_bytes(value[AMS_TCP_HEADER_LENGTH_RANGE].try_into().unwrap()),
-            },
-        )
-    }
-}
-
-impl From<&[u8; AMS_TCP_HEADER_LEN]> for AmsTcpHeader {
-    fn from(value: &[u8; AMS_TCP_HEADER_LEN]) -> Self {
-        Self {
-            reserved: u16::from_le_bytes(value[AMS_TCP_HEADER_RESERVED_RANGE].try_into().unwrap()),
-            length: u32::from_le_bytes(value[AMS_TCP_HEADER_LENGTH_RANGE].try_into().unwrap()),
-        }
-    }
-}
+use crate::protocol::router::commands::ads::CommandId;
+use crate::protocol::router::commands::ads::state_flags::StateFlag;
 
 /// The AMS Packet Header structure (32 bytes).
 ///
@@ -281,6 +195,8 @@ impl From<AmsHeader> for Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::protocol::router::AmsRouterCommand;
+    use crate::protocol::tcp::AmsTcpHeader;
 
     fn create_test_header() -> AmsHeader {
         AmsHeader::new(
@@ -303,7 +219,7 @@ mod tests {
 
     #[test]
     fn test_tcp_header_roundtrip() {
-        let header = AmsTcpHeader::new(100);
+        let header = AmsTcpHeader::new(AmsRouterCommand::AdsCommand, 100);
         let mut buffer = Vec::new();
 
         header.write_to(&mut buffer).expect("Write failed");
@@ -314,7 +230,7 @@ mod tests {
 
         let parsed = AmsTcpHeader::try_from(buffer.as_slice()).expect("Parse failed");
         assert_eq!(parsed, header);
-        assert_eq!(parsed.length(), 100);
+        assert_eq!(parsed.length, 100);
     }
 
     #[test]

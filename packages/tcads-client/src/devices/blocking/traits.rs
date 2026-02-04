@@ -1,7 +1,6 @@
 use crate::client::blocking::Client;
 use crate::errors::Result;
-use tcads_core::prelude::{AdsState, AmsAddr};
-use tcads_core::protocol::commands::{AdsDeviceInfoResponse, AdsReadStateResponse};
+use tcads_core::protocol::router::commands::ads::{AdsDeviceInfoResponse, AdsReadStateResponse};
 
 pub type AdsDeviceInfo = AdsDeviceInfoResponse;
 pub type AdsReadState = AdsReadStateResponse;
@@ -14,8 +13,8 @@ pub trait AdsDevice {
     /// Returns a reference to the underlying ADS client connection.
     fn client(&self) -> &Client;
 
-    /// Returns the target AMS Address of this device.
-    fn addr(&self) -> AmsAddr;
+    // Returns the target AMS Address of this device.
+    // fn addr(&self) -> AmsAddr;
 
     /// Reads the name and version of the ADS device.
     fn read_device_info(&self) -> Result<AdsDeviceInfo> {
@@ -27,8 +26,8 @@ pub trait AdsDevice {
         todo!()
     }
 
-    /// Changes the ADS status and the device status of the ADS device.
-    fn write_control(&self, ads_state: AdsState, device_state: u16, data: &[u8]) -> Result<()> {
-        todo!()
-    }
+    // Changes the ADS status and the device status of the ADS device.
+    // fn write_control(&self, ads_state: AdsState, device_state: u16, data: &[u8]) -> Result<()> {
+    //     todo!()
+    // }
 }
