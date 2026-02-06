@@ -1,7 +1,7 @@
 //! Structures and implementations for representing and handling ADS network addresses.
 //! An ADS network address consists of an AMS Net ID and an AMS port number.
 
-use super::errors::AddrError;
+use super::error::AddrError;
 use super::net_id::{AmsNetId, NETID_LEN};
 use std::fmt;
 use std::io::{self, Read, Write};

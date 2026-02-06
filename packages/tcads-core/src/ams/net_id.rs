@@ -1,4 +1,4 @@
-use super::errors::NetIdError;
+use super::error::NetIdError;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::str::FromStr;

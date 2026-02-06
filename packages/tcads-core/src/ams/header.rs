@@ -1,5 +1,5 @@
 use super::command::AmsCommand;
-use super::errors::AmsTcpHeaderError;
+use super::error::AmsTcpHeaderError;
 use std::io::{self, Read, Write};
 
 /// Length of the AMS TCP header (6 bytes).
