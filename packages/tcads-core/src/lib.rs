@@ -12,6 +12,6 @@ pub mod constants;
 /// Rust wrappers for ADS primitives.
 pub mod types;
 
-mod io;
+pub mod io;
 /// The core wire-format definitions.
 pub mod protocol;
