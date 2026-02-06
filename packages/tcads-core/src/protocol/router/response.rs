@@ -57,17 +57,27 @@ impl AmsPortConnectResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::router::request::AmsPortConnectRequest;
+    use crate::protocol::router::request::{AmsPortCloseRequest, AmsPortConnectRequest};
     use std::net::TcpStream;
 
     #[test]
     fn it_works() {
         let mut stream = TcpStream::connect("127.0.0.1:48898").unwrap();
 
-        AmsPortConnectRequest::write_to(&mut stream).unwrap();
+        //AmsPortConnectRequest::write_to(&mut stream).unwrap();
 
-        let addr = AmsPortConnectResponse::read_from(&mut stream).unwrap();
+        //let addr = AmsPortConnectResponse::read_from(&mut stream).unwrap();
 
-        panic!("Address is {}", addr);
+        //println!("Registered with {}", addr);
+
+        let close = AmsPortCloseRequest::new(9000);
+
+        close.write_to(&mut stream).unwrap();
+
+        let mut resp = [0u8; 10];
+
+        let n = stream.read(&mut resp).unwrap();
+
+        panic!("{n} bytes received with {:?}", resp);
     }
 }

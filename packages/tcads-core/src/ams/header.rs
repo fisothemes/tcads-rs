@@ -1,0 +1,137 @@
+use super::command::AmsCommand;
+use super::errors::AmsTcpHeaderError;
+use std::io::{self, Read, Write};
+
+/// Length of the AMS TCP header (6 bytes).
+pub const AMS_TCP_HEADER_LEN: usize = 6;
+
+/// The 6-byte prefix for TCP communication.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct AmsTcpHeader {
+    command: AmsCommand,
+    length: u32,
+}
+
+impl AmsTcpHeader {
+    /// Constructs a new AmsTcpHeader.
+    pub fn new(command: AmsCommand, length: u32) -> Self {
+        Self { command, length }
+    }
+
+    /// Returns the AmsCommand.
+    pub fn command(&self) -> AmsCommand {
+        self.command
+    }
+
+    /// Returns the length of the payload (excluding the 6-byte header).
+    pub fn length(&self) -> u32 {
+        self.length
+    }
+
+    /// Creates a new AmsTcpHeader from a byte array.
+    pub fn from_bytes(bytes: [u8; AMS_TCP_HEADER_LEN]) -> Self {
+        Self::from(bytes)
+    }
+
+    /// Converts the current instance into a byte array.
+    pub fn to_bytes(&self) -> [u8; AMS_TCP_HEADER_LEN] {
+        self.into()
+    }
+
+    /// Reads exactly 6 bytes from the reader and converts them into an [`AmsTcpHeader`].
+    pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
+        let mut buf = [0u8; AMS_TCP_HEADER_LEN];
+        r.read_exact(&mut buf)?;
+        Ok(Self::from(buf))
+    }
+
+    /// Writes the current instance into the writer.
+    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
+        w.write_all(&self.to_bytes())?;
+        Ok(())
+    }
+}
+
+impl From<&AmsTcpHeader> for [u8; AMS_TCP_HEADER_LEN] {
+    fn from(value: &AmsTcpHeader) -> Self {
+        let mut buf = [0u8; AMS_TCP_HEADER_LEN];
+        buf[..2].copy_from_slice(&u16::from(value.command).to_le_bytes());
+        buf[2..AMS_TCP_HEADER_LEN].copy_from_slice(&value.length.to_le_bytes());
+        buf
+    }
+}
+
+impl From<[u8; AMS_TCP_HEADER_LEN]> for AmsTcpHeader {
+    fn from(value: [u8; AMS_TCP_HEADER_LEN]) -> Self {
+        Self {
+            command: AmsCommand::from(u16::from_le_bytes(value[0..2].try_into().unwrap())),
+            length: u32::from_le_bytes(value[2..AMS_TCP_HEADER_LEN].try_into().unwrap()),
+        }
+    }
+}
+
+impl TryFrom<&[u8]> for AmsTcpHeader {
+    type Error = AmsTcpHeaderError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() < AMS_TCP_HEADER_LEN {
+            return Err(AmsTcpHeaderError::BufferTooSmall {
+                expected: AMS_TCP_HEADER_LEN,
+                found: value.len(),
+            });
+        }
+
+        let value: [u8; AMS_TCP_HEADER_LEN] = value[..AMS_TCP_HEADER_LEN].try_into().unwrap();
+
+        Ok(Self::from(value))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn test_header_new_and_accessors() {
+        let header = AmsTcpHeader::new(AmsCommand::PortConnect, 0x1234_5678);
+        assert_eq!(header.command(), AmsCommand::PortConnect);
+        assert_eq!(header.length(), 0x1234_5678);
+    }
+
+    #[test]
+    fn test_to_bytes_and_from_bytes_roundtrip() {
+        let header = AmsTcpHeader::new(AmsCommand::RouterNotification, 0xA1B2_C3D4);
+        let bytes = header.to_bytes();
+        assert_eq!(bytes, [0x01, 0x10, 0xD4, 0xC3, 0xB2, 0xA1]);
+
+        let parsed = AmsTcpHeader::from_bytes(bytes);
+        assert_eq!(parsed, header);
+    }
+
+    #[test]
+    fn test_try_from_slice_too_small() {
+        let err = AmsTcpHeader::try_from(&[0u8; AMS_TCP_HEADER_LEN - 1][..]).unwrap_err();
+
+        assert_eq! {
+            err,
+            AmsTcpHeaderError::BufferTooSmall {
+                expected: AMS_TCP_HEADER_LEN,
+                found: AMS_TCP_HEADER_LEN - 1,
+            }
+        }
+    }
+
+    #[test]
+    fn test_read_write_roundtrip() {
+        let header = AmsTcpHeader::new(AmsCommand::PortClose, 42);
+
+        let mut buf = Vec::new();
+        header.write_to(&mut buf).unwrap();
+        assert_eq!(buf.len(), AMS_TCP_HEADER_LEN);
+
+        let mut cursor = Cursor::new(buf);
+        let parsed = AmsTcpHeader::read_from(&mut cursor).unwrap();
+        assert_eq!(parsed, header);
+    }
+}
