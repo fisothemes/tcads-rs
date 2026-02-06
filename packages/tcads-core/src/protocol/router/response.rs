@@ -57,7 +57,7 @@ impl AmsPortConnectResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::router::request::{AmsPortCloseRequest, AmsPortConnectRequest};
+    use crate::protocol::router::request::AmsPortCloseRequest;
     use std::net::TcpStream;
 
     #[test]
