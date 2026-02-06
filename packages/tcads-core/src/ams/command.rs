@@ -3,16 +3,16 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 #[repr(u16)]
 pub enum AmsCommand {
-    /// Standard ADS command (Read, Write, etc.)
+    /// Standard ADS command (Read, Write, etc.) (`0x000`)
     #[default]
     AdsCommand = 0x0000,
-    /// Close an AMS port
+    /// Close an AMS port (`0x0001`)
     PortClose = 0x0001,
-    /// Register/Connect an AMS port
+    /// Register/Connect an AMS port (`0x1000`)
     PortConnect = 0x1000,
-    /// Router Notification
+    /// Router Notification (`0x1001`)
     RouterNotification = 0x1001,
-    /// Get Local NetId
+    /// Get Local NetId (`0x1002`)
     GetLocalNetId = 0x1002,
     /// Unknown/Unsupported command
     Unknown(u16),
