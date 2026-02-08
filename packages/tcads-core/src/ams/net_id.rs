@@ -31,6 +31,16 @@ impl AmsNetId {
         self.0
     }
 
+    /// Converts the given byte array into an [`AmsNetId`].
+    pub fn from_bytes(bytes: [u8; NETID_LEN]) -> Self {
+        Self(bytes)
+    }
+
+    /// Converts the given byte slice into an [`AmsNetId`].
+    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, NetIdError> {
+        Self::try_from(bytes)
+    }
+
     /// Reads exactly 6 bytes from the reader and converts them into an [`AmsNetId`].
     pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
         let mut buf = [0u8; NETID_LEN];
