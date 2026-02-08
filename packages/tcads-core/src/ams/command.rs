@@ -1,3 +1,5 @@
+use std::io::{self, Read, Write};
+
 /// AMS Router Command Identifiers.
 /// These identify the type of the packet at the TCP/router level.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -16,6 +18,30 @@ pub enum AmsCommand {
     GetLocalNetId = 0x1002,
     /// Unknown/Unsupported command
     Unknown(u16),
+}
+
+impl AmsCommand {
+    pub fn from_bytes(bytes: [u8; 2]) -> Self {
+        u16::from_le_bytes(bytes).into()
+    }
+
+    pub fn to_bytes(&self) -> [u8; 2] {
+        (*self).into()
+    }
+
+    pub fn try_from_slice(bytes: &[u8]) -> io::Result<Self> {
+        bytes.try_into()
+    }
+
+    pub fn read_from<R: Read>(reader: &mut R) -> io::Result<Self> {
+        let mut buf = [0u8; 2];
+        reader.read_exact(&mut buf)?;
+        Ok(u16::from_le_bytes(buf).into())
+    }
+
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<()> {
+        writer.write_all(&self.to_bytes())
+    }
 }
 
 impl From<AmsCommand> for u16 {
@@ -41,6 +67,32 @@ impl From<u16> for AmsCommand {
             0x1002 => Self::GetLocalNetId,
             n => Self::Unknown(n),
         }
+    }
+}
+
+impl From<[u8; 2]> for AmsCommand {
+    fn from(bytes: [u8; 2]) -> Self {
+        u16::from_le_bytes(bytes).into()
+    }
+}
+
+impl From<AmsCommand> for [u8; 2] {
+    fn from(value: AmsCommand) -> Self {
+        let value: u16 = value.into();
+        value.to_le_bytes()
+    }
+}
+
+impl TryFrom<&[u8]> for AmsCommand {
+    type Error = io::Error;
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        if bytes.len() != 2 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Invalid command length must be 2 bytes long",
+            ));
+        }
+        Ok(u16::from_le_bytes([bytes[0], bytes[1]]).into())
     }
 }
 
