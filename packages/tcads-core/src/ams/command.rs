@@ -21,24 +21,29 @@ pub enum AmsCommand {
 }
 
 impl AmsCommand {
+    /// Creates a new AmsCommand from a byte array.
     pub fn from_bytes(bytes: [u8; 2]) -> Self {
         u16::from_le_bytes(bytes).into()
     }
 
+    /// Converts the current instance into a byte array.
     pub fn to_bytes(&self) -> [u8; 2] {
         (*self).into()
     }
 
+    /// Creates a new AmsCommand from a byte slice.
     pub fn try_from_slice(bytes: &[u8]) -> io::Result<Self> {
         bytes.try_into()
     }
 
+    /// Reads exactly 2 bytes from the reader and converts them into an [`AmsCommand`].
     pub fn read_from<R: Read>(reader: &mut R) -> io::Result<Self> {
         let mut buf = [0u8; 2];
         reader.read_exact(&mut buf)?;
         Ok(u16::from_le_bytes(buf).into())
     }
 
+    /// Writes the current instance into the writer.
     pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<()> {
         writer.write_all(&self.to_bytes())
     }
