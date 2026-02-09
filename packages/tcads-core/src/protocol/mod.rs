@@ -41,5 +41,8 @@
 //! let packet = AmsAdsPacket::new(header, payload);
 //! ```
 
+pub mod error;
 pub mod router;
 pub mod tcp;
+
+pub use error::ProtocolError;
