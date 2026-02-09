@@ -1,5 +1,5 @@
 use crate::ams::{AMS_TCP_HEADER_LEN, AmsCommand, AmsTcpHeader};
-use std::io::{self, Read, Write};
+use std::io::{self, IoSlice, Read, Write};
 
 /// Maximum allowed AMS frame/packet size (64KB) to prevent allocation attacks.
 pub const AMS_FRAME_MAX_LEN: usize = 65535 - AMS_TCP_HEADER_LEN;
@@ -104,9 +104,18 @@ impl AmsFrame {
     }
 
     /// Writes a frame into a writer.
+    ///
+    /// # Note
+    ///
+    /// This uses Vectored I/O (Scatter/Gather) internally so that the header and payload
+    /// are sent in ONE syscall without copying
     pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        self.header.write_to(w)?;
-        w.write_all(&self.payload)
+        let header_bytes = self.header.to_bytes();
+
+        let bufs = [IoSlice::new(&header_bytes), IoSlice::new(&self.payload)];
+
+        w.write_vectored(&bufs)?;
+        Ok(())
     }
 
     /// Writes a frame given as bytes into a writer.
@@ -177,7 +186,7 @@ mod tests {
 
         let mut cursor = Cursor::new(data);
 
-        let (header, payload) = AmsFrame::read_from(&mut cursor).unwrap().split();
+        let (header, payload) = AmsFrame::read_from(&mut cursor).unwrap().into_parts();
 
         assert_eq!(header.command(), AmsCommand::PortConnect);
         assert_eq!(header.length(), 4);
