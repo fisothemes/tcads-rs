@@ -179,3 +179,80 @@ impl TryFrom<AmsFrame> for PortConnectResponse {
         Ok(Self { addr })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_frame_from_request() {
+        let request = PortConnectRequest::new(851);
+        let frame = request.to_frame();
+
+        assert_eq!(frame.header().command(), AmsCommand::PortConnect);
+        assert_eq!(frame.header().length(), 2);
+        assert_eq!(frame.payload(), 851u16.to_le_bytes());
+    }
+
+    #[test]
+    fn create_request_from_frame() {
+        let frame = AmsFrame::new(AmsCommand::PortConnect, 12345u16.to_le_bytes());
+
+        let req = PortConnectRequest::try_from(frame).expect("Should parse valid request");
+        assert_eq!(req.desired_port(), 12345);
+    }
+
+    #[test]
+    fn creating_request_from_frame_fails_on_wrong_length() {
+        let frame = AmsFrame::new(AmsCommand::PortConnect, vec![0u8; 8]);
+
+        let err = PortConnectRequest::try_from(frame).unwrap_err();
+
+        assert!(matches!(
+            err,
+            ProtocolError::UnexpectedLength {
+                expected: 2,
+                got: 8
+            }
+        ));
+    }
+
+    #[test]
+    fn create_frame_from_response() {
+        let resp = PortConnectResponse::new("192.168.1.1.1.1:851".parse().unwrap());
+
+        let frame = AmsFrame::from(resp);
+
+        assert_eq!(frame.header().command(), AmsCommand::PortConnect);
+        assert_eq!(frame.header().length() as usize, ams::AMS_ADDR_LEN);
+
+        let payload = frame.payload();
+
+        assert_eq!(&payload[0..6], [192, 168, 1, 1, 1, 1]);
+        assert_eq!(&payload[6..8], 851u16.to_le_bytes());
+    }
+
+    #[test]
+    fn create_response_from_frame() {
+        let frame = AmsFrame::new(AmsCommand::PortConnect, [192, 168, 1, 1, 1, 1, 0x32, 0x80]);
+
+        let resp = PortConnectResponse::try_from(frame).expect("Should parse valid response");
+
+        assert_eq!(*resp.addr(), "192.168.1.1.1.1:32818".parse().unwrap());
+    }
+
+    #[test]
+    fn creating_response_from_frame_fails_on_wrong_length() {
+        let frame = AmsFrame::new(AmsCommand::PortConnect, vec![0u8; 10]);
+
+        let err = PortConnectResponse::try_from(frame).unwrap_err();
+
+        assert!(matches!(
+            err,
+            ProtocolError::UnexpectedLength {
+                expected: 8,
+                got: 10
+            }
+        ));
+    }
+}
