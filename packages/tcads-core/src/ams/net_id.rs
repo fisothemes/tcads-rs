@@ -6,6 +6,9 @@ use std::str::FromStr;
 /// Length of the AMS Net ID (6 bytes)
 pub const NETID_LEN: usize = 6;
 
+/// Length of the AMS port (2 bytes)
+pub const AMS_PORT_LEN: usize = 2;
+
 /// A 6-byte identifier for an ADS device (e.g. `172.16.17.10.1.1`).
 ///
 /// # Notes
