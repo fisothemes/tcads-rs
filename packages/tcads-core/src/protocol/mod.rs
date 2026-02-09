@@ -42,6 +42,7 @@
 //! ```
 
 pub mod error;
+pub mod port_connect;
 pub mod router;
 pub mod tcp;
 
