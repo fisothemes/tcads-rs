@@ -7,11 +7,11 @@ pub enum ProtocolError {
     Io(#[from] io::Error),
     #[error("AMS Error: {0}")]
     Ams(#[from] AmsError),
-    #[error("Unexpected AMS Command: expected {expected:?}, got {actual:?}")]
+    #[error("Unexpected AMS Command: expected {expected:?}, got {got:?}")]
     UnexpectedCommand {
         expected: AmsCommand,
-        actual: AmsCommand,
+        got: AmsCommand,
     },
-    #[error("Unexpected Length: expected {expected}, got {actual}")]
-    UnexpectedLength { expected: usize, actual: usize },
+    #[error("Unexpected Length: expected {expected}, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
 }
