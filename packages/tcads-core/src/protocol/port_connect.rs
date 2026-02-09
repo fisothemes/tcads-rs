@@ -186,8 +186,7 @@ mod tests {
 
     #[test]
     fn create_frame_from_request() {
-        let request = PortConnectRequest::new(851);
-        let frame = request.to_frame();
+        let frame = PortConnectRequest::new(851).to_frame();
 
         assert_eq!(frame.header().command(), AmsCommand::PortConnect);
         assert_eq!(frame.header().length(), 2);
@@ -204,7 +203,7 @@ mod tests {
 
     #[test]
     fn creating_request_from_frame_fails_on_wrong_length() {
-        let frame = AmsFrame::new(AmsCommand::PortConnect, vec![0u8; 8]);
+        let frame = AmsFrame::new(AmsCommand::PortConnect, [0u8; 8]);
 
         let err = PortConnectRequest::try_from(frame).unwrap_err();
 
@@ -213,6 +212,21 @@ mod tests {
             ProtocolError::UnexpectedLength {
                 expected: 2,
                 got: 8
+            }
+        ));
+    }
+
+    #[test]
+    fn creating_request_from_frame_fails_on_wrong_command() {
+        let frame = AmsFrame::new(AmsCommand::PortClose, [0u8; 2]);
+
+        let err = PortConnectRequest::try_from(frame).unwrap_err();
+
+        assert!(matches!(
+            err,
+            ProtocolError::UnexpectedCommand {
+                expected: AmsCommand::PortClose,
+                got: AmsCommand::PortConnect
             }
         ));
     }
@@ -243,7 +257,7 @@ mod tests {
 
     #[test]
     fn creating_response_from_frame_fails_on_wrong_length() {
-        let frame = AmsFrame::new(AmsCommand::PortConnect, vec![0u8; 10]);
+        let frame = AmsFrame::new(AmsCommand::PortConnect, [0u8; 10]);
 
         let err = PortConnectResponse::try_from(frame).unwrap_err();
 
@@ -252,6 +266,21 @@ mod tests {
             ProtocolError::UnexpectedLength {
                 expected: 8,
                 got: 10
+            }
+        ));
+    }
+
+    #[test]
+    fn creating_response_from_frame_fails_on_wrong_command() {
+        let frame = AmsFrame::new(AmsCommand::PortClose, [0u8; 2]);
+
+        let err = PortConnectResponse::try_from(frame).unwrap_err();
+
+        assert!(matches!(
+            err,
+            ProtocolError::UnexpectedCommand {
+                expected: AmsCommand::PortConnect,
+                got: AmsCommand::PortClose
             }
         ));
     }
