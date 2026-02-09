@@ -38,6 +38,10 @@ impl AmsTcpHeader {
         self.into()
     }
 
+    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, AmsTcpHeaderError> {
+        Self::try_from(bytes)
+    }
+
     /// Reads exactly 6 bytes from the reader and converts them into an [`AmsTcpHeader`].
     pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
         let mut buf = [0u8; AMS_TCP_HEADER_LEN];
