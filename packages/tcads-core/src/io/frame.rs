@@ -1,7 +1,7 @@
 use crate::ams::{AMS_TCP_HEADER_LEN, AmsCommand, AmsTcpHeader};
 use std::io::{self, Read, Write};
 
-/// Maximum allowed AMS frame/packet Size (64KB)
+/// Maximum allowed AMS frame/packet size (64KB) to prevent allocation attacks.
 pub const AMS_FRAME_MAX_LEN: usize = 65535 - AMS_TCP_HEADER_LEN;
 
 /// A single AMS frame/packet consisting of a header and a payload.
@@ -13,10 +13,23 @@ pub struct AmsFrame {
 
 impl AmsFrame {
     /// Creates a new frame with the given command and payload.
-    pub fn new(command: AmsCommand, payload: Vec<u8>) -> Self {
+    ///
+    /// Accepts `Vec<u8>` (move) or `&[u8]` (copy).
+    /// # Note
+    ///
+    /// The payload length is clamped [u32::MAX] to prevent overflows.
+    pub fn new<B: Into<Vec<u8>>>(command: AmsCommand, payload: B) -> Self {
+        let payload = payload.into();
         let payload_len = payload.len().min(u32::MAX as usize) as u32;
-        let header = AmsTcpHeader::new(command, payload_len);
-        Self { header, payload }
+        Self {
+            header: AmsTcpHeader::new(command, payload_len),
+            payload,
+        }
+    }
+
+    /// Creates a new frame with the given command and empty payload.
+    pub fn empty(command: AmsCommand) -> Self {
+        Self::new(command, Vec::new())
     }
 
     /// Returns the frame's header.
@@ -30,7 +43,7 @@ impl AmsFrame {
     }
 
     /// Splits the frame into its header and payload.
-    pub fn split(self) -> (AmsTcpHeader, Vec<u8>) {
+    pub fn into_parts(self) -> (AmsTcpHeader, Vec<u8>) {
         (self.header, self.payload)
     }
 
@@ -44,30 +57,33 @@ impl AmsFrame {
 
     /// Reads a frame from a reader and returns it.
     pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
-        let mut buf = [0u8; AMS_TCP_HEADER_LEN];
-        r.read_exact(&mut buf)?;
-        let header = AmsTcpHeader::from_bytes(buf);
-        let payload_len = header.length() as usize;
-        if payload_len > AMS_FRAME_MAX_LEN {
+        let header = AmsTcpHeader::read_from(r)?;
+
+        if header.length() as usize > AMS_FRAME_MAX_LEN {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(
-                    "Payload too large: {payload_len} bytes exceeds max of {AMS_FRAME_MAX_LEN}"
+                    "Payload too large: {} bytes (max {AMS_FRAME_MAX_LEN} bytes)",
+                    header.length()
                 ),
             ));
         }
-        let mut payload = vec![0; payload_len];
+
+        let mut payload = vec![0u8; header.length() as usize];
         r.read_exact(&mut payload)?;
+
         Ok(Self { header, payload })
     }
 
-    /// Reads a frame's payload into the given buffer and returns the header.
+    /// Reads a frame's payload into the provided mutable slice.
+    ///
+    /// # Note
+    ///
     /// The buffer is payload-only (no header bytes), and only the first AMS/TCP header length bytes are filled.
+    ///
+    /// Errors if the buffer is too small.
     pub fn read_into<R: Read>(r: &mut R, payload_buf: &mut [u8]) -> io::Result<AmsTcpHeader> {
-        let mut header_buf = [0u8; AMS_TCP_HEADER_LEN];
-        r.read_exact(&mut header_buf)?;
-
-        let header = AmsTcpHeader::from_bytes(header_buf);
+        let header = AmsTcpHeader::read_from(r)?;
 
         let expected_len = header.length() as usize;
 
@@ -89,16 +105,17 @@ impl AmsFrame {
 
     /// Writes a frame into a writer.
     pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        w.write_all(&self.header.to_bytes())?;
+        self.header.write_to(w)?;
         w.write_all(&self.payload)
     }
 
     /// Writes a frame given as bytes into a writer.
+    ///
+    /// # Note
+    ///
     /// The buffer must start with a TCP header and contain at least `header.length()` bytes of payload.
     /// Extra bytes in the buffer are ignored.
-    pub fn write_into<W: Write, B: AsRef<[u8]>>(w: &mut W, buf: B) -> io::Result<()> {
-        let buf = buf.as_ref();
-
+    pub fn write_into<W: Write>(w: &mut W, buf: &[u8]) -> io::Result<()> {
         if buf.len() < AMS_TCP_HEADER_LEN {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -110,7 +127,8 @@ impl AmsFrame {
             ));
         }
 
-        let header = AmsTcpHeader::from_bytes(buf[..AMS_TCP_HEADER_LEN].try_into().unwrap());
+        let header = AmsTcpHeader::try_from_slice(&buf[..AMS_TCP_HEADER_LEN])
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?;
 
         let actual_payload_len = buf.len() - AMS_TCP_HEADER_LEN;
         let expected_payload_len = header.length() as usize;
@@ -126,6 +144,24 @@ impl AmsFrame {
         }
 
         w.write_all(&buf[..AMS_TCP_HEADER_LEN + expected_payload_len])
+    }
+}
+
+impl From<(AmsCommand, Vec<u8>)> for AmsFrame {
+    fn from((command, payload): (AmsCommand, Vec<u8>)) -> Self {
+        Self::new(command, payload)
+    }
+}
+
+impl From<AmsFrame> for (AmsCommand, Vec<u8>) {
+    fn from(frame: AmsFrame) -> Self {
+        (frame.header().command(), frame.payload().to_vec())
+    }
+}
+
+impl From<AmsFrame> for Vec<u8> {
+    fn from(frame: AmsFrame) -> Self {
+        frame.to_vec()
     }
 }
 
