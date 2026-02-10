@@ -88,21 +88,30 @@ impl FromStr for AmsNetId {
 
     /// Parse AMS Net ID from string like `"192.168.1.1.1.1"`
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let parts: Vec<&str> = s.split('.').collect();
-
-        if parts.len() != NETID_LEN {
-            return Err(NetIdError::WrongOctetCount {
-                expected: NETID_LEN,
-                found: parts.len(),
-            });
-        }
-
         let mut bytes = [0u8; NETID_LEN];
-        for (i, part) in parts.iter().enumerate() {
+        let mut parts = s.split('.');
+
+        for i in 0..NETID_LEN {
+            let part = parts.next().ok_or_else(|| {
+                let found = i;
+                NetIdError::WrongOctetCount {
+                    expected: NETID_LEN,
+                    found,
+                }
+            })?;
+
             bytes[i] = part.parse::<u8>().map_err(|_| NetIdError::InvalidOctet {
                 position: i,
                 value: part.to_string(),
             })?;
+        }
+
+        let extra_count = parts.count();
+        if extra_count > 0 {
+            return Err(NetIdError::WrongOctetCount {
+                expected: NETID_LEN,
+                found: NETID_LEN + extra_count,
+            });
         }
 
         Ok(Self(bytes))
