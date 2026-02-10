@@ -224,8 +224,8 @@ mod tests {
         assert!(matches!(
             err,
             ProtocolError::UnexpectedCommand {
-                expected: AmsCommand::PortClose,
-                got: AmsCommand::PortConnect
+                expected: AmsCommand::PortConnect,
+                got: AmsCommand::PortClose
             }
         ));
     }
