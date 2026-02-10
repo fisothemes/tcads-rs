@@ -30,8 +30,8 @@ impl PortCloseRequest {
     }
 
     /// Attempts to parse an [`AmsFrame`] into a [`PortCloseRequest`].
-    /// # Note
     ///
+    /// # Note
     /// Payload length must be exactly 2 bytes or a [`ProtocolError`] is returned.
     pub fn try_from_frame(frame: AmsFrame) -> Result<Self, ProtocolError> {
         Self::try_from(frame)
