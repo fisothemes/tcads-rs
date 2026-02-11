@@ -1,4 +1,4 @@
-use std::io::{self, Read, Write};
+use super::error::AmsCommandError;
 
 /// AMS Router Command Identifiers.
 /// These identify the type of the packet at the TCP/router level.
@@ -32,20 +32,8 @@ impl AmsCommand {
     }
 
     /// Creates a new [`AmsCommand`] from a byte slice.
-    pub fn try_from_slice(bytes: &[u8]) -> io::Result<Self> {
+    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, AmsCommandError> {
         bytes.try_into()
-    }
-
-    /// Reads exactly 2 bytes from the reader and converts them into an [`AmsCommand`].
-    pub fn read_from<R: Read>(reader: &mut R) -> io::Result<Self> {
-        let mut buf = [0u8; 2];
-        reader.read_exact(&mut buf)?;
-        Ok(u16::from_le_bytes(buf).into())
-    }
-
-    /// Writes the current instance into the writer.
-    pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<()> {
-        writer.write_all(&self.to_bytes())
     }
 }
 
@@ -89,13 +77,13 @@ impl From<AmsCommand> for [u8; 2] {
 }
 
 impl TryFrom<&[u8]> for AmsCommand {
-    type Error = io::Error;
+    type Error = AmsCommandError;
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         if bytes.len() != 2 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Invalid command length must be 2 bytes long",
-            ));
+            return Err(AmsCommandError::InvalidBufferSize {
+                expected: 2,
+                got: bytes.len(),
+            });
         }
         Ok(u16::from_le_bytes([bytes[0], bytes[1]]).into())
     }

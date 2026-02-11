@@ -1,17 +1,9 @@
 /// Errors specific to AMS protocol
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum AmsError {
     /// Invalid AMS/TCP header
     #[error("Invalid AMS/TCP header: {0}")]
     InvalidAmsTcpHeader(#[from] AmsTcpHeaderError),
-
-    /// Unknown command code
-    #[error("Unknown command: {0:#06x}")]
-    UnknownCommand(u16),
-
-    /// Frame too large
-    #[error("Frame too large: {0} bytes (max: {1})")]
-    FrameTooLarge(usize, usize),
 
     /// Invalid AmsAddr format or content
     #[error("Invalid AMS address: {0}")]
@@ -20,6 +12,12 @@ pub enum AmsError {
     /// Invalid NetId format or content
     #[error("Invalid NetId: {0}")]
     InvalidNetId(#[from] NetIdError),
+    /// Invalid command format or content
+    #[error("Invalid command: {0}")]
+    InvalidCommand(#[from] AmsCommandError),
+    /// Invalid router state format or content
+    #[error("Invalid router state: {0}")]
+    InvalidRouterState(#[from] RouterStateError),
 }
 
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
@@ -27,6 +25,7 @@ pub enum AmsTcpHeaderError {
     /// Unknown command code
     #[error("Unknown command: {0:#06x}")]
     UnknownCommand(u16),
+    /// Invalid length field
     #[error("Invalid length: expected {} bytes, found {} bytes", expected, found)]
     InvalidateLength { expected: usize, found: usize },
     /// Buffer too small for AmsTcpHeader (needs 6 bytes: 2 for [`AmsCommand`](super::command::AmsCommand) + 4 for payload length)
@@ -65,18 +64,36 @@ pub enum AddrError {
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum NetIdError {
     /// Wrong number of octets (expected 6)
-    #[error("Expected {} octets, found {}", expected, found)]
-    WrongOctetCount { expected: usize, found: usize },
+    #[error("Expected {} octets, got {}", expected, got)]
+    WrongOctetCount { expected: usize, got: usize },
 
     /// Invalid octet value (not a valid u8)
     #[error("Invalid octet at position {}: '{}'", position, value)]
     InvalidOctet { position: usize, value: String },
 
     /// Buffer too small for NetId
-    #[error("Buffer too small: expected {} bytes, found {}", expected, found)]
-    BufferTooSmall { expected: usize, found: usize },
+    #[error("Buffer too small: expected {} bytes, got {}", expected, got)]
+    BufferTooSmall { expected: usize, got: usize },
+
+    /// Unexpected buffer size
+    #[error("Invalid buffer size: expected {} bytes, got {}", expected, got)]
+    InvalidBufferSize { expected: usize, got: usize },
 
     /// Invalid format (e.g. missing dots)
     #[error("Invalid format: {0}")]
     InvalidFormat(String),
+}
+
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum AmsCommandError {
+    /// Unexpected buffer size
+    #[error("Invalid buffer size: expected {} bytes, got {}", expected, got)]
+    InvalidBufferSize { expected: usize, got: usize },
+}
+
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum RouterStateError {
+    /// Unexpected buffer size
+    #[error("Invalid buffer size: expected {} bytes, got {}", expected, got)]
+    InvalidBufferSize { expected: usize, got: usize },
 }

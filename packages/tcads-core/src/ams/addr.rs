@@ -4,7 +4,6 @@
 use super::error::AddrError;
 use super::net_id::{AmsNetId, NETID_LEN};
 use std::fmt;
-use std::io::{self, Read, Write};
 use std::str::FromStr;
 
 /// AMS port number
@@ -49,19 +48,6 @@ impl AmsAddr {
     /// Converts the given byte slice into an [`AmsAddr`].
     pub fn try_from_slice(bytes: &[u8]) -> Result<Self, AddrError> {
         Self::try_from(bytes)
-    }
-
-    /// Reads exactly 8 bytes from the reader and converts them into an [`AmsAddr`].
-    pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
-        let mut buf = [0u8; AMS_ADDR_LEN];
-        r.read_exact(&mut buf)?;
-        Ok(Self::from(buf))
-    }
-
-    /// Writes the current instance into the writer.
-    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        w.write_all(&self.to_bytes())?;
-        Ok(())
     }
 }
 

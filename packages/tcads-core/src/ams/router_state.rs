@@ -1,4 +1,4 @@
-use std::io::{self, Read, Write};
+use super::error::RouterStateError;
 
 /// AMS Router state codes.
 ///
@@ -28,20 +28,8 @@ impl RouterState {
     }
 
     /// Creates a new [`RouterState`] from a byte slice.
-    pub fn try_from_slice(bytes: &[u8]) -> io::Result<Self> {
+    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, RouterStateError> {
         bytes.try_into()
-    }
-
-    /// Reads exactly 4 bytes from the reader and converts them into a [`RouterState`].
-    pub fn read_from<R: Read>(reader: &mut R) -> io::Result<Self> {
-        let mut buf = [0u8; 4];
-        reader.read_exact(&mut buf)?;
-        Ok(u32::from_le_bytes(buf).into())
-    }
-
-    /// Writes the current instance into the writer.
-    pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<()> {
-        writer.write_all(&self.to_bytes())
     }
 }
 
@@ -81,13 +69,13 @@ impl From<RouterState> for [u8; 4] {
 }
 
 impl TryFrom<&[u8]> for RouterState {
-    type Error = io::Error;
+    type Error = RouterStateError;
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         if bytes.len() != 4 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Invalid state length must be 4 bytes long",
-            ));
+            return Err(RouterStateError::InvalidBufferSize {
+                expected: 4,
+                got: bytes.len(),
+            });
         }
         Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]).into())
     }

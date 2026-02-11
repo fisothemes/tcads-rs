@@ -57,7 +57,10 @@ impl AmsFrame {
 
     /// Reads a frame from a reader and returns it.
     pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
-        let header = AmsTcpHeader::read_from(r)?;
+        let mut header_buf = [0u8; AMS_TCP_HEADER_LEN];
+        r.read_exact(&mut header_buf)?;
+
+        let header = AmsTcpHeader::from(header_buf);
 
         if header.length() as usize > AMS_FRAME_MAX_LEN {
             return Err(io::Error::new(
@@ -83,7 +86,10 @@ impl AmsFrame {
     ///
     /// Errors if the buffer is too small.
     pub fn read_into<R: Read>(r: &mut R, payload_buf: &mut [u8]) -> io::Result<AmsTcpHeader> {
-        let header = AmsTcpHeader::read_from(r)?;
+        let mut header_buf = [0u8; AMS_TCP_HEADER_LEN];
+        r.read_exact(&mut header_buf)?;
+
+        let header = AmsTcpHeader::from(header_buf);
 
         let expected_len = header.length() as usize;
 

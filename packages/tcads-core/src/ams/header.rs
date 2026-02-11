@@ -1,6 +1,5 @@
 use super::command::AmsCommand;
 use super::error::AmsTcpHeaderError;
-use std::io::{self, Read, Write};
 
 /// Length of the AMS TCP header (6 bytes).
 pub const AMS_TCP_HEADER_LEN: usize = 6;
@@ -40,19 +39,6 @@ impl AmsTcpHeader {
 
     pub fn try_from_slice(bytes: &[u8]) -> Result<Self, AmsTcpHeaderError> {
         Self::try_from(bytes)
-    }
-
-    /// Reads exactly 6 bytes from the reader and converts them into an [`AmsTcpHeader`].
-    pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
-        let mut buf = [0u8; AMS_TCP_HEADER_LEN];
-        r.read_exact(&mut buf)?;
-        Ok(Self::from(buf))
-    }
-
-    /// Writes the current instance into the writer.
-    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        w.write_all(&self.to_bytes())?;
-        Ok(())
     }
 }
 
@@ -124,18 +110,5 @@ mod tests {
                 found: AMS_TCP_HEADER_LEN - 1,
             }
         }
-    }
-
-    #[test]
-    fn test_read_write_roundtrip() {
-        let header = AmsTcpHeader::new(AmsCommand::PortClose, 42);
-
-        let mut buf = Vec::new();
-        header.write_to(&mut buf).unwrap();
-        assert_eq!(buf.len(), AMS_TCP_HEADER_LEN);
-
-        let mut cursor = Cursor::new(buf);
-        let parsed = AmsTcpHeader::read_from(&mut cursor).unwrap();
-        assert_eq!(parsed, header);
     }
 }

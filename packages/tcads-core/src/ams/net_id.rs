@@ -1,6 +1,5 @@
 use super::error::NetIdError;
 use std::fmt;
-use std::io::{self, Read, Write};
 use std::str::FromStr;
 
 /// Length of the AMS Net ID (6 bytes)
@@ -43,19 +42,6 @@ impl AmsNetId {
     pub fn try_from_slice(bytes: &[u8]) -> Result<Self, NetIdError> {
         Self::try_from(bytes)
     }
-
-    /// Reads exactly 6 bytes from the reader and converts them into an [`AmsNetId`].
-    pub fn read_from<R: Read>(r: &mut R) -> io::Result<Self> {
-        let mut buf = [0u8; NETID_LEN];
-        r.read_exact(&mut buf)?;
-        Ok(Self(buf))
-    }
-
-    /// Writes the current instance into the writer.
-    pub fn write_to<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        w.write_all(&self.0)?;
-        Ok(())
-    }
 }
 
 impl From<[u8; NETID_LEN]> for AmsNetId {
@@ -70,10 +56,10 @@ impl TryFrom<&[u8]> for AmsNetId {
 
     /// Convert a slice of bytes into an [`AmsNetId`].
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        if bytes.len() < NETID_LEN {
-            return Err(NetIdError::BufferTooSmall {
+        if bytes.len() != NETID_LEN {
+            return Err(NetIdError::InvalidBufferSize {
                 expected: NETID_LEN,
-                found: bytes.len(),
+                got: bytes.len(),
             });
         }
 
@@ -96,7 +82,7 @@ impl FromStr for AmsNetId {
                 let found = i;
                 NetIdError::WrongOctetCount {
                     expected: NETID_LEN,
-                    found,
+                    got: found,
                 }
             })?;
 
@@ -110,7 +96,7 @@ impl FromStr for AmsNetId {
         if extra_count > 0 {
             return Err(NetIdError::WrongOctetCount {
                 expected: NETID_LEN,
-                found: NETID_LEN + extra_count,
+                got: NETID_LEN + extra_count,
             });
         }
 
