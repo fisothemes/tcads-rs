@@ -21,16 +21,20 @@ use crate::protocol::ProtocolError;
 /// ```no_run
 /// use tcads_core::protocol::RouterNotification;
 /// use tcads_core::io::blocking::AmsStream;
+/// use tcads_core::error::Error;
+/// use std::net::TcpStream;
 ///
-/// # fn example(mut stream: AmsStream<std::net::TcpStream>) -> std::io::Result<()> {
-/// // Listen for notifications
-/// for frame in stream.read_frame()? {
-///     if let Ok(notification) = RouterNotification::try_from(frame) {
-///         println!("Router state changed: {}", notification.state());
+/// fn example(mut stream: AmsStream<TcpStream>) -> Result<(), Error> {
+///     let (reader, _) = stream.try_split()?;
+///     // Listen for notifications
+///     for result in reader.incoming() {
+///         let frame = result?;
+///         if let Ok(notification) = RouterNotification::try_from(frame) {
+///             println!("Router state changed: {}", notification.state());
+///         }
 ///     }
+/// Ok(())
 /// }
-/// # Ok(())
-/// # }
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RouterNotification {
