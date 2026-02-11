@@ -21,7 +21,7 @@ pub enum AmsCommand {
 }
 
 impl AmsCommand {
-    /// Creates a new AmsCommand from a byte array.
+    /// Creates a new [`AmsCommand`] from a byte array.
     pub fn from_bytes(bytes: [u8; 2]) -> Self {
         u16::from_le_bytes(bytes).into()
     }
@@ -31,7 +31,7 @@ impl AmsCommand {
         (*self).into()
     }
 
-    /// Creates a new AmsCommand from a byte slice.
+    /// Creates a new [`AmsCommand`] from a byte slice.
     pub fn try_from_slice(bytes: &[u8]) -> io::Result<Self> {
         bytes.try_into()
     }
@@ -108,15 +108,10 @@ mod tests {
     #[test]
     fn test_command_conversion() {
         assert_eq!(AmsCommand::from(0x0000), AmsCommand::AdsCommand);
-
         assert_eq!(AmsCommand::from(0x0001), AmsCommand::PortClose);
-
         assert_eq!(AmsCommand::from(0x1000), AmsCommand::PortConnect);
-
         assert_eq!(AmsCommand::from(0x1001), AmsCommand::RouterNotification);
-
         assert_eq!(AmsCommand::from(0x1002), AmsCommand::GetLocalNetId);
-
         assert_eq!(AmsCommand::from(0x1234), AmsCommand::Unknown(0x1234));
     }
 }
