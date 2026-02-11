@@ -1,0 +1,107 @@
+use std::io::{self, Read, Write};
+
+/// AMS Router state codes.
+///
+/// Represents the operational state of the AMS Router.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(u32)]
+pub enum RouterState {
+    /// Router is stopped (0)
+    Stop = 0,
+    /// Router is started/running (1)
+    Start = 1,
+    /// Router/route was removed (2)
+    Removed = 2,
+    /// Unknown state
+    Unknown(u32),
+}
+
+impl RouterState {
+    /// Creates a new [`RouterState`] from a byte array.
+    pub fn from_bytes(bytes: [u8; 4]) -> Self {
+        u32::from_le_bytes(bytes).into()
+    }
+
+    /// Converts the current instance into a byte array.
+    pub fn to_bytes(&self) -> [u8; 4] {
+        (*self).into()
+    }
+
+    /// Creates a new [`RouterState`] from a byte slice.
+    pub fn try_from_slice(bytes: &[u8]) -> io::Result<Self> {
+        bytes.try_into()
+    }
+
+    /// Reads exactly 4 bytes from the reader and converts them into a [`RouterState`].
+    pub fn read_from<R: Read>(reader: &mut R) -> io::Result<Self> {
+        let mut buf = [0u8; 4];
+        reader.read_exact(&mut buf)?;
+        Ok(u32::from_le_bytes(buf).into())
+    }
+
+    /// Writes the current instance into the writer.
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> io::Result<()> {
+        writer.write_all(&self.to_bytes())
+    }
+}
+
+impl From<u32> for RouterState {
+    fn from(value: u32) -> Self {
+        match value {
+            0 => Self::Stop,
+            1 => Self::Start,
+            2 => Self::Removed,
+            n => Self::Unknown(n),
+        }
+    }
+}
+
+impl From<RouterState> for u32 {
+    fn from(value: RouterState) -> Self {
+        match value {
+            RouterState::Stop => 0,
+            RouterState::Start => 1,
+            RouterState::Removed => 2,
+            RouterState::Unknown(n) => n,
+        }
+    }
+}
+
+impl From<[u8; 4]> for RouterState {
+    fn from(bytes: [u8; 4]) -> Self {
+        u32::from_le_bytes(bytes).into()
+    }
+}
+
+impl From<RouterState> for [u8; 4] {
+    fn from(value: RouterState) -> Self {
+        let value: u32 = value.into();
+        value.to_le_bytes()
+    }
+}
+
+impl TryFrom<&[u8]> for RouterState {
+    type Error = io::Error;
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        if bytes.len() != 4 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Invalid state length must be 4 bytes long",
+            ));
+        }
+        Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]).into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_state_conversion() {
+        assert_eq!(RouterState::from(0), RouterState::Stop);
+        assert_eq!(RouterState::from(1), RouterState::Start);
+        assert_eq!(RouterState::from(2), RouterState::Removed);
+        assert_eq!(RouterState::from(3), RouterState::Unknown(3));
+    }
+}
