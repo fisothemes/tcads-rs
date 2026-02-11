@@ -5,3 +5,7 @@ pub mod port_connect;
 pub mod router_notification;
 
 pub use error::ProtocolError;
+pub use get_local_net_id::{GetLocalNetIdRequest, GetLocalNetIdResponse};
+pub use port_close::PortCloseRequest;
+pub use port_connect::{PortConnectRequest, PortConnectResponse};
+pub use router_notification::{RouterNotification, RouterState};
