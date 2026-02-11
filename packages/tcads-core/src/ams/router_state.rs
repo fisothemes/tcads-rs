@@ -93,6 +93,17 @@ impl TryFrom<&[u8]> for RouterState {
     }
 }
 
+impl std::fmt::Display for RouterState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Stop => write!(f, "Stop"),
+            Self::Start => write!(f, "Start"),
+            Self::Removed => write!(f, "Removed"),
+            Self::Unknown(_) => write!(f, "Unknown"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
