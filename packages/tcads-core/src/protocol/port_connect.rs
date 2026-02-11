@@ -9,7 +9,7 @@ use crate::protocol::ProtocolError;
 ///
 /// # Usage
 /// * **Client:** Sends this to the router to announce its presence. Typically, `desired_port` is
-/// set to `0` to request a dynamic port.
+///   set to `0` to request a dynamic port.
 /// * **Server/Router:** Receives this to register a new route/client.
 ///
 /// # Protocol Details
@@ -173,7 +173,7 @@ impl TryFrom<AmsFrame> for PortConnectResponse {
             });
         }
 
-        let addr = AmsAddr::try_from_slice(&value.payload()[..]).map_err(ams::AmsError::from)?;
+        let addr = AmsAddr::try_from_slice(value.payload()).map_err(ams::AmsError::from)?;
 
         Ok(Self { addr })
     }

@@ -8,8 +8,8 @@ use crate::protocol::ProtocolError;
 ///
 /// # Usage
 /// * **Server/Router:** Broadcasts this to all registered clients
-/// (used [`PortConnect`](AmsCommand::PortConnect) command) when the state changes
-/// (e.g., started, stopped, route removed).
+///   (used [`PortConnect`](AmsCommand::PortConnect) command) when the state changes
+///   (e.g., started, stopped, route removed).
 /// * **Client:** Receives this to monitor router health and connection status.
 ///
 /// # Protocol Details
