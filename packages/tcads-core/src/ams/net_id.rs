@@ -159,6 +159,6 @@ mod tests {
     fn try_from_short_buffer() {
         let bytes = [192, 168, 1];
         let err = AmsNetId::try_from(&bytes[..]).unwrap_err();
-        assert!(matches!(err, NetIdError::BufferTooSmall { .. }));
+        assert!(matches!(err, NetIdError::InvalidBufferSize { .. }));
     }
 }

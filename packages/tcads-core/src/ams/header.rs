@@ -80,7 +80,6 @@ impl TryFrom<&[u8]> for AmsTcpHeader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
 
     #[test]
     fn test_header_new_and_accessors() {
