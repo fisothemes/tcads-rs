@@ -19,21 +19,34 @@ use crate::protocol::ProtocolError;
 ///
 /// # Example
 /// ```no_run
-/// use tcads_core::protocol::RouterNotification;
+/// use tcads_core::protocol::{RouterNotification, PortConnectRequest, PortConnectResponse};
 /// use tcads_core::io::blocking::AmsStream;
+/// use tcads_core::ams::AmsCommand;
 /// use tcads_core::error::Error;
 /// use std::net::TcpStream;
 ///
 /// fn example(mut stream: AmsStream<TcpStream>) -> Result<(), Error> {
-///     let (reader, _) = stream.try_split()?;
+///     let (reader, mut writer) = stream.try_split()?;
+///     // Send Port Connect request
+///     writer.write_frame(&PortConnectRequest::default().to_frame())?;
 ///     // Listen for notifications
 ///     for result in reader.incoming() {
 ///         let frame = result?;
-///         if let Ok(notification) = RouterNotification::try_from(frame) {
-///             println!("Router state changed: {}", notification.state());
+///         match frame.header().command() {
+///             AmsCommand::PortConnect => {
+///                 let resp = PortConnectResponse::try_from(frame)?;
+///                 println!("Router assigned us address: {}", resp.addr());
+///             },
+///             AmsCommand::RouterNotification => {
+///                 let notif = RouterNotification::try_from(frame)?;
+///                 println!("Router state changed: {}", notif.state())
+///             },
+///             cmd => {
+///                 println!("Unexpected Router command: {cmd:?}");
+///             }
 ///         }
 ///     }
-/// Ok(())
+///     Ok(())
 /// }
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
