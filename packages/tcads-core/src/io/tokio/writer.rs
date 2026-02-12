@@ -3,7 +3,7 @@ use crate::io::frame::AmsFrame;
 use std::io::IoSlice;
 use tokio::io::{self, AsyncWrite, AsyncWriteExt, BufWriter};
 
-pub struct AmsWriter<W: AsyncWriteExt + Unpin> {
+pub struct AmsWriter<W: AsyncWrite + Unpin> {
     writer: BufWriter<W>,
 }
 
