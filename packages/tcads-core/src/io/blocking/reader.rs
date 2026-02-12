@@ -5,7 +5,7 @@ use std::io::{self, BufReader, Read};
 /// A buffered reader specialised for parsing AMS frames from a byte stream.
 ///
 /// This struct wraps an underlying reader in a [`BufReader`] to minimise system calls
-/// when reading the TCP header (6 bytes) and variable-length payload.
+/// when reading the [AMS/TCP header](AmsTcpHeader) (6 bytes) and variable-length payload.
 pub struct AmsReader<R: Read> {
     reader: BufReader<R>,
 }
@@ -91,7 +91,12 @@ impl<R: Read> AmsReader<R> {
         AmsIncoming { reader: self }
     }
 
-    /// Consumes the AmsReader, returning the inner reader.
+    /// Consumes the AmsReader, returning the underlying reader.
+    ///
+    /// # Note
+    ///
+    /// Any leftover data in the internal buffer is lost.
+    /// Therefore, a following read from the underlying reader may lead to data loss
     pub fn into_inner(self) -> R {
         self.reader.into_inner()
     }
