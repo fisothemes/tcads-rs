@@ -78,7 +78,7 @@ impl FromStr for AmsNetId {
         let mut parts = s.split('.');
 
         for (i, byte) in bytes.iter_mut().enumerate() {
-            let part = parts.next().ok_or_else(|| NetIdError::WrongOctetCount {
+            let part = parts.next().ok_or(NetIdError::WrongOctetCount {
                 expected: NETID_LEN,
                 got: i,
             })?;
