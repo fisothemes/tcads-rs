@@ -37,9 +37,9 @@ impl<W: Write> AmsWriter<W> {
     /// 2. Calls [`flush`](Write::flush) to send the packet immediately.
     pub fn write_frame(&mut self, frame: &AmsFrame) -> io::Result<()> {
         let header_bytes = frame.header().to_bytes();
-        let bufs = [IoSlice::new(&header_bytes), IoSlice::new(frame.payload())];
+        let mut bufs = [IoSlice::new(&header_bytes), IoSlice::new(frame.payload())];
 
-        WriteAllVectored::write_all_vectored(&mut self.writer, &mut bufs.iter().copied())?;
+        WriteAllVectored::write_all_vectored(&mut self.writer, &mut bufs)?;
         self.writer.flush()
     }
 

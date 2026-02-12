@@ -57,9 +57,9 @@ impl<S: Read + Write> AmsStream<S> {
     /// (if supported by the OS) to avoid TCP fragmentation or Nagle's algorithm delays.
     pub fn write_frame(&mut self, frame: &AmsFrame) -> io::Result<()> {
         let header_bytes = frame.header().to_bytes();
-        let bufs = [IoSlice::new(&header_bytes), IoSlice::new(frame.payload())];
+        let mut bufs = [IoSlice::new(&header_bytes), IoSlice::new(frame.payload())];
 
-        WriteAllVectored::write_all_vectored(&mut self.stream, &mut bufs.iter().copied())?;
+        WriteAllVectored::write_all_vectored(&mut self.stream, &mut bufs)?;
         self.stream.flush()
     }
 
