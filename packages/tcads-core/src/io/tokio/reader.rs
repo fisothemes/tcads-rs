@@ -1,6 +1,6 @@
 use crate::ams::{AMS_TCP_HEADER_LEN, AmsTcpHeader};
 use crate::io::frame::{AMS_FRAME_MAX_LEN, AmsFrame};
-use tokio::io::{self, AsyncRead, AsyncReadExt, BufReader};
+use tokio::io::{self, AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
 
 pub struct AmsReader<R: AsyncRead> {
     reader: BufReader<R>,
@@ -23,6 +23,10 @@ impl<R: AsyncRead + Unpin> AmsReader<R> {
 
     /// Reads a single AMS frame from the underlying stream.
     pub async fn read_frame(&mut self) -> io::Result<AmsFrame> {
+        if self.reader.fill_buf().await?.is_empty() {
+            return Err(io::Error::from(io::ErrorKind::UnexpectedEof));
+        }
+
         let mut header_buf = [0u8; AMS_TCP_HEADER_LEN];
         self.reader.read_exact(&mut header_buf).await?;
         let header = AmsTcpHeader::from(header_buf);

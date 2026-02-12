@@ -1,6 +1,6 @@
 use crate::ams::{AMS_TCP_HEADER_LEN, AmsTcpHeader};
 use crate::io::frame::{AMS_FRAME_MAX_LEN, AmsFrame};
-use std::io::{self, BufReader, Read};
+use std::io::{self, BufRead, BufReader, Read};
 
 /// A buffered reader specialised for parsing AMS frames from a byte stream.
 ///
@@ -27,6 +27,10 @@ impl<R: Read> AmsReader<R> {
 
     /// Reads a single AMS frame from the underlying stream.
     pub fn read_frame(&mut self) -> io::Result<AmsFrame> {
+        if self.reader.fill_buf()?.is_empty() {
+            return Err(io::Error::from(io::ErrorKind::UnexpectedEof));
+        }
+
         let mut header_buf = [0u8; AMS_TCP_HEADER_LEN];
         self.reader.read_exact(&mut header_buf)?;
         let header = AmsTcpHeader::from(header_buf);
