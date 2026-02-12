@@ -1,13 +1,17 @@
-use crate::io::frame::AmsFrame;
+use crate::ams::{AMS_TCP_HEADER_LEN, AmsTcpHeader};
+use crate::io::frame::{AMS_FRAME_MAX_LEN, AmsFrame};
 use std::io::{self, BufReader, Read};
 
-/// A buffered reader for AMS frames.
+/// A buffered reader specialised for parsing AMS frames from a byte stream.
+///
+/// This struct wraps an underlying reader in a [`BufReader`] to minimise system calls
+/// when reading the TCP header (6 bytes) and variable-length payload.
 pub struct AmsReader<R: Read> {
     reader: BufReader<R>,
 }
 
 impl<R: Read> AmsReader<R> {
-    /// Creates a new AmsReader with default buffering.
+    /// Creates a new AmsReader with [default buffering](BufReader::new).
     pub fn new(reader: R) -> Self {
         Self {
             reader: BufReader::new(reader),
@@ -23,7 +27,25 @@ impl<R: Read> AmsReader<R> {
 
     /// Reads a single AMS frame from the underlying stream.
     pub fn read_frame(&mut self) -> io::Result<AmsFrame> {
-        AmsFrame::read_from(&mut self.reader)
+        let mut header_buf = [0u8; AMS_TCP_HEADER_LEN];
+        self.reader.read_exact(&mut header_buf)?;
+        let header = AmsTcpHeader::from(header_buf);
+
+        let payload_len = header.length() as usize;
+        if payload_len > AMS_FRAME_MAX_LEN {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Payload too large: {} bytes (max {})",
+                    payload_len, AMS_FRAME_MAX_LEN
+                ),
+            ));
+        }
+
+        let mut payload = vec![0u8; payload_len];
+        self.reader.read_exact(&mut payload)?;
+
+        Ok(AmsFrame::from_parts(header, payload))
     }
 
     /// Returns an iterator over incoming frames.

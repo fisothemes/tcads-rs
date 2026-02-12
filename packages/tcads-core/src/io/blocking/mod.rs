@@ -1,5 +1,6 @@
 pub mod reader;
 pub mod stream;
+mod traits;
 pub mod writer;
 
 pub use reader::{AmsIncoming, AmsReader};

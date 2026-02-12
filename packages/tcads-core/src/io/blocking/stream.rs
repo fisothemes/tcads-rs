@@ -1,10 +1,16 @@
 use super::reader::AmsReader;
+use super::traits::WriteAllVectored;
 use super::writer::AmsWriter;
-use crate::io::frame::AmsFrame;
-use std::io::{self, Read, Write};
+use crate::ams::{AMS_TCP_HEADER_LEN, AmsTcpHeader};
+use crate::io::frame::{AMS_FRAME_MAX_LEN, AmsFrame};
+use std::io::{self, IoSlice, Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpStream};
 use std::time::Duration;
 
+/// A stream wrapper for communicating with an AMS Router.
+///
+/// This struct serves as the main entry point for an ADS connection. It wraps a raw byte stream
+/// (typically a [`TcpStream`]) and provides methods to read and write [`AmsFrame`]s.
 pub struct AmsStream<S: Read + Write = TcpStream> {
     stream: S,
 }
@@ -15,17 +21,46 @@ impl<S: Read + Write> AmsStream<S> {
         Self { stream }
     }
 
-    /// Reads a frame directly from the stream.
+    /// Reads a frame directly from the stream without internal buffering.
     ///
-    /// Note: If you are doing this in a loop, prefer [`split`](AmsStream::split)
-    /// or [`try_split`](AmsStream::try_split) to get a buffered [`AmsReader`].
+    /// # Note
+    ///
+    /// This function performs two read calls (one for the header, one for the payload).
+    /// If you are reading frames in a tight loop, prefer using [`split`](AmsStream::split)
+    /// or [`try_split`](AmsStream::try_split) to get an [`AmsReader`], which buffers reads
+    /// to minimise system calls.
     pub fn read_frame(&mut self) -> io::Result<AmsFrame> {
-        AmsFrame::read_from(&mut self.stream)
+        let mut header_buf = [0u8; AMS_TCP_HEADER_LEN];
+        self.stream.read_exact(&mut header_buf)?;
+        let header = AmsTcpHeader::from(header_buf);
+
+        let payload_len = header.length() as usize;
+        if payload_len > AMS_FRAME_MAX_LEN {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Payload too large: {} bytes (max {})",
+                    payload_len, AMS_FRAME_MAX_LEN
+                ),
+            ));
+        }
+
+        let mut payload = vec![0u8; payload_len];
+        self.stream.read_exact(&mut payload)?;
+
+        Ok(AmsFrame::from_parts(header, payload))
     }
 
-    /// Writes a frame directly to the stream.
+    /// Writes a frame directly to the stream using vectored I/O.
+    ///
+    /// This method attempts to send the header and payload in a single system call
+    /// (if supported by the OS) to avoid TCP fragmentation or Nagle's algorithm delays.
     pub fn write_frame(&mut self, frame: &AmsFrame) -> io::Result<()> {
-        frame.write_to(&mut self.stream)
+        let header_bytes = frame.header().to_bytes();
+        let bufs = [IoSlice::new(&header_bytes), IoSlice::new(frame.payload())];
+
+        WriteAllVectored::write_all_vectored(&mut self.stream, &mut bufs.iter().copied())?;
+        self.stream.flush()
     }
 
     /// Consumes the AmsStream and returns the underlying stream.
@@ -45,9 +80,31 @@ impl<S: Read + Write + Clone> AmsStream<S> {
 }
 
 impl AmsStream<TcpStream> {
-    /// Splits the stream into a buffered Reader and buffered Writer.
+    /// Connects to an AMS router at the specified address.
     ///
-    /// This is the preferred way to handle the main connection loop.
+    /// This convenience method that:
+    ///
+    /// 1. Establishes a [`TcpStream`] connection.
+    /// 2. **Disables Nagle's algorithm** (`set_nodelay(true)`). This is critical for ADS
+    ///    performance, preventing 200ms latency spikes on small Read/Write requests.
+    /// 3. Wraps the stream in an [`AmsStream`].
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use tcads_core::io::blocking::AmsStream;
+    ///
+    /// let stream = AmsStream::connect("127.0.0.1:48898").unwrap();
+    /// ```
+    pub fn connect<A: std::net::ToSocketAddrs>(addr: A) -> io::Result<Self> {
+        let stream = TcpStream::connect(addr)?;
+        stream.set_nodelay(true)?;
+        Ok(Self::new(stream))
+    }
+
+    /// Splits the `TcpStream` into a buffered Reader and buffered Writer.
+    ///
+    /// This allows reading and writing to occur on separate threads or logic paths.
     pub fn try_split(self) -> io::Result<(AmsReader<TcpStream>, AmsWriter<TcpStream>)> {
         Ok((
             AmsReader::new(self.stream.try_clone()?),
@@ -84,7 +141,7 @@ impl AmsStream<TcpStream> {
     /// Shuts down the read, write, or both halves of this connection.
     /// This function will cause all pending and future I/O on the specified
     /// portions to return immediately with an appropriate value
-    /// (see the documentation of [Shutdown]).
+    /// (see documentation for [`Shutdown`]).
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.stream.shutdown(how)
     }

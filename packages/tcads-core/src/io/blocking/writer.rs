@@ -1,13 +1,23 @@
+use super::traits::WriteAllVectored;
 use crate::io::frame::AmsFrame;
-use std::io::{self, BufWriter, IntoInnerError, Write};
+use std::io::{self, BufWriter, IntoInnerError, IoSlice, Write};
 
-/// A buffered writer for AMS frames.
+/// A buffered writer specialised for serializing AMS frames to a byte stream.
+///
+/// This struct wraps an underlying writer in a [`BufWriter`].
+///
+/// # Latency Note
+///
+/// To ensure real-time responsiveness for ADS commands, [`write_frame`](Self::write_frame)
+/// **automatically flushes** the buffer after writing each frame.
+///
+/// This prevents commands from sitting in the buffer waiting for 8KB of data to accumulate.
 pub struct AmsWriter<W: Write> {
     writer: BufWriter<W>,
 }
 
 impl<W: Write> AmsWriter<W> {
-    /// Creates a new AmsWriter with default buffering.
+    /// Creates a new AmsWriter with [default buffering](BufWriter::new).
     pub fn new(writer: W) -> Self {
         Self {
             writer: BufWriter::new(writer),
@@ -22,8 +32,14 @@ impl<W: Write> AmsWriter<W> {
     }
 
     /// Writes a frame and immediately flushes the buffer.
+    ///
+    /// 1. Queues the header and payload into the internal buffer using vectored writes.
+    /// 2. Calls [`flush`](Write::flush) to send the packet immediately.
     pub fn write_frame(&mut self, frame: &AmsFrame) -> io::Result<()> {
-        frame.write_to(&mut self.writer)?;
+        let header_bytes = frame.header().to_bytes();
+        let bufs = [IoSlice::new(&header_bytes), IoSlice::new(frame.payload())];
+
+        WriteAllVectored::write_all_vectored(&mut self.writer, &mut bufs.iter().copied())?;
         self.writer.flush()
     }
 
