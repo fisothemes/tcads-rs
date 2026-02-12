@@ -5,6 +5,8 @@ use super::error::AmsTcpHeaderError;
 pub const AMS_TCP_HEADER_LEN: usize = 6;
 
 /// The 6-byte prefix for TCP communication.
+///
+/// See [Beckhoff ADS Specification (TE1000)](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/115846283.html?id=5591912318145837195).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct AmsTcpHeader {
     command: AmsCommand,
