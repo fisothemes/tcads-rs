@@ -77,16 +77,13 @@ impl FromStr for AmsNetId {
         let mut bytes = [0u8; NETID_LEN];
         let mut parts = s.split('.');
 
-        for i in 0..NETID_LEN {
-            let part = parts.next().ok_or_else(|| {
-                let found = i;
-                NetIdError::WrongOctetCount {
-                    expected: NETID_LEN,
-                    got: found,
-                }
+        for (i, byte) in bytes.iter_mut().enumerate() {
+            let part = parts.next().ok_or_else(|| NetIdError::WrongOctetCount {
+                expected: NETID_LEN,
+                got: i,
             })?;
 
-            bytes[i] = part.parse::<u8>().map_err(|_| NetIdError::InvalidOctet {
+            *byte = part.parse::<u8>().map_err(|_| NetIdError::InvalidOctet {
                 position: i,
                 value: part.to_string(),
             })?;
