@@ -10,10 +10,10 @@ pub enum AmsError {
     InvalidAddr(#[from] AddrError),
 
     /// Invalid NetId format or content
-    #[error("Invalid NetId: {0}")]
+    #[error("Invalid Net ID: {0}")]
     InvalidNetId(#[from] NetIdError),
     /// Invalid command format or content
-    #[error("Invalid command: {0}")]
+    #[error("Invalid AMS command: {0}")]
     InvalidCommand(#[from] AmsCommandError),
     /// Invalid router state format or content
     #[error("Invalid router state: {0}")]
