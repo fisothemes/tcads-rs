@@ -51,7 +51,7 @@ impl TryFrom<AmsFrame> for GetLocalNetIdRequest {
         let header = value.header();
 
         if header.command() != AmsCommand::GetLocalNetId {
-            return Err(ProtocolError::UnexpectedCommand {
+            return Err(ProtocolError::UnexpectedAmsCommand {
                 expected: AmsCommand::GetLocalNetId,
                 got: header.command(),
             });
@@ -128,7 +128,7 @@ impl TryFrom<AmsFrame> for GetLocalNetIdResponse {
         let header = value.header();
 
         if header.command() != AmsCommand::GetLocalNetId {
-            return Err(ProtocolError::UnexpectedCommand {
+            return Err(ProtocolError::UnexpectedAmsCommand {
                 expected: AmsCommand::GetLocalNetId,
                 got: header.command(),
             });
@@ -200,7 +200,7 @@ mod tests {
 
         assert!(matches!(
             err,
-            ProtocolError::UnexpectedCommand {
+            ProtocolError::UnexpectedAmsCommand {
                 expected: AmsCommand::GetLocalNetId,
                 got: AmsCommand::PortClose
             }
@@ -251,7 +251,7 @@ mod tests {
 
         assert!(matches!(
             err,
-            ProtocolError::UnexpectedCommand {
+            ProtocolError::UnexpectedAmsCommand {
                 expected: AmsCommand::GetLocalNetId,
                 got: AmsCommand::PortConnect
             }

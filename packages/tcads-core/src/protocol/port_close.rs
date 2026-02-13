@@ -72,7 +72,7 @@ impl TryFrom<AmsFrame> for PortCloseRequest {
         let header = value.header();
 
         if header.command() != AmsCommand::PortClose {
-            return Err(ProtocolError::UnexpectedCommand {
+            return Err(ProtocolError::UnexpectedAmsCommand {
                 expected: AmsCommand::PortClose,
                 got: header.command(),
             });
@@ -144,7 +144,7 @@ mod tests {
 
         assert!(matches!(
             err,
-            ProtocolError::UnexpectedCommand {
+            ProtocolError::UnexpectedAmsCommand {
                 expected: AmsCommand::PortClose,
                 got: AmsCommand::PortConnect
             }

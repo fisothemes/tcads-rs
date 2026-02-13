@@ -70,7 +70,7 @@ impl TryFrom<AmsFrame> for PortConnectRequest {
         let header = value.header();
 
         if header.command() != AmsCommand::PortConnect {
-            return Err(ProtocolError::UnexpectedCommand {
+            return Err(ProtocolError::UnexpectedAmsCommand {
                 expected: AmsCommand::PortConnect,
                 got: header.command(),
             });
@@ -160,7 +160,7 @@ impl TryFrom<AmsFrame> for PortConnectResponse {
         let header = value.header();
 
         if header.command() != AmsCommand::PortConnect {
-            return Err(ProtocolError::UnexpectedCommand {
+            return Err(ProtocolError::UnexpectedAmsCommand {
                 expected: AmsCommand::PortConnect,
                 got: header.command(),
             });
@@ -223,7 +223,7 @@ mod tests {
 
         assert!(matches!(
             err,
-            ProtocolError::UnexpectedCommand {
+            ProtocolError::UnexpectedAmsCommand {
                 expected: AmsCommand::PortConnect,
                 got: AmsCommand::PortClose
             }
@@ -277,7 +277,7 @@ mod tests {
 
         assert!(matches!(
             err,
-            ProtocolError::UnexpectedCommand {
+            ProtocolError::UnexpectedAmsCommand {
                 expected: AmsCommand::PortConnect,
                 got: AmsCommand::PortClose
             }

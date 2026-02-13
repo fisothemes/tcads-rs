@@ -100,7 +100,7 @@ impl TryFrom<AmsFrame> for RouterNotification {
         let header = value.header();
 
         if header.command() != AmsCommand::RouterNotification {
-            return Err(ProtocolError::UnexpectedCommand {
+            return Err(ProtocolError::UnexpectedAmsCommand {
                 expected: AmsCommand::RouterNotification,
                 got: header.command(),
             });
@@ -191,7 +191,7 @@ mod tests {
 
         assert!(matches!(
             err,
-            ProtocolError::UnexpectedCommand {
+            ProtocolError::UnexpectedAmsCommand {
                 expected: AmsCommand::RouterNotification,
                 got: AmsCommand::PortConnect
             }
