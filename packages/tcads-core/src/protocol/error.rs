@@ -1,4 +1,4 @@
-use super::ads::AdsError;
+use crate::ads::AdsError;
 use crate::ams::{AmsCommand, AmsError};
 use std::io;
 
