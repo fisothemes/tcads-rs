@@ -1,4 +1,4 @@
-use super::error::AdsError;
+use super::error::AdsReturnCodeError;
 
 /// ADS Return Codes representing the result of an ADS operation.
 ///
@@ -364,7 +364,7 @@ impl AdsReturnCode {
     }
 
     /// Tries to create a new `AdsReturnCode` from a 4-byte array (Little Endian).
-    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, AdsError> {
+    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, AdsReturnCodeError> {
         bytes.try_into()
     }
 }
@@ -704,14 +704,13 @@ impl From<AdsReturnCode> for [u8; AdsReturnCode::LENGTH] {
 }
 
 impl TryFrom<&[u8]> for AdsReturnCode {
-    type Error = AdsError;
+    type Error = AdsReturnCodeError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() < AdsReturnCode::LENGTH {
-            return Err(AdsError::InvalidBufferSize {
-                item: "AdsReturnCode",
+            return Err(AdsReturnCodeError::InvalidBufferSize {
                 expected: AdsReturnCode::LENGTH,
-                found: value.len(),
+                got: value.len(),
             });
         }
         let arr = [value[0], value[1], value[2], value[3]];
