@@ -5,7 +5,7 @@ use std::io::{self, IoSlice, Write};
 /// Unlike `write_vectored`, which may write only a portion of the data, this method
 /// loops until every byte in every slice has been written or an error occurs.
 pub trait WriteAllVectored {
-    /// Writes all data from the provided iterator of buffers.
+    /// Writes all data from the provided slice of buffers.
     fn write_all_vectored(&mut self, bufs: &mut [IoSlice]) -> io::Result<()>;
 }
 
