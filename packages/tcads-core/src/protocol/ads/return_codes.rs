@@ -1,3 +1,5 @@
+use super::error::AdsError;
+
 /// ADS Return Codes representing the result of an ADS operation.
 ///
 /// See [Beckhoff ADS Specification (TE1000)](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/374277003.html?id=4954945278371876402)
@@ -343,9 +345,27 @@ pub enum AdsReturnCode {
 }
 
 impl AdsReturnCode {
+    /// The length of the ADS return code in bytes.
+    pub const LENGTH: usize = 4;
+
     /// Returns `true` if the code represents success (0).
     pub fn is_success(&self) -> bool {
         matches!(self, Self::Ok)
+    }
+
+    /// Creates a new `AdsReturnCode` from a 4-byte array (Little Endian).
+    pub fn from_bytes(bytes: [u8; Self::LENGTH]) -> Self {
+        Self::from(bytes)
+    }
+
+    /// Converts the return code to a 4-byte array (Little Endian).
+    pub fn to_bytes(&self) -> [u8; Self::LENGTH] {
+        (*self).into()
+    }
+
+    /// Tries to create a new `AdsReturnCode` from a 4-byte array (Little Endian).
+    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, AdsError> {
+        bytes.try_into()
     }
 }
 
@@ -668,5 +688,59 @@ impl From<AdsReturnCode> for u32 {
             // --- Fallback ---
             AdsReturnCode::Unknown(n) => n,
         }
+    }
+}
+
+impl From<[u8; Self::LENGTH]> for AdsReturnCode {
+    fn from(value: [u8; Self::LENGTH]) -> Self {
+        u32::from_le_bytes(value).into()
+    }
+}
+
+impl From<AdsReturnCode> for [u8; AdsReturnCode::LENGTH] {
+    fn from(value: AdsReturnCode) -> Self {
+        u32::from(value).to_le_bytes()
+    }
+}
+
+impl TryFrom<&[u8]> for AdsReturnCode {
+    type Error = AdsError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() < AdsReturnCode::LENGTH {
+            return Err(AdsError::InvalidBufferSize {
+                item: "AdsReturnCode",
+                expected: AdsReturnCode::LENGTH,
+                found: value.len(),
+            });
+        }
+        let arr = [value[0], value[1], value[2], value[3]];
+        Ok(Self::from(arr))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_u32() {
+        assert_eq!(AdsReturnCode::from(0x0), AdsReturnCode::Ok);
+    }
+
+    #[test]
+    fn test_from_ads_return_code() {
+        assert_eq!(AdsReturnCode::from(AdsReturnCode::Ok), AdsReturnCode::Ok);
+    }
+
+    #[test]
+    fn test_from_ads_return_code_to_u32() {
+        assert_eq!(u32::from(AdsReturnCode::RtErrIrqlNotLessOrEqual), 0x1010);
+    }
+
+    #[test]
+    fn test_from_ads_return_code_to_bytes() {
+        let bytes: [u8; AdsReturnCode::LENGTH] = AdsReturnCode::RtErrIrqlNotLessOrEqual.into();
+        assert_eq!([0x10, 0x10, 0x00, 0x00], bytes);
     }
 }
