@@ -21,13 +21,16 @@ pub enum AmsCommand {
 }
 
 impl AmsCommand {
+    /// The length of an AMS command identifier in bytes.
+    pub const LENGTH: usize = 2;
+
     /// Creates a new [`AmsCommand`] from a byte array.
-    pub fn from_bytes(bytes: [u8; 2]) -> Self {
+    pub fn from_bytes(bytes: [u8; AmsCommand::LENGTH]) -> Self {
         u16::from_le_bytes(bytes).into()
     }
 
     /// Converts the current instance into a byte array.
-    pub fn to_bytes(&self) -> [u8; 2] {
+    pub fn to_bytes(&self) -> [u8; AmsCommand::LENGTH] {
         (*self).into()
     }
 
@@ -63,13 +66,13 @@ impl From<u16> for AmsCommand {
     }
 }
 
-impl From<[u8; 2]> for AmsCommand {
-    fn from(bytes: [u8; 2]) -> Self {
+impl From<[u8; AmsCommand::LENGTH]> for AmsCommand {
+    fn from(bytes: [u8; AmsCommand::LENGTH]) -> Self {
         u16::from_le_bytes(bytes).into()
     }
 }
 
-impl From<AmsCommand> for [u8; 2] {
+impl From<AmsCommand> for [u8; AmsCommand::LENGTH] {
     fn from(value: AmsCommand) -> Self {
         let value: u16 = value.into();
         value.to_le_bytes()
@@ -79,9 +82,9 @@ impl From<AmsCommand> for [u8; 2] {
 impl TryFrom<&[u8]> for AmsCommand {
     type Error = AmsCommandError;
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        if bytes.len() != 2 {
+        if bytes.len() != AmsCommand::LENGTH {
             return Err(AmsCommandError::InvalidBufferSize {
-                expected: 2,
+                expected: AmsCommand::LENGTH,
                 got: bytes.len(),
             });
         }
