@@ -1,4 +1,4 @@
-use super::error::AdsError;
+use super::error::StateFlagError;
 use core::ops::{BitAnd, BitOr, BitOrAssign, Not};
 use std::fmt;
 
@@ -126,7 +126,7 @@ impl StateFlag {
     }
 
     /// Tries to parse a `StateFlag` from a byte slice.
-    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, AdsError> {
+    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, StateFlagError> {
         bytes.try_into()
     }
 
@@ -211,14 +211,13 @@ impl From<StateFlag> for [u8; StateFlag::LENGTH] {
 }
 
 impl TryFrom<&[u8]> for StateFlag {
-    type Error = AdsError;
+    type Error = StateFlagError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() < StateFlag::LENGTH {
-            return Err(AdsError::InvalidBufferSize {
-                item: "StateFlag",
+            return Err(StateFlagError::InvalidBufferSize {
                 expected: StateFlag::LENGTH,
-                found: value.len(),
+                got: value.len(),
             });
         }
         Ok(Self::from([value[0], value[1]]))
