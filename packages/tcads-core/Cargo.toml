@@ -12,5 +12,5 @@ readme = "README.md"
 
 [dependencies]
 thiserror = { workspace = true }
-tokio = {workspace = true, features = ["io-util", "net"]}
+tokio = { workspace = true, features = ["io-util", "net", "macros"] }
 encoding_rs = { workspace = true }
