@@ -16,5 +16,6 @@ repository = "https://github.com/fisothemes/tcads-rs"
 [workspace.dependencies]
 tcads-core = { path = "packages/tcads-core" }
 tokio = "1"
+tokio-test = "0.4"
 thiserror = "2"
 encoding_rs = "0.8"
