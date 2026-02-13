@@ -1,3 +1,4 @@
+use super::AdsError;
 use super::command::AdsCommand;
 use super::return_codes::AdsReturnCode;
 use super::state_flag::StateFlag;
@@ -83,5 +84,116 @@ impl AdsHeader {
     /// This ID makes it possible to assign a received response to a request.
     pub fn invoke_id(&self) -> u32 {
         self.invoke_id
+    }
+
+    /// Converts the current instance into a byte array.
+    pub fn to_bytes(&self) -> [u8; ADS_HEADER_LEN] {
+        self.into()
+    }
+
+    /// Creates a new AdsHeader from a byte array.
+    pub fn from_bytes(bytes: [u8; ADS_HEADER_LEN]) -> Self {
+        Self::from(bytes)
+    }
+
+    /// Tries to parse an `AdsHeader` from a byte slice.
+    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, AdsError> {
+        bytes.try_into()
+    }
+}
+
+impl From<&AdsHeader> for [u8; ADS_HEADER_LEN] {
+    fn from(value: &AdsHeader) -> Self {
+        let mut buf = [0u8; ADS_HEADER_LEN];
+
+        buf[0..8].copy_from_slice(&value.target.to_bytes());
+        buf[8..16].copy_from_slice(&value.source.to_bytes());
+        buf[16..18].copy_from_slice(&value.command_id.to_bytes());
+        buf[18..20].copy_from_slice(&value.state_flags.to_bytes());
+        buf[20..24].copy_from_slice(&value.length.to_le_bytes());
+        buf[24..28].copy_from_slice(&value.error_code.to_bytes());
+        buf[28..32].copy_from_slice(&value.invoke_id.to_le_bytes());
+
+        buf
+    }
+}
+
+impl From<AdsHeader> for [u8; ADS_HEADER_LEN] {
+    fn from(value: AdsHeader) -> Self {
+        (&value).into()
+    }
+}
+
+impl From<&[u8; ADS_HEADER_LEN]> for AdsHeader {
+    fn from(value: &[u8; ADS_HEADER_LEN]) -> Self {
+        let target = AmsAddr::from_bytes(value[0..8].try_into().unwrap());
+        let source = AmsAddr::from_bytes(value[8..16].try_into().unwrap());
+        let command_id = AdsCommand::from_bytes(value[16..18].try_into().unwrap());
+        let state_flags = StateFlag::from_bytes(value[18..20].try_into().unwrap());
+        let length = u32::from_le_bytes(value[20..24].try_into().unwrap());
+        let error_code = AdsReturnCode::from_bytes(value[24..28].try_into().unwrap());
+        let invoke_id = u32::from_le_bytes(value[28..32].try_into().unwrap());
+
+        Self {
+            target,
+            source,
+            command_id,
+            state_flags,
+            length,
+            error_code,
+            invoke_id,
+        }
+    }
+}
+
+impl From<[u8; ADS_HEADER_LEN]> for AdsHeader {
+    fn from(value: [u8; ADS_HEADER_LEN]) -> Self {
+        (&value).into()
+    }
+}
+
+impl TryFrom<&[u8]> for AdsHeader {
+    type Error = AdsError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() < ADS_HEADER_LEN {
+            return Err(AdsError::InvalidBufferSize {
+                item: "AdsHeader",
+                expected: ADS_HEADER_LEN,
+                found: value.len(),
+            });
+        }
+        Ok(Self::from(&value[0..ADS_HEADER_LEN].try_into().unwrap()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ams::AmsNetId;
+
+    #[test]
+    fn test_roundtrip_serialization() {
+        let target = AmsAddr::new(AmsNetId::new(192, 168, 0, 1, 1, 1), 851);
+        let source = AmsAddr::new(AmsNetId::new(10, 10, 10, 10, 1, 1), 30000);
+
+        let header = AdsHeader::new(
+            target,
+            source,
+            AdsCommand::AdsRead,
+            StateFlag::tcp_ads_request(),
+            4,
+            AdsReturnCode::Ok,
+            12345,
+        );
+
+        let bytes = header.to_bytes();
+        let parsed = AdsHeader::from_bytes(bytes);
+        let parsed_slice = AdsHeader::try_from_slice(&bytes[..ADS_HEADER_LEN]).unwrap();
+
+        assert_eq!(header, parsed);
+        assert_eq!(parsed.command_id(), AdsCommand::AdsRead);
+        assert_eq!(parsed.invoke_id(), 12345);
+        assert_eq!(parsed_slice, parsed);
     }
 }
