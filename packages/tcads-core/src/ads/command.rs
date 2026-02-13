@@ -1,4 +1,4 @@
-use super::error::AdsError;
+use super::error::AdsCommandError;
 
 /// ADS Command IDs used within the AMS Header.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -44,7 +44,7 @@ impl AdsCommand {
     }
 
     /// Tries to parse an `AdsCommand` from a byte slice.
-    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, AdsError> {
+    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, AdsCommandError> {
         bytes.try_into()
     }
 }
@@ -98,14 +98,13 @@ impl From<AdsCommand> for [u8; AdsCommand::LENGTH] {
 }
 
 impl TryFrom<&[u8]> for AdsCommand {
-    type Error = AdsError;
+    type Error = AdsCommandError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         if bytes.len() < AdsCommand::LENGTH {
-            return Err(AdsError::InvalidBufferSize {
-                item: "AdsCommand",
+            return Err(AdsCommandError::InvalidBufferSize {
                 expected: AdsCommand::LENGTH,
-                found: bytes.len(),
+                got: bytes.len(),
             });
         }
         Ok(Self::from([bytes[0], bytes[1]]))

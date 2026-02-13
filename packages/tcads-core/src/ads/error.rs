@@ -9,4 +9,14 @@ pub enum AdsError {
         expected: usize,
         found: usize,
     },
+    /// Invalid command format or content
+    #[error("Invalid ADS command: {0}")]
+    InvalidCommand(#[from] AdsCommandError),
+}
+
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum AdsCommandError {
+    /// Unexpected buffer size
+    #[error("Invalid buffer size: expected {expected} bytes, got {got}")]
+    InvalidBufferSize { expected: usize, got: usize },
 }
