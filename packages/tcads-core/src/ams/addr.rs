@@ -9,9 +9,6 @@ use std::str::FromStr;
 /// AMS port number
 pub type AmsPort = u16;
 
-/// Length of the AMS address (8 bytes)
-pub const AMS_ADDR_LEN: usize = 8;
-
 /// An address in the ADS network (AMS Net ID + AMS Port No.).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct AmsAddr {
@@ -20,6 +17,9 @@ pub struct AmsAddr {
 }
 
 impl AmsAddr {
+    /// The length of an AMS address in bytes.
+    pub const LENGTH: usize = 8;
+
     /// Creates a new ADS address.
     pub const fn new(net_id: AmsNetId, port: AmsPort) -> Self {
         Self { net_id, port }
@@ -36,12 +36,12 @@ impl AmsAddr {
     }
 
     /// Converts the current instance into a byte array.
-    pub fn to_bytes(&self) -> [u8; AMS_ADDR_LEN] {
+    pub fn to_bytes(&self) -> [u8; AmsAddr::LENGTH] {
         self.into()
     }
 
     /// Converts the given byte array into an [`AmsAddr`].
-    pub fn from_bytes(bytes: [u8; AMS_ADDR_LEN]) -> Self {
+    pub fn from_bytes(bytes: [u8; AmsAddr::LENGTH]) -> Self {
         Self::from(bytes)
     }
 
@@ -63,9 +63,9 @@ impl From<AmsAddr> for (AmsNetId, AmsPort) {
     }
 }
 
-impl From<&AmsAddr> for [u8; AMS_ADDR_LEN] {
+impl From<&AmsAddr> for [u8; AmsAddr::LENGTH] {
     fn from(value: &AmsAddr) -> Self {
-        let mut buf = [0u8; AMS_ADDR_LEN];
+        let mut buf = [0u8; AmsAddr::LENGTH];
 
         buf[..AmsNetId::LENGTH].copy_from_slice(value.net_id.as_bytes());
         buf[AmsNetId::LENGTH..].copy_from_slice(&value.port.to_le_bytes());
@@ -74,9 +74,9 @@ impl From<&AmsAddr> for [u8; AMS_ADDR_LEN] {
     }
 }
 
-impl From<[u8; AMS_ADDR_LEN]> for AmsAddr {
+impl From<[u8; AmsAddr::LENGTH]> for AmsAddr {
     /// Converts an array of 8 bytes (6 bytes NetId + 2 bytes port in little-endian) into an [`AmsAddr`].
-    fn from(value: [u8; AMS_ADDR_LEN]) -> Self {
+    fn from(value: [u8; AmsAddr::LENGTH]) -> Self {
         Self::try_from(&value[..]).unwrap()
     }
 }
@@ -86,9 +86,9 @@ impl TryFrom<&[u8]> for AmsAddr {
 
     /// Converts a slice of bytes into an [`AmsAddr`]. The slice must contain at least 8 bytes.
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        if bytes.len() < AMS_ADDR_LEN {
+        if bytes.len() < AmsAddr::LENGTH {
             return Err(AddrError::BufferTooSmall {
-                expected: AMS_ADDR_LEN,
+                expected: AmsAddr::LENGTH,
                 found: bytes.len(),
             });
         }

@@ -166,9 +166,9 @@ impl TryFrom<AmsFrame> for PortConnectResponse {
             });
         }
 
-        if header.length() as usize != ams::AMS_ADDR_LEN {
+        if header.length() as usize != AmsAddr::LENGTH {
             return Err(ProtocolError::UnexpectedLength {
-                expected: ams::AMS_ADDR_LEN,
+                expected: AmsAddr::LENGTH,
                 got: header.length() as usize,
             });
         }
@@ -237,7 +237,7 @@ mod tests {
         let frame = AmsFrame::from(resp);
 
         assert_eq!(frame.header().command(), AmsCommand::PortConnect);
-        assert_eq!(frame.header().length() as usize, ams::AMS_ADDR_LEN);
+        assert_eq!(frame.header().length() as usize, AmsAddr::LENGTH);
 
         let payload = frame.payload();
 
