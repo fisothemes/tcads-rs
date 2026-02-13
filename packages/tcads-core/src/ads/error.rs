@@ -1,14 +1,16 @@
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum AdsError {
-    #[error("Buffer too small for ADS Header: expected {expected}, found {found}")]
-    HeaderBufferTooSmall { expected: usize, found: usize },
-
-    #[error("Buffer too small for {item}: expected {expected}, found {found}")]
-    InvalidBufferSize {
-        item: &'static str,
-        expected: usize,
-        found: usize,
-    },
+    /// Invalid ADS header format or content
+    #[error("Invalid ADS header: {0}")]
+    InvalidAdsHeader(#[from] AdsHeaderError),
+    /// Invalid ADS return code format or content.
+    /// This is not the [AdsReturnCode](super::AdsReturnCode).
+    /// Just errors to do with formatting into a valid return code.
+    #[error("Invalid ADS return code: {0}")]
+    InvalidAdsReturnCode(#[from] AdsReturnCodeError),
+    /// Invalid AMS state flag format or content
+    #[error("Invalid AMS state flag: {0}")]
+    InvalidStateFlag(#[from] StateFlagError),
     /// Invalid command format or content
     #[error("Invalid ADS command: {0}")]
     InvalidCommand(#[from] AdsCommandError),
