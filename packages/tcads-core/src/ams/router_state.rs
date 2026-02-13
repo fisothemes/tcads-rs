@@ -17,13 +17,16 @@ pub enum RouterState {
 }
 
 impl RouterState {
+    /// Length of the [`RouterState`] in bytes.
+    pub const LENGTH: usize = 4;
+
     /// Creates a new [`RouterState`] from a byte array.
-    pub fn from_bytes(bytes: [u8; 4]) -> Self {
+    pub fn from_bytes(bytes: [u8; RouterState::LENGTH]) -> Self {
         u32::from_le_bytes(bytes).into()
     }
 
     /// Converts the current instance into a byte array.
-    pub fn to_bytes(&self) -> [u8; 4] {
+    pub fn to_bytes(&self) -> [u8; RouterState::LENGTH] {
         (*self).into()
     }
 
@@ -55,13 +58,13 @@ impl From<RouterState> for u32 {
     }
 }
 
-impl From<[u8; 4]> for RouterState {
-    fn from(bytes: [u8; 4]) -> Self {
+impl From<[u8; RouterState::LENGTH]> for RouterState {
+    fn from(bytes: [u8; RouterState::LENGTH]) -> Self {
         u32::from_le_bytes(bytes).into()
     }
 }
 
-impl From<RouterState> for [u8; 4] {
+impl From<RouterState> for [u8; RouterState::LENGTH] {
     fn from(value: RouterState) -> Self {
         let value: u32 = value.into();
         value.to_le_bytes()
@@ -71,9 +74,9 @@ impl From<RouterState> for [u8; 4] {
 impl TryFrom<&[u8]> for RouterState {
     type Error = RouterStateError;
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        if bytes.len() != 4 {
+        if bytes.len() != RouterState::LENGTH {
             return Err(RouterStateError::InvalidBufferSize {
-                expected: 4,
+                expected: RouterState::LENGTH,
                 got: bytes.len(),
             });
         }
