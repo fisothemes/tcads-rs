@@ -1,3 +1,4 @@
+use super::ads::AdsError;
 use crate::ams::{AmsCommand, AmsError};
 use std::io;
 
@@ -7,6 +8,8 @@ pub enum ProtocolError {
     Io(#[from] io::Error),
     #[error("AMS Error: {0}")]
     Ams(#[from] AmsError),
+    #[error("ADS Error: {0}")]
+    Ads(#[from] AdsError),
     #[error("Unexpected AMS Command: expected {expected:?}, got {got:?}")]
     UnexpectedCommand {
         expected: AmsCommand,
