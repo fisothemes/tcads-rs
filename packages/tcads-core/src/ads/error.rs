@@ -11,6 +11,9 @@ pub enum AdsError {
     /// Invalid AMS state flag format or content
     #[error("Invalid AMS state flag: {0}")]
     InvalidStateFlag(#[from] StateFlagError),
+    /// Invalid ADS state format or content.
+    #[error("Invalid ADS state: {0}")]
+    InvalidAdsState(#[from] AdsStateError),
     /// Invalid command format or content
     #[error("Invalid ADS command: {0}")]
     InvalidCommand(#[from] AdsCommandError),
@@ -30,6 +33,12 @@ pub enum AdsReturnCodeError {
 
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum StateFlagError {
+    #[error("Unexpected length: expected {expected} bytes, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
+}
+
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum AdsStateError {
     #[error("Unexpected length: expected {expected} bytes, got {got}")]
     UnexpectedLength { expected: usize, got: usize },
 }
