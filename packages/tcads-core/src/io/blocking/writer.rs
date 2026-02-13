@@ -33,6 +33,7 @@ impl<W: Write> AmsWriter<W> {
 
     /// Writes a frame and immediately flushes the buffer.
     ///
+    /// This method performs the following steps:
     /// 1. Queues the header and payload into the internal buffer using vectored writes.
     /// 2. Calls [`flush`](Write::flush) to send the packet immediately.
     pub fn write_frame(&mut self, frame: &AmsFrame) -> io::Result<()> {
@@ -44,6 +45,10 @@ impl<W: Write> AmsWriter<W> {
     }
 
     /// Consumes the AmsWriter, returning the writer
+    ///
+    /// # Note
+    ///
+    /// The buffer is written out (flushed) before returning the writer.
     pub fn into_inner(self) -> Result<W, IntoInnerError<BufWriter<W>>> {
         self.writer.into_inner()
     }
