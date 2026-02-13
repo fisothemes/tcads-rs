@@ -15,6 +15,12 @@ pub enum AdsError {
 }
 
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum AmsTcpHeaderError {
+    #[error("Unexpected length: expected {expected} bytes, got {got} bytes")]
+    UnexpectedLength { expected: usize, got: usize },
+}
+
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum AdsReturnCodeError {
     /// Unexpected buffer size
     #[error("Invalid buffer size: expected {expected} bytes, got {got}")]

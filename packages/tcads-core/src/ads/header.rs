@@ -1,5 +1,5 @@
-use super::AdsError;
 use super::command::AdsCommand;
+use super::error::AmsTcpHeaderError;
 use super::return_codes::AdsReturnCode;
 use super::state_flag::StateFlag;
 use crate::ams::AmsAddr;
@@ -97,7 +97,7 @@ impl AdsHeader {
     }
 
     /// Tries to parse an `AdsHeader` from a byte slice.
-    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, AdsError> {
+    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, AmsTcpHeaderError> {
         bytes.try_into()
     }
 }
@@ -153,14 +153,13 @@ impl From<[u8; ADS_HEADER_LEN]> for AdsHeader {
 }
 
 impl TryFrom<&[u8]> for AdsHeader {
-    type Error = AdsError;
+    type Error = AmsTcpHeaderError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() < ADS_HEADER_LEN {
-            return Err(AdsError::InvalidBufferSize {
-                item: "AdsHeader",
+            return Err(AmsTcpHeaderError::UnexpectedLength {
                 expected: ADS_HEADER_LEN,
-                found: value.len(),
+                got: value.len(),
             });
         }
         Ok(Self::from(&value[0..ADS_HEADER_LEN].try_into().unwrap()))
