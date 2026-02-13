@@ -4,9 +4,6 @@ use super::return_codes::AdsReturnCode;
 use super::state_flag::StateFlag;
 use crate::ams::AmsAddr;
 
-/// Length of the ADS Header (32 bytes)
-pub const ADS_HEADER_LEN: usize = 32;
-
 /// The ADS Packet Header structure (32 bytes).
 ///
 /// This header follows the [AMS/TCP Header](crate::ams::AmsTcpHeader) in an ADS frame and contains
@@ -29,6 +26,9 @@ pub struct AdsHeader {
 }
 
 impl AdsHeader {
+    /// Length of the ADS Header (32 bytes)
+    pub const LENGTH: usize = 32;
+
     /// Creates a new ADS Header.
     pub fn new(
         target: AmsAddr,
@@ -87,12 +87,12 @@ impl AdsHeader {
     }
 
     /// Converts the current instance into a byte array.
-    pub fn to_bytes(&self) -> [u8; ADS_HEADER_LEN] {
+    pub fn to_bytes(&self) -> [u8; AdsHeader::LENGTH] {
         self.into()
     }
 
     /// Creates a new AdsHeader from a byte array.
-    pub fn from_bytes(bytes: [u8; ADS_HEADER_LEN]) -> Self {
+    pub fn from_bytes(bytes: [u8; AdsHeader::LENGTH]) -> Self {
         Self::from(bytes)
     }
 
@@ -102,9 +102,9 @@ impl AdsHeader {
     }
 }
 
-impl From<&AdsHeader> for [u8; ADS_HEADER_LEN] {
+impl From<&AdsHeader> for [u8; AdsHeader::LENGTH] {
     fn from(value: &AdsHeader) -> Self {
-        let mut buf = [0u8; ADS_HEADER_LEN];
+        let mut buf = [0u8; AdsHeader::LENGTH];
 
         buf[0..8].copy_from_slice(&value.target.to_bytes());
         buf[8..16].copy_from_slice(&value.source.to_bytes());
@@ -118,14 +118,14 @@ impl From<&AdsHeader> for [u8; ADS_HEADER_LEN] {
     }
 }
 
-impl From<AdsHeader> for [u8; ADS_HEADER_LEN] {
+impl From<AdsHeader> for [u8; AdsHeader::LENGTH] {
     fn from(value: AdsHeader) -> Self {
         (&value).into()
     }
 }
 
-impl From<&[u8; ADS_HEADER_LEN]> for AdsHeader {
-    fn from(value: &[u8; ADS_HEADER_LEN]) -> Self {
+impl From<&[u8; AdsHeader::LENGTH]> for AdsHeader {
+    fn from(value: &[u8; AdsHeader::LENGTH]) -> Self {
         let target = AmsAddr::from_bytes(value[0..8].try_into().unwrap());
         let source = AmsAddr::from_bytes(value[8..16].try_into().unwrap());
         let command_id = AdsCommand::from_bytes(value[16..18].try_into().unwrap());
@@ -146,8 +146,8 @@ impl From<&[u8; ADS_HEADER_LEN]> for AdsHeader {
     }
 }
 
-impl From<[u8; ADS_HEADER_LEN]> for AdsHeader {
-    fn from(value: [u8; ADS_HEADER_LEN]) -> Self {
+impl From<[u8; AdsHeader::LENGTH]> for AdsHeader {
+    fn from(value: [u8; AdsHeader::LENGTH]) -> Self {
         (&value).into()
     }
 }
@@ -156,13 +156,13 @@ impl TryFrom<&[u8]> for AdsHeader {
     type Error = AdsHeaderError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        if value.len() != ADS_HEADER_LEN {
+        if value.len() != AdsHeader::LENGTH {
             return Err(AdsHeaderError::UnexpectedLength {
-                expected: ADS_HEADER_LEN,
+                expected: AdsHeader::LENGTH,
                 got: value.len(),
             });
         }
-        Ok(Self::from(&value[0..ADS_HEADER_LEN].try_into().unwrap()))
+        Ok(Self::from(&value[0..AdsHeader::LENGTH].try_into().unwrap()))
     }
 }
 
@@ -188,7 +188,7 @@ mod tests {
 
         let bytes = header.to_bytes();
         let parsed = AdsHeader::from_bytes(bytes);
-        let parsed_slice = AdsHeader::try_from_slice(&bytes[..ADS_HEADER_LEN]).unwrap();
+        let parsed_slice = AdsHeader::try_from_slice(&bytes[..AdsHeader::LENGTH]).unwrap();
 
         assert_eq!(header, parsed);
         assert_eq!(parsed.command_id(), AdsCommand::AdsRead);
