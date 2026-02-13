@@ -1,3 +1,4 @@
+use super::error::AdsError;
 use core::ops::{BitAnd, BitOr, BitOrAssign, Not};
 use std::fmt;
 
@@ -8,6 +9,9 @@ use std::fmt;
 pub struct StateFlag(pub u16);
 
 impl StateFlag {
+    /// The length of the State Flag in bytes.
+    pub const LENGTH: usize = 2;
+
     /// Bit 0: RESPONSE
     ///
     /// 0 = This message is a *request*
@@ -111,6 +115,21 @@ impl StateFlag {
         Self(Self::ADS_COMMAND | Self::UDP | Self::RESPONSE)
     }
 
+    /// Creates `StateFlag` from a 2-byte array (Little Endian).
+    pub fn from_bytes(bytes: [u8; Self::LENGTH]) -> Self {
+        Self::from(bytes)
+    }
+
+    /// Converts flags to a 2-byte array (Little Endian).
+    pub fn to_bytes(&self) -> [u8; Self::LENGTH] {
+        (*self).into()
+    }
+
+    /// Tries to parse a `StateFlag` from a byte slice.
+    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, AdsError> {
+        bytes.try_into()
+    }
+
     /// True if the RESPONSE bit is set (Server -> Client).
     pub fn is_response(&self) -> bool {
         (self.0 & Self::RESPONSE) != 0
@@ -176,6 +195,33 @@ impl From<u16> for StateFlag {
 impl From<StateFlag> for u16 {
     fn from(flag: StateFlag) -> Self {
         flag.0
+    }
+}
+
+impl From<[u8; Self::LENGTH]> for StateFlag {
+    fn from(value: [u8; Self::LENGTH]) -> Self {
+        Self(u16::from_le_bytes(value))
+    }
+}
+
+impl From<StateFlag> for [u8; StateFlag::LENGTH] {
+    fn from(value: StateFlag) -> Self {
+        value.0.to_le_bytes()
+    }
+}
+
+impl TryFrom<&[u8]> for StateFlag {
+    type Error = AdsError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() < StateFlag::LENGTH {
+            return Err(AdsError::InvalidBufferSize {
+                item: "StateFlag",
+                expected: StateFlag::LENGTH,
+                found: value.len(),
+            });
+        }
+        Ok(Self::from([value[0], value[1]]))
     }
 }
 
@@ -462,5 +508,25 @@ mod tests {
         assert!(flag.is_request());
         assert!(flag.is_udp());
         assert!(flag.is_broadcast());
+    }
+
+    #[test]
+    fn test_from_bytes() {
+        let bytes = [0x01, 0x02];
+        let flag = StateFlag::from_bytes(bytes);
+        assert_eq!(flag.0, 0x0201);
+    }
+
+    #[test]
+    fn test_to_bytes() {
+        let flag = StateFlag::from_bytes([0x01, 0x02]);
+        assert_eq!(flag.to_bytes(), [0x01, 0x02]);
+    }
+
+    #[test]
+    fn test_try_from_slice() {
+        let bytes = [0x01, 0x02];
+        let flag = StateFlag::try_from_slice(&bytes[..]).unwrap();
+        assert_eq!(flag.0, 0x0201);
     }
 }
