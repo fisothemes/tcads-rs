@@ -1,3 +1,5 @@
+use super::error::AdsError;
+
 /// ADS Command IDs used within the AMS Header.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AdsCommand {
@@ -25,6 +27,26 @@ pub enum AdsCommand {
     AdsReadWrite,
     /// A command ID not known to this library version, probably an internal command.
     Other(u16),
+}
+
+impl AdsCommand {
+    /// The length of the ADS Command ID in bytes.
+    pub const LENGTH: usize = 2;
+
+    /// Creates a new `AdsCommand` from a 2-byte array (Little Endian).
+    pub fn from_bytes(bytes: [u8; Self::LENGTH]) -> Self {
+        Self::from(bytes)
+    }
+
+    /// Converts the command to a 2-byte array (Little Endian).
+    pub fn to_bytes(&self) -> [u8; Self::LENGTH] {
+        (*self).into()
+    }
+
+    /// Tries to parse an `AdsCommand` from a byte slice.
+    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, AdsError> {
+        bytes.try_into()
+    }
 }
 
 impl From<u16> for AdsCommand {
@@ -63,6 +85,33 @@ impl From<AdsCommand> for u16 {
     }
 }
 
+impl From<[u8; Self::LENGTH]> for AdsCommand {
+    fn from(bytes: [u8; Self::LENGTH]) -> Self {
+        u16::from_le_bytes(bytes).into()
+    }
+}
+
+impl From<AdsCommand> for [u8; AdsCommand::LENGTH] {
+    fn from(cmd: AdsCommand) -> Self {
+        u16::from(cmd).to_le_bytes()
+    }
+}
+
+impl TryFrom<&[u8]> for AdsCommand {
+    type Error = AdsError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        if bytes.len() < AdsCommand::LENGTH {
+            return Err(AdsError::InvalidBufferSize {
+                item: "AdsCommand",
+                expected: AdsCommand::LENGTH,
+                found: bytes.len(),
+            });
+        }
+        Ok(Self::from([bytes[0], bytes[1]]))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -85,5 +134,26 @@ mod tests {
     #[test]
     fn test_command_id_ord() {
         assert!(AdsCommand::AdsReadDeviceInfo < AdsCommand::AdsReadWrite);
+    }
+
+    #[test]
+    fn test_command_id_bytes() {
+        assert_eq!(AdsCommand::AdsReadDeviceInfo.to_bytes(), [0x01, 0x00]);
+    }
+
+    #[test]
+    fn test_command_id_from_bytes() {
+        assert_eq!(
+            AdsCommand::from_bytes([0x01, 0x00]),
+            AdsCommand::AdsReadDeviceInfo
+        );
+    }
+
+    #[test]
+    fn test_command_id_try_from_slice() {
+        assert_eq!(
+            AdsCommand::try_from_slice(&[0x01, 0x00]).unwrap(),
+            AdsCommand::AdsReadDeviceInfo
+        );
     }
 }
