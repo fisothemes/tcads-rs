@@ -2,9 +2,6 @@ use super::error::NetIdError;
 use std::fmt;
 use std::str::FromStr;
 
-/// Length of the AMS Net ID (6 bytes)
-pub const NETID_LEN: usize = 6;
-
 /// Length of the AMS port (2 bytes)
 pub const AMS_PORT_LEN: usize = 2;
 
@@ -15,9 +12,12 @@ pub const AMS_PORT_LEN: usize = 2;
 /// The **AMS Net ID** is purely logical and usually has no relation to the IP address.
 /// It is configured at the target system. At the PC this TwinCAT System Control is used.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct AmsNetId([u8; NETID_LEN]);
+pub struct AmsNetId([u8; AmsNetId::LENGTH]);
 
 impl AmsNetId {
+    /// The length of an AMS Net ID in bytes.
+    pub const LENGTH: usize = 6;
+
     /// Create a new AmsNetId from the given octets.
     pub const fn new(oct1: u8, oct2: u8, oct3: u8, oct4: u8, oct5: u8, oct6: u8) -> Self {
         Self([oct1, oct2, oct3, oct4, oct5, oct6])
@@ -29,12 +29,12 @@ impl AmsNetId {
     }
 
     /// Converts the current instance into a byte array.
-    pub fn to_bytes(&self) -> [u8; NETID_LEN] {
+    pub fn to_bytes(&self) -> [u8; AmsNetId::LENGTH] {
         self.0
     }
 
     /// Converts the given byte array into an [`AmsNetId`].
-    pub fn from_bytes(bytes: [u8; NETID_LEN]) -> Self {
+    pub fn from_bytes(bytes: [u8; AmsNetId::LENGTH]) -> Self {
         Self(bytes)
     }
 
@@ -44,9 +44,9 @@ impl AmsNetId {
     }
 }
 
-impl From<[u8; NETID_LEN]> for AmsNetId {
+impl From<[u8; AmsNetId::LENGTH]> for AmsNetId {
     /// Convert an array of 6 bytes into an [`AmsNetId`].
-    fn from(value: [u8; NETID_LEN]) -> Self {
+    fn from(value: [u8; AmsNetId::LENGTH]) -> Self {
         Self(value)
     }
 }
@@ -56,15 +56,15 @@ impl TryFrom<&[u8]> for AmsNetId {
 
     /// Convert a slice of bytes into an [`AmsNetId`].
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        if bytes.len() != NETID_LEN {
+        if bytes.len() != AmsNetId::LENGTH {
             return Err(NetIdError::InvalidBufferSize {
-                expected: NETID_LEN,
+                expected: AmsNetId::LENGTH,
                 got: bytes.len(),
             });
         }
 
-        let mut arr = [0u8; NETID_LEN];
-        arr.copy_from_slice(&bytes[..NETID_LEN]);
+        let mut arr = [0u8; AmsNetId::LENGTH];
+        arr.copy_from_slice(&bytes[..AmsNetId::LENGTH]);
         Ok(Self(arr))
     }
 }
@@ -74,12 +74,12 @@ impl FromStr for AmsNetId {
 
     /// Parse AMS Net ID from string like `"192.168.1.1.1.1"`
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut bytes = [0u8; NETID_LEN];
+        let mut bytes = [0u8; AmsNetId::LENGTH];
         let mut parts = s.split('.');
 
         for (i, byte) in bytes.iter_mut().enumerate() {
             let part = parts.next().ok_or(NetIdError::WrongOctetCount {
-                expected: NETID_LEN,
+                expected: AmsNetId::LENGTH,
                 got: i,
             })?;
 
@@ -92,8 +92,8 @@ impl FromStr for AmsNetId {
         let extra_count = parts.count();
         if extra_count > 0 {
             return Err(NetIdError::WrongOctetCount {
-                expected: NETID_LEN,
-                got: NETID_LEN + extra_count,
+                expected: AmsNetId::LENGTH,
+                got: AmsNetId::LENGTH + extra_count,
             });
         }
 
@@ -101,7 +101,7 @@ impl FromStr for AmsNetId {
     }
 }
 
-impl From<AmsNetId> for [u8; NETID_LEN] {
+impl From<AmsNetId> for [u8; AmsNetId::LENGTH] {
     fn from(value: AmsNetId) -> Self {
         value.0
     }

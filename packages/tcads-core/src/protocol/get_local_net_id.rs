@@ -134,9 +134,9 @@ impl TryFrom<AmsFrame> for GetLocalNetIdResponse {
             });
         }
 
-        if header.length() as usize != ams::NETID_LEN {
+        if header.length() as usize != AmsNetId::LENGTH {
             return Err(ProtocolError::UnexpectedLength {
-                expected: ams::NETID_LEN,
+                expected: AmsNetId::LENGTH,
                 got: header.length() as usize,
             });
         }
@@ -215,7 +215,7 @@ mod tests {
         let frame = resp.to_frame();
 
         assert_eq!(frame.header().command(), AmsCommand::GetLocalNetId);
-        assert_eq!(frame.header().length() as usize, ams::NETID_LEN);
+        assert_eq!(frame.header().length() as usize, AmsNetId::LENGTH);
         assert_eq!(frame.payload(), &[192, 168, 1, 1, 1, 1]);
     }
 

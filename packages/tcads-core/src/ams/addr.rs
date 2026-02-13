@@ -2,7 +2,7 @@
 //! An ADS network address consists of an AMS Net ID and an AMS port number.
 
 use super::error::AddrError;
-use super::net_id::{AmsNetId, NETID_LEN};
+use super::net_id::AmsNetId;
 use std::fmt;
 use std::str::FromStr;
 
@@ -67,8 +67,8 @@ impl From<&AmsAddr> for [u8; AMS_ADDR_LEN] {
     fn from(value: &AmsAddr) -> Self {
         let mut buf = [0u8; AMS_ADDR_LEN];
 
-        buf[..NETID_LEN].copy_from_slice(value.net_id.as_bytes());
-        buf[NETID_LEN..].copy_from_slice(&value.port.to_le_bytes());
+        buf[..AmsNetId::LENGTH].copy_from_slice(value.net_id.as_bytes());
+        buf[AmsNetId::LENGTH..].copy_from_slice(&value.port.to_le_bytes());
 
         buf
     }
