@@ -708,7 +708,7 @@ impl TryFrom<&[u8]> for AdsReturnCode {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() < AdsReturnCode::LENGTH {
-            return Err(AdsReturnCodeError::InvalidBufferSize {
+            return Err(AdsReturnCodeError::UnexpectedLength {
                 expected: AdsReturnCode::LENGTH,
                 got: value.len(),
             });

@@ -102,7 +102,7 @@ impl TryFrom<&[u8]> for AdsCommand {
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         if bytes.len() < AdsCommand::LENGTH {
-            return Err(AdsCommandError::InvalidBufferSize {
+            return Err(AdsCommandError::UnexpectedLength {
                 expected: AdsCommand::LENGTH,
                 got: bytes.len(),
             });

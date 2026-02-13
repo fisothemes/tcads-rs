@@ -215,7 +215,7 @@ impl TryFrom<&[u8]> for StateFlag {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() < StateFlag::LENGTH {
-            return Err(StateFlagError::InvalidBufferSize {
+            return Err(StateFlagError::UnexpectedLength {
                 expected: StateFlag::LENGTH,
                 got: value.len(),
             });

@@ -22,21 +22,18 @@ pub enum AmsTcpHeaderError {
 
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum AdsReturnCodeError {
-    /// Unexpected buffer size
-    #[error("Invalid buffer size: expected {expected} bytes, got {got}")]
-    InvalidBufferSize { expected: usize, got: usize },
+    #[error("Unexpected length: expected {expected} bytes, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
 }
 
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum StateFlagError {
-    /// Unexpected buffer size
-    #[error("Invalid buffer size: expected {expected} bytes, got {got}")]
-    InvalidBufferSize { expected: usize, got: usize },
+    #[error("Unexpected length: expected {expected} bytes, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
 }
 
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum AdsCommandError {
-    /// Unexpected buffer size
-    #[error("Invalid buffer size: expected {expected} bytes, got {got}")]
-    InvalidBufferSize { expected: usize, got: usize },
+    #[error("Unexpected length: expected {expected} bytes, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
 }
