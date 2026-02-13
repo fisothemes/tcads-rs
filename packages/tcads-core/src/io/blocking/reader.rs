@@ -60,9 +60,9 @@ impl<R: Read> AmsReader<R> {
     /// ```no_run
     /// use tcads_core::io::blocking::AmsStream;
     /// use tcads_core::ams::AmsCommand;
-    /// use tcads_core::error::Error;
+    /// use tcads_core::protocol::ProtocolError;
     ///
-    /// fn run_client(tcp: std::net::TcpStream) -> Result<(), Error> {
+    /// fn run_client(tcp: std::net::TcpStream) -> Result<(), ProtocolError> {
     ///     let stream = AmsStream::new(tcp);
     ///     let (reader, mut writer) = stream.try_split()?;
     ///
