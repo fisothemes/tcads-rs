@@ -1,4 +1,4 @@
-use crate::ams::{AMS_TCP_HEADER_LEN, AmsTcpHeader};
+use crate::ams::AmsTcpHeader;
 use crate::io::frame::{AMS_FRAME_MAX_LEN, AmsFrame};
 use std::io::{self, BufRead, BufReader, Read};
 
@@ -31,7 +31,7 @@ impl<R: Read> AmsReader<R> {
             return Err(io::Error::from(io::ErrorKind::UnexpectedEof));
         }
 
-        let mut header_buf = [0u8; AMS_TCP_HEADER_LEN];
+        let mut header_buf = [0u8; AmsTcpHeader::LENGTH];
         self.reader.read_exact(&mut header_buf)?;
         let header = AmsTcpHeader::from(header_buf);
 

@@ -1,7 +1,7 @@
 use super::reader::AmsReader;
 use super::traits::WriteAllVectored;
 use super::writer::AmsWriter;
-use crate::ams::{AMS_TCP_HEADER_LEN, AmsTcpHeader};
+use crate::ams::AmsTcpHeader;
 use crate::io::frame::{AMS_FRAME_MAX_LEN, AmsFrame};
 use std::io::{self, IoSlice, Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpStream};
@@ -30,7 +30,7 @@ impl<S: Read + Write> AmsStream<S> {
     /// or [`try_split`](AmsStream::try_split) to get an [`AmsReader`], which buffers reads
     /// to minimise system calls.
     pub fn read_frame(&mut self) -> io::Result<AmsFrame> {
-        let mut header_buf = [0u8; AMS_TCP_HEADER_LEN];
+        let mut header_buf = [0u8; AmsTcpHeader::LENGTH];
         self.stream.read_exact(&mut header_buf)?;
         let header = AmsTcpHeader::from(header_buf);
 

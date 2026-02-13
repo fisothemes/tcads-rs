@@ -1,7 +1,7 @@
-use crate::ams::{AMS_TCP_HEADER_LEN, AmsCommand, AmsTcpHeader};
+use crate::ams::{AmsCommand, AmsTcpHeader};
 
 /// Maximum allowed AMS frame/packet size (64KB) to prevent allocation attacks.
-pub const AMS_FRAME_MAX_LEN: usize = 65535 - AMS_TCP_HEADER_LEN;
+pub const AMS_FRAME_MAX_LEN: usize = 65535 - AmsTcpHeader::LENGTH;
 
 /// A single AMS frame/packet consisting of a header and a payload.
 ///
@@ -99,7 +99,7 @@ impl AmsFrame {
 
     /// Returns the total size of this frame in bytes (header + payload).
     pub fn total_size(&self) -> usize {
-        AMS_TCP_HEADER_LEN + self.payload.len()
+        AmsTcpHeader::LENGTH + self.payload.len()
     }
 
     /// Serializes the frame into a byte vector.
@@ -108,7 +108,7 @@ impl AmsFrame {
     /// For I/O, prefer using an `AmsWriter` which can use vectored I/O
     /// depending on implementation.
     pub fn to_vec(&self) -> Vec<u8> {
-        let mut vec = Vec::with_capacity(AMS_TCP_HEADER_LEN + self.payload.len());
+        let mut vec = Vec::with_capacity(AmsTcpHeader::LENGTH + self.payload.len());
         vec.extend_from_slice(&self.header.to_bytes());
         vec.extend_from_slice(&self.payload);
         vec
@@ -220,6 +220,6 @@ mod tests {
     #[test]
     fn total_size_is_correct() {
         let frame = AmsFrame::new(AmsCommand::GetLocalNetId, [1, 2, 3, 4]);
-        assert_eq!(frame.total_size(), AMS_TCP_HEADER_LEN + 4);
+        assert_eq!(frame.total_size(), AmsTcpHeader::LENGTH + 4);
     }
 }

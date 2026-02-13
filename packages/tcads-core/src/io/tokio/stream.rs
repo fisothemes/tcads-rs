@@ -1,7 +1,7 @@
 use super::reader::AmsReader;
 use super::traits::WriteAllVectored;
 use super::writer::AmsWriter;
-use crate::ams::{AMS_TCP_HEADER_LEN, AmsTcpHeader};
+use crate::ams::AmsTcpHeader;
 use crate::io::frame::{AMS_FRAME_MAX_LEN, AmsFrame};
 use std::io::IoSlice;
 use std::net::SocketAddr;
@@ -36,7 +36,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AmsStream<S> {
     /// [`into_split`](AmsStream::into_split) to get an [`AmsReader`], which buffers
     /// reads to minimise system calls and handles clean EOFs more gracefully.
     pub async fn read_frame(&mut self) -> io::Result<AmsFrame> {
-        let mut header_buf = [0u8; AMS_TCP_HEADER_LEN];
+        let mut header_buf = [0u8; AmsTcpHeader::LENGTH];
         self.stream.read_exact(&mut header_buf).await?;
         let header = AmsTcpHeader::from(header_buf);
 

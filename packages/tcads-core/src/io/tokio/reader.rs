@@ -1,4 +1,4 @@
-use crate::ams::{AMS_TCP_HEADER_LEN, AmsTcpHeader};
+use crate::ams::AmsTcpHeader;
 use crate::io::frame::{AMS_FRAME_MAX_LEN, AmsFrame};
 use tokio::io::{self, AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
 
@@ -37,7 +37,7 @@ impl<R: AsyncRead + Unpin> AmsReader<R> {
             return Err(io::Error::from(io::ErrorKind::UnexpectedEof));
         }
 
-        let mut header_buf = [0u8; AMS_TCP_HEADER_LEN];
+        let mut header_buf = [0u8; AmsTcpHeader::LENGTH];
         self.reader.read_exact(&mut header_buf).await?;
         let header = AmsTcpHeader::from(header_buf);
 
@@ -122,7 +122,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_payload_too_large() {
-        let mut header = [0u8; AMS_TCP_HEADER_LEN];
+        let mut header = [0u8; AmsTcpHeader::LENGTH];
         let bad_len = (AMS_FRAME_MAX_LEN as u32 + 1).to_le_bytes();
         header[2..6].copy_from_slice(&bad_len);
 

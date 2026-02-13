@@ -1,9 +1,6 @@
 use super::command::AmsCommand;
 use super::error::AmsTcpHeaderError;
 
-/// Length of the AMS TCP header (6 bytes).
-pub const AMS_TCP_HEADER_LEN: usize = 6;
-
 /// The 6-byte prefix for TCP communication.
 ///
 /// See [Beckhoff ADS Specification (TE1000)](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/115846283.html?id=5591912318145837195).
@@ -14,6 +11,9 @@ pub struct AmsTcpHeader {
 }
 
 impl AmsTcpHeader {
+    /// Length of the AMS/TCP header in bytes.
+    pub const LENGTH: usize = 6;
+
     /// Constructs a new AmsTcpHeader.
     pub fn new(command: AmsCommand, length: u32) -> Self {
         Self { command, length }
@@ -30,12 +30,12 @@ impl AmsTcpHeader {
     }
 
     /// Creates a new AmsTcpHeader from a byte array.
-    pub fn from_bytes(bytes: [u8; AMS_TCP_HEADER_LEN]) -> Self {
+    pub fn from_bytes(bytes: [u8; AmsTcpHeader::LENGTH]) -> Self {
         Self::from(bytes)
     }
 
     /// Converts the current instance into a byte array.
-    pub fn to_bytes(&self) -> [u8; AMS_TCP_HEADER_LEN] {
+    pub fn to_bytes(&self) -> [u8; AmsTcpHeader::LENGTH] {
         self.into()
     }
 
@@ -44,20 +44,20 @@ impl AmsTcpHeader {
     }
 }
 
-impl From<&AmsTcpHeader> for [u8; AMS_TCP_HEADER_LEN] {
+impl From<&AmsTcpHeader> for [u8; AmsTcpHeader::LENGTH] {
     fn from(value: &AmsTcpHeader) -> Self {
-        let mut buf = [0u8; AMS_TCP_HEADER_LEN];
+        let mut buf = [0u8; AmsTcpHeader::LENGTH];
         buf[..2].copy_from_slice(&u16::from(value.command).to_le_bytes());
-        buf[2..AMS_TCP_HEADER_LEN].copy_from_slice(&value.length.to_le_bytes());
+        buf[2..AmsTcpHeader::LENGTH].copy_from_slice(&value.length.to_le_bytes());
         buf
     }
 }
 
-impl From<[u8; AMS_TCP_HEADER_LEN]> for AmsTcpHeader {
-    fn from(value: [u8; AMS_TCP_HEADER_LEN]) -> Self {
+impl From<[u8; AmsTcpHeader::LENGTH]> for AmsTcpHeader {
+    fn from(value: [u8; AmsTcpHeader::LENGTH]) -> Self {
         Self {
             command: AmsCommand::from(u16::from_le_bytes(value[0..2].try_into().unwrap())),
-            length: u32::from_le_bytes(value[2..AMS_TCP_HEADER_LEN].try_into().unwrap()),
+            length: u32::from_le_bytes(value[2..AmsTcpHeader::LENGTH].try_into().unwrap()),
         }
     }
 }
@@ -66,14 +66,14 @@ impl TryFrom<&[u8]> for AmsTcpHeader {
     type Error = AmsTcpHeaderError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        if value.len() < AMS_TCP_HEADER_LEN {
+        if value.len() < AmsTcpHeader::LENGTH {
             return Err(AmsTcpHeaderError::BufferTooSmall {
-                expected: AMS_TCP_HEADER_LEN,
+                expected: AmsTcpHeader::LENGTH,
                 found: value.len(),
             });
         }
 
-        let value: [u8; AMS_TCP_HEADER_LEN] = value[..AMS_TCP_HEADER_LEN].try_into().unwrap();
+        let value: [u8; AmsTcpHeader::LENGTH] = value[..AmsTcpHeader::LENGTH].try_into().unwrap();
 
         Ok(Self::from(value))
     }
@@ -102,13 +102,13 @@ mod tests {
 
     #[test]
     fn test_try_from_slice_too_small() {
-        let err = AmsTcpHeader::try_from(&[0u8; AMS_TCP_HEADER_LEN - 1][..]).unwrap_err();
+        let err = AmsTcpHeader::try_from(&[0u8; AmsTcpHeader::LENGTH - 1][..]).unwrap_err();
 
         assert_eq! {
             err,
             AmsTcpHeaderError::BufferTooSmall {
-                expected: AMS_TCP_HEADER_LEN,
-                found: AMS_TCP_HEADER_LEN - 1,
+                expected: AmsTcpHeader::LENGTH,
+                found: AmsTcpHeader::LENGTH - 1,
             }
         }
     }
