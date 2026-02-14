@@ -10,7 +10,7 @@ use std::str::FromStr;
 pub type AmsPort = u16;
 
 /// An address in the ADS network (AMS Net ID + AMS Port No.).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct AmsAddr {
     net_id: AmsNetId,
     port: AmsPort,

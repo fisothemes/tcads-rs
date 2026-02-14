@@ -11,7 +11,7 @@ pub const AMS_PORT_LEN: usize = 2;
 ///
 /// The **AMS Net ID** is purely logical and usually has no relation to the IP address.
 /// It is configured at the target system. At the PC this TwinCAT System Control is used.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct AmsNetId([u8; AmsNetId::LENGTH]);
 
 impl AmsNetId {
