@@ -14,6 +14,9 @@ pub enum AdsError {
     /// Invalid ADS state format or content.
     #[error("Invalid ADS state: {0}")]
     InvalidAdsState(#[from] AdsStateError),
+    /// Invalid ADS notification transmission mode format or content.
+    #[error("Invalid ADS notification transmission mode: {0}")]
+    InvalidAdsTransMode(#[from] AdsTransModeError),
     /// Invalid command format or content
     #[error("Invalid ADS command: {0}")]
     InvalidCommand(#[from] AdsCommandError),
@@ -39,6 +42,12 @@ pub enum StateFlagError {
 
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum AdsStateError {
+    #[error("Unexpected length: expected {expected} bytes, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
+}
+
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum AdsTransModeError {
     #[error("Unexpected length: expected {expected} bytes, got {got}")]
     UnexpectedLength { expected: usize, got: usize },
 }
