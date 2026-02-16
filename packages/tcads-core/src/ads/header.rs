@@ -100,6 +100,20 @@ impl AdsHeader {
     pub fn try_from_slice(bytes: &[u8]) -> Result<Self, AdsHeaderError> {
         bytes.try_into()
     }
+
+    /// Parses an `AdsHeader` from the beginning of the byte slice, returning the header
+    /// and the remaining bytes.
+    pub fn parse_prefix(bytes: &[u8]) -> Result<(Self, &[u8]), AdsHeaderError> {
+        if bytes.len() < Self::LENGTH {
+            return Err(AdsHeaderError::UnexpectedLength {
+                expected: Self::LENGTH,
+                got: bytes.len(),
+            });
+        }
+
+        let header = AdsHeader::from_bytes(bytes[..Self::LENGTH].try_into().unwrap());
+        Ok((header, &bytes[Self::LENGTH..]))
+    }
 }
 
 impl From<&AdsHeader> for [u8; AdsHeader::LENGTH] {
