@@ -1,3 +1,5 @@
+use crate::ads::StateFlag;
+
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum AdsError {
     /// Invalid ADS header format or content
@@ -20,6 +22,9 @@ pub enum AdsError {
     /// Invalid command format or content
     #[error("Invalid ADS command: {0}")]
     InvalidCommand(#[from] AdsCommandError),
+    /// Invalid ADS data length format or content (not header or return code).
+    #[error("Unexpected data length: expected {expected} bytes, got {got} bytes")]
+    UnexpectedDataLength { expected: usize, got: usize },
 }
 
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
@@ -38,6 +43,11 @@ pub enum AdsReturnCodeError {
 pub enum StateFlagError {
     #[error("Unexpected length: expected {expected} bytes, got {got}")]
     UnexpectedLength { expected: usize, got: usize },
+    #[error("Unexpected state flag: expected one of {expected:?}, got {got:?}")]
+    UnexpectedStateFlag {
+        expected: Vec<StateFlag>,
+        got: StateFlag,
+    },
 }
 
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
