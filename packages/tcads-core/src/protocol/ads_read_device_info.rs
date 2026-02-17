@@ -153,6 +153,12 @@ impl AdsReadDeviceInfoResponse {
     /// Size of the ADS Read Device Info Response body.
     pub const PAYLOAD_SIZE: usize = 24;
 
+    /// Creates a new Read Device Info Response over TCP.
+    ///
+    /// # Note
+    ///
+    /// The device name is limited to 16 bytes and must use character valid in
+    /// the Windows-1252 (CP1252) encoding.
     pub fn try_new(
         target: AmsAddr,
         source: AmsAddr,
@@ -181,32 +187,58 @@ impl AdsReadDeviceInfoResponse {
         })
     }
 
+    /// Tries to parse a response from an AMS Frame.
     pub fn try_from_frame(frame: &AmsFrame) -> Result<Self, ProtocolError> {
         Self::try_from(frame)
     }
 
+    /// Consumes the response and converts it into an AMS Frame.
     pub fn into_frame(self) -> AmsFrame {
         AmsFrame::from(&self)
     }
 
+    /// Serializes the response into an AMS Frame.
     pub fn to_frame(&self) -> AmsFrame {
         AmsFrame::from(self)
     }
 
+    /// Returns the ADS return code.
     pub fn result(&self) -> AdsReturnCode {
         self.result
     }
 
+    /// Returns the ADS device version.
     pub fn version(&self) -> AdsDeviceVersion {
         self.version
     }
 
+    /// Returns the ADS device name.
     pub fn device_name(&self) -> Cow<'_, str> {
         self.device_name.as_str()
     }
 
+    /// Returns the ADS header.
     pub fn header(&self) -> &AdsHeader {
         &self.header
+    }
+
+    /// Parses the response payload into a tuple of return code, version, and device name.
+    pub fn parse_payload(
+        payload: &[u8],
+    ) -> Result<(AdsReturnCode, AdsDeviceVersion, AdsString<16>), AdsError> {
+        if payload.len() != Self::PAYLOAD_SIZE {
+            return Err(AdsError::UnexpectedDataLength {
+                expected: Self::PAYLOAD_SIZE,
+                got: payload.len(),
+            })?;
+        }
+
+        let result = AdsReturnCode::try_from_slice(&payload[0..4]).map_err(AdsError::from)?;
+        let version = AdsDeviceVersion::try_from_slice(&payload[4..8]).map_err(AdsError::from)?;
+        let raw_name: [u8; 16] = payload[8..24].try_into().unwrap();
+        let device_name = AdsString::from(raw_name);
+
+        Ok((result, version, device_name))
     }
 }
 
@@ -260,18 +292,7 @@ impl TryFrom<&AmsFrame> for AdsReadDeviceInfoResponse {
             .map_err(AdsError::from)?;
         }
 
-        if data.len() != Self::PAYLOAD_SIZE {
-            return Err(AdsError::UnexpectedDataLength {
-                expected: Self::PAYLOAD_SIZE,
-                got: data.len(),
-            })?;
-        }
-
-        let result = AdsReturnCode::try_from_slice(&data[0..4]).map_err(AdsError::from)?;
-        let version = AdsDeviceVersion::try_from_slice(&data[4..8]).map_err(AdsError::from)?;
-
-        let raw_name: [u8; 16] = data[8..24].try_into().unwrap();
-        let device_name = AdsString::from(raw_name);
+        let (result, version, device_name) = Self::parse_payload(&data)?;
 
         Ok(Self {
             header,
