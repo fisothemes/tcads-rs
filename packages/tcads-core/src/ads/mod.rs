@@ -9,7 +9,7 @@ pub mod string;
 pub mod trans_mode;
 
 pub use command::AdsCommand;
-pub use device_state::AdsState;
+pub use device_state::{AdsState, DeviceState};
 pub use device_version::AdsDeviceVersion;
 pub use error::{
     AdsCommandError, AdsDeviceVersionError, AdsError, AdsHeaderError, AdsReturnCodeError,

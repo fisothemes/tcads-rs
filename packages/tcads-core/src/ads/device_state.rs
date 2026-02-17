@@ -1,5 +1,17 @@
 use super::error::AdsStateError;
 
+/// The device status of the ADS device.
+///
+/// # Note
+///
+/// The documentation is extremely unclear about the meaning of this value.
+///
+/// - **For a TwinCAT PLC:** It is almost always `0`.
+/// - **For Custom ADS Servers:** If you write your own ADS Server,
+///   you can put whatever status flags you want in there
+///   (e.g. bitmask for "Overheating", "Door Open").
+pub type DeviceState = u16;
+
 /// The ADS State of the device.
 ///
 /// Describes the current operating state (e.g. Run, Stop, Config).
