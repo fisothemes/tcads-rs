@@ -57,6 +57,12 @@ pub enum AdsStateError {
 }
 
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum AdsDeviceVersionError {
+    #[error("Unexpected length: expected {expected} bytes, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
+}
+
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum AdsTransModeError {
     #[error("Unexpected length: expected {expected} bytes, got {got}")]
     UnexpectedLength { expected: usize, got: usize },
