@@ -6,7 +6,7 @@ pub mod port_close;
 pub mod port_connect;
 pub mod router_notification;
 
-pub use ads_read_device_info::AdsReadDeviceInfoRequest;
+pub use ads_read_device_info::{AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse};
 pub use ads_read_state::{AdsReadStateRequest, AdsReadStateResponse};
 pub use error::ProtocolError;
 pub use get_local_net_id::{GetLocalNetIdRequest, GetLocalNetIdResponse};
