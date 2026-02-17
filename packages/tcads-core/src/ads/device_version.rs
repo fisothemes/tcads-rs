@@ -1,8 +1,9 @@
 use super::error::AdsDeviceVersionError;
 use std::fmt;
+use std::fmt::Debug;
 
 /// An ADS Device's version number.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct AdsDeviceVersion {
     major: u8,
     minor: u8,
@@ -93,6 +94,12 @@ impl TryFrom<&[u8]> for AdsDeviceVersion {
             });
         }
         Ok(Self::from([bytes[0], bytes[1], bytes[2], bytes[3]]))
+    }
+}
+
+impl Debug for AdsDeviceVersion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}.{}.{}", self.major, self.minor, self.build)
     }
 }
 
