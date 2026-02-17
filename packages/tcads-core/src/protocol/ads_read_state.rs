@@ -1,6 +1,7 @@
 use super::ProtocolError;
 use crate::ads::{
-    AdsCommand, AdsError, AdsHeader, AdsReturnCode, AdsState, StateFlag, StateFlagError,
+    AdsCommand, AdsError, AdsHeader, AdsReturnCode, AdsState, DeviceState, StateFlag,
+    StateFlagError,
 };
 use crate::ams::{AmsAddr, AmsCommand};
 use crate::io::AmsFrame;
@@ -163,6 +164,7 @@ impl AdsReadStateResponse {
     /// The size of the ADS Read State Response body (Result + AdsState + DeviceState).
     pub const PAYLOAD_SIZE: usize = 8;
 
+    /// Creates a new Read State Response over TCP.
     pub fn new(
         target: AmsAddr,
         source: AmsAddr,
@@ -189,13 +191,14 @@ impl AdsReadStateResponse {
         }
     }
 
+    /// Creates a new Read State Response over UDP.
     pub fn new_udp(
         target: AmsAddr,
         source: AmsAddr,
         invoke_id: u32,
         result: AdsReturnCode,
         ads_state: AdsState,
-        device_state: u16,
+        device_state: DeviceState,
     ) -> Self {
         let header = AdsHeader::new(
             target,
@@ -215,32 +218,68 @@ impl AdsReadStateResponse {
         }
     }
 
+    /// Tries to parse a response from an AMS Frame.
     pub fn try_from_frame(frame: &AmsFrame) -> Result<Self, ProtocolError> {
         Self::try_from(frame)
     }
 
+    /// Consumes the response and converts it into an AMS Frame.
     pub fn into_frame(self) -> AmsFrame {
         AmsFrame::from(&self)
     }
 
+    /// Serializes the response into an AMS Frame.
     pub fn to_frame(&self) -> AmsFrame {
         AmsFrame::from(self)
     }
 
+    /// Returns the ADS return code.
     pub fn result(&self) -> AdsReturnCode {
         self.result
     }
 
+    /// Returns the ADS status of the device.
     pub fn ads_state(&self) -> AdsState {
         self.ads_state
     }
 
-    pub fn device_state(&self) -> u16 {
+    /// Returns the device status of the device.
+    ///
+    /// # Note
+    ///
+    /// The documentation is extremely unclear about the meaning of this value.
+    ///
+    /// - **For a TwinCAT PLC:** It is almost always `0`.
+    /// - **For Custom ADS Servers:** If you write your own ADS Server,
+    ///   you can put whatever status flags you want in there
+    ///   (e.g. bitmask for "Overheating", "Door Open").
+    pub fn device_state(&self) -> DeviceState {
         self.device_state
     }
 
+    /// Returns the ADS header.
     pub fn header(&self) -> &AdsHeader {
         &self.header
+    }
+
+    /// Parses only the ADS payload portion (8 bytes).
+    ///
+    /// Returns the [ADS Return Code](AdsReturnCode), [ADS State](AdsState), and [Device State](DeviceState)
+    pub fn parse_payload(
+        payload: &[u8],
+    ) -> Result<(AdsReturnCode, AdsState, DeviceState), ProtocolError> {
+        if payload.len() != Self::PAYLOAD_SIZE {
+            return Err(AdsError::UnexpectedDataLength {
+                expected: Self::PAYLOAD_SIZE,
+                got: payload.len(),
+            })?;
+        }
+
+        let result = AdsReturnCode::try_from_slice(&payload[0..4]).map_err(AdsError::from)?;
+        let ads_state = AdsState::try_from_slice(&payload[4..6]).map_err(AdsError::from)?;
+        let device_state = u16::from_le_bytes(payload[6..8].try_into().unwrap());
+
+        Ok((result, ads_state, device_state))
     }
 }
 
@@ -294,16 +333,7 @@ impl TryFrom<&AmsFrame> for AdsReadStateResponse {
             .map_err(AdsError::from)?;
         }
 
-        if data.len() != Self::PAYLOAD_SIZE {
-            return Err(AdsError::UnexpectedDataLength {
-                expected: Self::PAYLOAD_SIZE,
-                got: data.len(),
-            })?;
-        }
-
-        let result = AdsReturnCode::try_from_slice(&data[0..4]).map_err(AdsError::from)?;
-        let ads_state = AdsState::try_from_slice(&data[4..6]).map_err(AdsError::from)?;
-        let device_state = u16::from_le_bytes(data[6..8].try_into().unwrap());
+        let (result, ads_state, device_state) = Self::parse_payload(data)?;
 
         Ok(Self {
             header,
