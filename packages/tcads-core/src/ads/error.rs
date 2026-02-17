@@ -22,6 +22,12 @@ pub enum AdsError {
     /// Invalid command format or content
     #[error("Invalid ADS command: {0}")]
     InvalidCommand(#[from] AdsCommandError),
+    /// Invalid ADS device version format or content.
+    #[error("Invalid ADS device version: {0}")]
+    InvalidAdsDeviceVersion(#[from] AdsDeviceVersionError),
+    /// Invalid ADS string format or content.
+    #[error("Invalid ADS string: {0}")]
+    InvalidAdsString(#[from] AdsStringError),
     /// Invalid ADS data length format or content (not header or return code).
     #[error("Unexpected data length: expected {expected} bytes, got {got} bytes")]
     UnexpectedDataLength { expected: usize, got: usize },
@@ -72,4 +78,17 @@ pub enum AdsTransModeError {
 pub enum AdsCommandError {
     #[error("Unexpected length: expected {expected} bytes, got {got}")]
     UnexpectedLength { expected: usize, got: usize },
+}
+
+/// Error returned when parsing an AdsString fails.
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum AdsStringError {
+    #[error("Invalid length: expected {expected} bytes, got {got}")]
+    TooLong { expected: usize, got: usize },
+    #[error("String contains characters not supported by Windows-1252 encoding")]
+    EncodingError,
+    #[error("Invalid UTF-8: {0}")]
+    InvalidUtf8(#[from] std::str::Utf8Error),
+    #[error("Invalid ADS string: {0}")]
+    Other(String),
 }

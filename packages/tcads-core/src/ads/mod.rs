@@ -5,6 +5,7 @@ pub mod error;
 pub mod header;
 pub mod return_codes;
 pub mod state_flag;
+pub mod string;
 pub mod trans_mode;
 
 pub use command::AdsCommand;
@@ -17,4 +18,5 @@ pub use error::{
 pub use header::AdsHeader;
 pub use return_codes::AdsReturnCode;
 pub use state_flag::StateFlag;
+pub use string::AdsString;
 pub use trans_mode::AdsTransMode;
