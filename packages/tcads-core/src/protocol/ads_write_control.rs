@@ -6,6 +6,24 @@ use crate::ads::{
 use crate::ams::{AmsAddr, AmsCommand};
 use crate::io::AmsFrame;
 
+// Represents an ADS Write Control Request (Command `0x0005`).
+///
+/// This command is sent to an ADS device to change its ADS state (e.g., Run, Stop) and/or device state.
+///
+/// # Usage
+/// * **Client:** Sends this to control the state of the target device (e.g. starting/stopping a PLC).
+/// * **Server:** Receives this, attempts the state transition, and responds with [`AdsWriteControlResponse`].
+///
+/// # Protocol Details
+/// * **AMS Command:** [`AdsCommand`](AmsCommand::AdsCommand) (`0x0000`)
+/// * **ADS Command:** [`AdsWriteControl`](AdsCommand::AdsWriteControl) (`0x0005`)
+/// * **ADS Payload Length:** 8 + n bytes (ADS State + Device State + Length + Data)
+/// * **ADS Payload Layout:**
+///   * **ADS State:** 2 bytes ([`AdsState`]) - The new target state (e.g., [`AdsState::Run`]).
+///   * **Device State:** 2 bytes (u16) - The new device-specific state (usually 0).
+///   * **Length:** 4 bytes (u32) - Length of the additional data.
+///   * **Data:** n bytes - Additional data to transfer further information. Optional for current
+///     ADS Devices (PLC, NC, ...).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AdsWriteControlRequest {
     header: AdsHeader,
@@ -15,8 +33,10 @@ pub struct AdsWriteControlRequest {
 }
 
 impl AdsWriteControlRequest {
+    /// The minimum size of the ADS payload (State + Device State + Length).
     pub const MIN_PAYLOAD_SIZE: usize = 8;
 
+    /// Creates a new Write Control Request without additional data.
     pub fn new(
         target: AmsAddr,
         source: AmsAddr,
@@ -34,6 +54,10 @@ impl AdsWriteControlRequest {
         )
     }
 
+    /// Creates a new Write Control Request with additional data.
+    ///
+    /// Additional data to transfer further information. At this moment in time, it is not known
+    /// what that data is 🙁.
     pub fn with_data(
         target: AmsAddr,
         source: AmsAddr,
@@ -62,14 +86,17 @@ impl AdsWriteControlRequest {
         }
     }
 
+    /// Tries to parse a request from an AMS Frame.
     pub fn try_from_frame(frame: &AmsFrame) -> Result<Self, ProtocolError> {
         Self::try_from(frame)
     }
 
+    /// Consumes the request and converts it into an AMS Frame.
     pub fn into_frame(self) -> AmsFrame {
         AmsFrame::from(&self)
     }
 
+    /// Serializes the request into an AMS Frame.
     pub fn to_frame(&self) -> AmsFrame {
         AmsFrame::from(self)
     }
@@ -78,14 +105,17 @@ impl AdsWriteControlRequest {
         &self.header
     }
 
+    /// Returns the ADS state.
     pub fn ads_state(&self) -> AdsState {
         self.ads_state
     }
 
+    /// Returns the device state.
     pub fn device_state(&self) -> DeviceState {
         self.device_state
     }
 
+    /// Returns the additional data.
     pub fn data(&self) -> &[u8] {
         &self.data
     }
@@ -192,6 +222,21 @@ impl TryFrom<AmsFrame> for AdsWriteControlRequest {
     }
 }
 
+/// Represents an ADS Write Control Response (Command `0x0005`).
+///
+/// This is the reply sent by the ADS device indicating the success or failure of the state
+/// change operation.
+///
+/// # Usage
+/// * **Server:** Sends this to acknowledge a state change request.
+/// * **Client:** Receives this to confirm the operation was successful.
+///
+/// # Protocol Details
+/// * **AMS Command:** [`AdsCommand`](AmsCommand::AdsCommand) (`0x0000`)
+/// * **ADS Command:** [`AdsWriteControl`](AdsCommand::AdsWriteControl) (`0x0005`)
+/// * **ADS Payload Length:** 4 bytes
+/// * **ADS Payload Layout:**
+///   * **Result Code:** 4 bytes ([`AdsReturnCode`])
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AdsWriteControlResponse {
     header: AdsHeader,
@@ -199,8 +244,10 @@ pub struct AdsWriteControlResponse {
 }
 
 impl AdsWriteControlResponse {
-    const PAYLOAD_SIZE: usize = 4;
+    /// Size of the ADS Write Control Response body.
+    pub const PAYLOAD_SIZE: usize = 4;
 
+    /// Creates a new Write Control Response.
     pub fn new(target: AmsAddr, source: AmsAddr, invoke_id: u32, result: AdsReturnCode) -> Self {
         Self {
             header: AdsHeader::new(
@@ -216,22 +263,27 @@ impl AdsWriteControlResponse {
         }
     }
 
+    /// Tries to parse a response from an AMS Frame.
     pub fn try_from_frame(frame: &AmsFrame) -> Result<Self, ProtocolError> {
         Self::try_from(frame)
     }
 
+    /// Consumes the response and converts it into an AMS Frame.
     pub fn into_frame(self) -> AmsFrame {
         AmsFrame::from(&self)
     }
 
+    /// Serializes the response into an AMS Frame.
     pub fn to_frame(&self) -> AmsFrame {
         AmsFrame::from(self)
     }
 
+    /// Returns the ADS header.
     pub fn header(&self) -> &AdsHeader {
         &self.header
     }
 
+    /// Returns the [ADS Return Code](AdsReturnCode).
     pub fn result(&self) -> AdsReturnCode {
         self.result
     }
