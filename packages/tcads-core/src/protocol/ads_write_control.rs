@@ -191,3 +191,111 @@ impl TryFrom<AmsFrame> for AdsWriteControlRequest {
         Self::try_from(&value)
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AdsWriteControlResponse {
+    header: AdsHeader,
+    result: AdsReturnCode,
+}
+
+impl AdsWriteControlResponse {
+    const PAYLOAD_SIZE: usize = 4;
+
+    pub fn new(target: AmsAddr, source: AmsAddr, invoke_id: u32, result: AdsReturnCode) -> Self {
+        Self {
+            header: AdsHeader::new(
+                target,
+                source,
+                AdsCommand::AdsWriteControl,
+                StateFlag::tcp_ads_response(),
+                Self::PAYLOAD_SIZE as u32,
+                result,
+                invoke_id,
+            ),
+            result,
+        }
+    }
+
+    pub fn try_from_frame(frame: &AmsFrame) -> Result<Self, ProtocolError> {
+        Self::try_from(frame)
+    }
+
+    pub fn into_frame(self) -> AmsFrame {
+        AmsFrame::from(&self)
+    }
+
+    pub fn to_frame(&self) -> AmsFrame {
+        AmsFrame::from(self)
+    }
+
+    pub fn header(&self) -> &AdsHeader {
+        &self.header
+    }
+
+    pub fn result(&self) -> AdsReturnCode {
+        self.result
+    }
+
+    /// Parses only the ADS payload portion.
+    ///
+    /// Returns the [ADS Return Code](AdsReturnCode).
+    pub fn parse_payload(payload: &[u8]) -> Result<AdsReturnCode, ProtocolError> {
+        if payload.len() != Self::PAYLOAD_SIZE {
+            return Err(AdsError::UnexpectedDataLength {
+                expected: Self::PAYLOAD_SIZE,
+                got: payload.len(),
+            })?;
+        }
+
+        Ok(AdsReturnCode::try_from_slice(payload).map_err(AdsError::from)?)
+    }
+}
+
+impl From<&AdsWriteControlResponse> for AmsFrame {
+    fn from(value: &AdsWriteControlResponse) -> Self {
+        AmsFrame::new(AmsCommand::AdsCommand, value.result.to_bytes())
+    }
+}
+
+impl From<AdsWriteControlResponse> for AmsFrame {
+    fn from(value: AdsWriteControlResponse) -> Self {
+        AmsFrame::from(&value)
+    }
+}
+
+impl TryFrom<&AmsFrame> for AdsWriteControlResponse {
+    type Error = ProtocolError;
+
+    fn try_from(value: &AmsFrame) -> Result<Self, Self::Error> {
+        let header = value.header();
+
+        if header.command() != AmsCommand::AdsCommand {
+            return Err(ProtocolError::UnexpectedAmsCommand {
+                expected: AmsCommand::AdsCommand,
+                got: header.command(),
+            });
+        }
+
+        let (header, data) = AdsHeader::parse_prefix(value.payload()).map_err(AdsError::from)?;
+
+        if header.command_id() != AdsCommand::AdsWriteControl {
+            return Err(ProtocolError::UnexpectedAdsCommand {
+                expected: AdsCommand::AdsWriteControl,
+                got: header.command_id(),
+            });
+        }
+
+        if !header.state_flags().is_response() {
+            return Err(StateFlagError::UnexpectedStateFlag {
+                expected: vec![StateFlag::tcp_ads_response(), StateFlag::udp_ads_response()],
+                got: header.state_flags(),
+            })
+            .map_err(AdsError::from)?;
+        }
+
+        Ok(Self {
+            header,
+            result: Self::parse_payload(data)?,
+        })
+    }
+}

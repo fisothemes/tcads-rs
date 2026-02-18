@@ -9,7 +9,7 @@ pub mod router_notification;
 
 pub use ads_read_device_info::{AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse};
 pub use ads_read_state::{AdsReadStateRequest, AdsReadStateResponse};
-pub use ads_write_control::AdsWriteControlRequest;
+pub use ads_write_control::{AdsWriteControlRequest, AdsWriteControlResponse};
 pub use error::ProtocolError;
 pub use get_local_net_id::{GetLocalNetIdRequest, GetLocalNetIdResponse};
 pub use port_close::PortCloseRequest;
