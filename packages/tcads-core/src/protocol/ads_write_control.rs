@@ -196,11 +196,10 @@ impl TryFrom<&AmsFrame> for AdsWriteControlRequest {
         }
 
         if !header.state_flags().is_request() {
-            return Err(StateFlagError::UnexpectedStateFlag {
+            return Err(AdsError::from(StateFlagError::UnexpectedStateFlag {
                 expected: vec![StateFlag::tcp_ads_request(), StateFlag::udp_ads_request()],
                 got: header.state_flags(),
-            })
-            .map_err(AdsError::from)?;
+            }))?;
         }
 
         let (ads_state, device_state, data) = Self::parse_payload(data)?;
@@ -344,11 +343,10 @@ impl TryFrom<&AmsFrame> for AdsWriteControlResponse {
         }
 
         if !header.state_flags().is_response() {
-            return Err(StateFlagError::UnexpectedStateFlag {
+            return Err(AdsError::from(StateFlagError::UnexpectedStateFlag {
                 expected: vec![StateFlag::tcp_ads_response(), StateFlag::udp_ads_response()],
                 got: header.state_flags(),
-            })
-            .map_err(AdsError::from)?;
+            }))?;
         }
 
         Ok(Self {

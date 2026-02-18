@@ -111,11 +111,10 @@ impl TryFrom<&AmsFrame> for AdsReadStateRequest {
         }
 
         if !header.state_flags().is_request() {
-            return Err(StateFlagError::UnexpectedStateFlag {
+            return Err(AdsError::from(StateFlagError::UnexpectedStateFlag {
                 expected: vec![StateFlag::tcp_ads_request(), StateFlag::udp_ads_request()],
                 got: header.state_flags(),
-            })
-            .map_err(AdsError::from)?;
+            }))?;
         }
 
         if !data.is_empty() {
@@ -326,11 +325,10 @@ impl TryFrom<&AmsFrame> for AdsReadStateResponse {
         }
 
         if !header.state_flags().is_response() {
-            return Err(StateFlagError::UnexpectedStateFlag {
+            return Err(AdsError::from(StateFlagError::UnexpectedStateFlag {
                 expected: vec![StateFlag::tcp_ads_response(), StateFlag::udp_ads_response()],
                 got: header.state_flags(),
-            })
-            .map_err(AdsError::from)?;
+            }))?;
         }
 
         let (result, ads_state, device_state) = Self::parse_payload(data)?;
