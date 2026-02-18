@@ -253,7 +253,13 @@ impl AdsWriteControlResponse {
 
 impl From<&AdsWriteControlResponse> for AmsFrame {
     fn from(value: &AdsWriteControlResponse) -> Self {
-        AmsFrame::new(AmsCommand::AdsCommand, value.result.to_bytes())
+        let mut payload =
+            Vec::with_capacity(AdsHeader::LENGTH + AdsWriteControlResponse::PAYLOAD_SIZE);
+
+        payload.extend_from_slice(&value.header.to_bytes());
+        payload.extend_from_slice(&value.result.to_bytes());
+
+        AmsFrame::new(AmsCommand::AdsCommand, payload)
     }
 }
 
