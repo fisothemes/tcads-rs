@@ -171,7 +171,7 @@ impl AdsReadStateResponse {
         invoke_id: u32,
         result: AdsReturnCode,
         ads_state: AdsState,
-        device_state: u16,
+        device_state: DeviceState,
     ) -> Self {
         let header = AdsHeader::new(
             target,
