@@ -20,3 +20,6 @@ pub use return_codes::AdsReturnCode;
 pub use state_flag::StateFlag;
 pub use string::AdsString;
 pub use trans_mode::AdsTransMode;
+
+pub type IndexGroup = u32;
+pub type IndexOffset = u32;
