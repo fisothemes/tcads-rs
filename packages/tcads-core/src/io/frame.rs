@@ -1,7 +1,7 @@
 use crate::ams::{AmsCommand, AmsTcpHeader};
 
-/// Maximum allowed AMS frame/packet size (64KB) to prevent allocation attacks.
-pub const AMS_FRAME_MAX_LEN: usize = 65535 - AmsTcpHeader::LENGTH;
+/// Maximum allowed AMS frame/packet size (4MB) to prevent allocation attacks.
+pub const AMS_FRAME_MAX_LEN: usize = 4 * 1024 * 1024;
 
 /// A single AMS frame/packet consisting of a header and a payload.
 ///
