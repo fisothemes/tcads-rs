@@ -1,3 +1,4 @@
+pub mod ads_read;
 pub mod ads_read_device_info;
 pub mod ads_read_state;
 pub mod ads_write_control;
@@ -7,6 +8,7 @@ pub mod port_close;
 pub mod port_connect;
 pub mod router_notification;
 
+pub use ads_read::{AdsReadRequest, AdsReadResponse};
 pub use ads_read_device_info::{AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse};
 pub use ads_read_state::{AdsReadStateRequest, AdsReadStateResponse};
 pub use ads_write_control::{AdsWriteControlRequest, AdsWriteControlResponse};
