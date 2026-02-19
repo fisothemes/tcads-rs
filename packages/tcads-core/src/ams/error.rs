@@ -27,7 +27,7 @@ pub enum AmsTcpHeaderError {
     UnknownCommand(u16),
     /// Invalid length field
     #[error("Invalid length: expected {} bytes, found {} bytes", expected, found)]
-    InvalidateLength { expected: usize, found: usize },
+    InvalidLength { expected: usize, found: usize },
     /// Buffer too small for AmsTcpHeader (needs 6 bytes: 2 for [`AmsCommand`](super::command::AmsCommand) + 4 for payload length)
     #[error("Buffer too small: expected {} bytes, found {}", expected, found)]
     BufferTooSmall { expected: usize, found: usize },
