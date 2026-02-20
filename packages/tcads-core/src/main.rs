@@ -2,9 +2,9 @@ use tcads_core::ads::{AdsCommand, AdsHeader, AdsState};
 use tcads_core::ams::{AmsAddr, AmsCommand};
 use tcads_core::io::blocking::AmsStream;
 use tcads_core::protocol::{
-    AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse, AdsReadStateRequest, AdsReadStateResponse,
-    AdsWriteControlRequest, AdsWriteControlResponse, GetLocalNetIdRequest, GetLocalNetIdResponse,
-    PortConnectRequest, PortConnectResponse, RouterNotification,
+    AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateRequest,
+    AdsReadStateResponse, AdsWriteControlRequest, AdsWriteControlResponse, GetLocalNetIdRequest,
+    GetLocalNetIdResponse, PortConnectRequest, PortConnectResponse, RouterNotification,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -57,6 +57,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     AdsCommand::AdsWriteControl => {
                         let resp = AdsWriteControlResponse::parse_payload(payload)?;
                         println!("AdsWriteControl: {:?}", resp);
+                    }
+                    AdsCommand::AdsRead => {
+                        let resp = AdsReadResponse::parse_payload(payload)?;
+                        println!("AdsRead: {:?}", resp);
                     }
                     _ => todo!(),
                 }
