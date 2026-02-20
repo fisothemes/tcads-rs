@@ -9,10 +9,12 @@ pub mod port_connect;
 pub mod router_notification;
 pub mod utils;
 
-pub use ads_read::{AdsReadRequest, AdsReadResponse};
+pub use ads_read::{AdsReadRequest, AdsReadResponse, AdsReadResponseOwned};
 pub use ads_read_device_info::{AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse};
 pub use ads_read_state::{AdsReadStateRequest, AdsReadStateResponse};
-pub use ads_write_control::{AdsWriteControlRequest, AdsWriteControlResponse};
+pub use ads_write_control::{
+    AdsWriteControlRequest, AdsWriteControlRequestOwned, AdsWriteControlResponse,
+};
 pub use error::ProtocolError;
 pub use get_local_net_id::{GetLocalNetIdRequest, GetLocalNetIdResponse};
 pub use port_close::PortCloseRequest;

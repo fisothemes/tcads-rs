@@ -3,8 +3,9 @@ use tcads_core::ams::{AmsAddr, AmsCommand};
 use tcads_core::io::blocking::AmsStream;
 use tcads_core::protocol::{
     AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse, AdsReadResponse, AdsReadStateRequest,
-    AdsReadStateResponse, AdsWriteControlRequest, AdsWriteControlResponse, GetLocalNetIdRequest,
-    GetLocalNetIdResponse, PortConnectRequest, PortConnectResponse, RouterNotification,
+    AdsReadStateResponse, AdsWriteControlRequestOwned, AdsWriteControlResponse,
+    GetLocalNetIdRequest, GetLocalNetIdResponse, PortConnectRequest, PortConnectResponse,
+    RouterNotification,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -38,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 writer
                     .write_frame(&AdsReadDeviceInfoRequest::new(target, source, 23).into_frame())?;
                 writer.write_frame(
-                    &AdsWriteControlRequest::new(target, source, 24, AdsState::Stop, 0)
+                    &AdsWriteControlRequestOwned::new(target, source, 24, AdsState::Stop, 0)
                         .into_frame(),
                 )?;
             }
