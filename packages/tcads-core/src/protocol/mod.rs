@@ -1,6 +1,7 @@
 pub mod ads_read;
 pub mod ads_read_device_info;
 pub mod ads_read_state;
+pub mod ads_write;
 pub mod ads_write_control;
 pub mod error;
 pub mod get_local_net_id;
@@ -12,6 +13,7 @@ pub mod utils;
 pub use ads_read::{AdsReadRequest, AdsReadResponse, AdsReadResponseOwned};
 pub use ads_read_device_info::{AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse};
 pub use ads_read_state::{AdsReadStateRequest, AdsReadStateResponse};
+pub use ads_write::{AdsWriteRequest, AdsWriteRequestOwned, AdsWriteResponse};
 pub use ads_write_control::{
     AdsWriteControlRequest, AdsWriteControlRequestOwned, AdsWriteControlResponse,
 };
