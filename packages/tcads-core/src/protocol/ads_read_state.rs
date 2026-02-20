@@ -1,7 +1,6 @@
 use super::{ProtocolError, parse_ads_frame};
 use crate::ads::{
     AdsCommand, AdsError, AdsHeader, AdsReturnCode, AdsState, DeviceState, StateFlag,
-    StateFlagError,
 };
 use crate::ams::{AmsAddr, AmsCommand};
 use crate::io::AmsFrame;
