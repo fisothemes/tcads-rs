@@ -1,4 +1,4 @@
-use super::ProtocolError;
+use super::{ProtocolError, parse_ads_frame};
 use crate::ads::{
     AdsCommand, AdsError, AdsHeader, AdsReturnCode, AdsState, DeviceState, StateFlag,
     StateFlagError,
@@ -92,30 +92,7 @@ impl TryFrom<&AmsFrame> for AdsReadStateRequest {
     type Error = ProtocolError;
 
     fn try_from(value: &AmsFrame) -> Result<Self, Self::Error> {
-        let header = value.header();
-
-        if header.command() != AmsCommand::AdsCommand {
-            return Err(ProtocolError::UnexpectedAmsCommand {
-                expected: AmsCommand::AdsCommand,
-                got: header.command(),
-            });
-        };
-
-        let (header, data) = AdsHeader::parse_prefix(value.payload()).map_err(AdsError::from)?;
-
-        if header.command_id() != AdsCommand::AdsReadState {
-            return Err(ProtocolError::UnexpectedAdsCommand {
-                expected: AdsCommand::AdsReadState,
-                got: header.command_id(),
-            });
-        }
-
-        if !header.state_flags().is_request() {
-            return Err(AdsError::from(StateFlagError::UnexpectedStateFlag {
-                expected: vec![StateFlag::tcp_ads_request(), StateFlag::udp_ads_request()],
-                got: header.state_flags(),
-            }))?;
-        }
+        let (header, data) = parse_ads_frame(value, AdsCommand::AdsReadState, true)?;
 
         if !data.is_empty() {
             return Err(AdsError::UnexpectedDataLength {
@@ -306,30 +283,7 @@ impl TryFrom<&AmsFrame> for AdsReadStateResponse {
     type Error = ProtocolError;
 
     fn try_from(value: &AmsFrame) -> Result<Self, Self::Error> {
-        let header = value.header();
-
-        if header.command() != AmsCommand::AdsCommand {
-            return Err(ProtocolError::UnexpectedAmsCommand {
-                expected: AmsCommand::AdsCommand,
-                got: header.command(),
-            });
-        };
-
-        let (header, data) = AdsHeader::parse_prefix(value.payload()).map_err(AdsError::from)?;
-
-        if header.command_id() != AdsCommand::AdsReadState {
-            return Err(ProtocolError::UnexpectedAdsCommand {
-                expected: AdsCommand::AdsReadState,
-                got: header.command_id(),
-            });
-        }
-
-        if !header.state_flags().is_response() {
-            return Err(AdsError::from(StateFlagError::UnexpectedStateFlag {
-                expected: vec![StateFlag::tcp_ads_response(), StateFlag::udp_ads_response()],
-                got: header.state_flags(),
-            }))?;
-        }
+        let (header, data) = parse_ads_frame(value, AdsCommand::AdsReadState, false)?;
 
         let (result, ads_state, device_state) = Self::parse_payload(data)?;
 
