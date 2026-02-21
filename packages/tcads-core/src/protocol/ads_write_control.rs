@@ -60,6 +60,11 @@ impl<'a> AdsWriteControlRequest<'a> {
         self.device_state
     }
 
+    /// Returns the length of the additional data.
+    pub fn length(&self) -> u32 {
+        self.data.len() as u32
+    }
+
     /// Returns the additional data.
     pub fn data(&self) -> &[u8] {
         self.data
@@ -221,6 +226,11 @@ impl AdsWriteControlRequestOwned {
     /// Returns the device state.
     pub fn device_state(&self) -> DeviceState {
         self.device_state
+    }
+
+    /// Returns the length of the additional data.
+    pub fn length(&self) -> u32 {
+        self.data.len() as u32
     }
 
     /// Returns the additional data.

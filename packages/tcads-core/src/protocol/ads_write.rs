@@ -60,6 +60,11 @@ impl<'a> AdsWriteRequest<'a> {
         self.index_offset
     }
 
+    /// Returns the length of the data to be written.
+    pub fn length(&self) -> u32 {
+        self.data.len() as u32
+    }
+
     /// Returns a zero-copy slice of the data to be written.
     pub fn data(&self) -> &[u8] {
         self.data
@@ -197,6 +202,11 @@ impl AdsWriteRequestOwned {
     /// Returns the index offset.
     pub fn index_offset(&self) -> IndexOffset {
         self.index_offset
+    }
+
+    /// Returns the length of the data to be written.
+    pub fn length(&self) -> u32 {
+        self.data.len() as u32
     }
 
     /// Returns the data to be written.

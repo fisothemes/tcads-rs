@@ -208,6 +208,11 @@ impl<'a> AdsReadResponse<'a> {
         self.result
     }
 
+    /// Returns the length of the data read.
+    pub fn length(&self) -> u32 {
+        self.data.len() as u32
+    }
+
     /// Returns the data read.
     pub fn data(&self) -> &[u8] {
         self.data
@@ -334,6 +339,11 @@ impl AdsReadResponseOwned {
     /// Returns the [ADS Return Code](AdsReturnCode).
     pub fn result(&self) -> AdsReturnCode {
         self.result
+    }
+
+    /// Returns the length of the data read.
+    pub fn length(&self) -> u32 {
+        self.data.len() as u32
     }
 
     /// Returns the response data.
