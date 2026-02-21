@@ -2,6 +2,7 @@ pub mod command;
 pub mod device_state;
 pub mod device_version;
 pub mod error;
+pub mod filetime;
 pub mod header;
 pub mod notification_handle;
 pub mod return_codes;
@@ -15,7 +16,9 @@ pub use device_version::AdsDeviceVersion;
 pub use error::{
     AdsCommandError, AdsDeviceVersionError, AdsError, AdsHeaderError, AdsNotificationHandleError,
     AdsReturnCodeError, AdsStateError, AdsStringError, AdsTransModeError, StateFlagError,
+    WindowsFileTimeError,
 };
+pub use filetime::WindowsFileTime;
 pub use header::AdsHeader;
 pub use notification_handle::NotificationHandle;
 pub use return_codes::AdsReturnCode;

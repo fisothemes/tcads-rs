@@ -31,6 +31,9 @@ pub enum AdsError {
     /// Invalid ADS notification handle format or content.
     #[error("Invalid ADS notification handle: {0}")]
     InvalidAdsNotificationHandle(#[from] AdsNotificationHandleError),
+    /// Invalid Windows file time format or content.
+    #[error("Invalid Windows file time: {0}")]
+    InvalidWindowsFileTime(#[from] WindowsFileTimeError),
     /// Invalid ADS data length format or content (not header or return code).
     #[error("Unexpected data length: expected {expected} bytes, got {got} bytes")]
     UnexpectedDataLength { expected: usize, got: usize },
@@ -99,6 +102,13 @@ pub enum AdsStringError {
 /// Error returned when parsing an [NotificationHandle](super::NotificationHandle) fails.
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum AdsNotificationHandleError {
+    #[error("unexpected length: expected {expected}, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
+}
+
+/// Error returned when parsing a Windows file time fails.
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum WindowsFileTimeError {
     #[error("unexpected length: expected {expected}, got {got}")]
     UnexpectedLength { expected: usize, got: usize },
 }
