@@ -28,6 +28,9 @@ pub enum AdsError {
     /// Invalid ADS string format or content.
     #[error("Invalid ADS string: {0}")]
     InvalidAdsString(#[from] AdsStringError),
+    /// Invalid ADS notification handle format or content.
+    #[error("Invalid ADS notification handle: {0}")]
+    InvalidAdsNotificationHandle(#[from] AdsNotificationHandleError),
     /// Invalid ADS data length format or content (not header or return code).
     #[error("Unexpected data length: expected {expected} bytes, got {got} bytes")]
     UnexpectedDataLength { expected: usize, got: usize },
@@ -91,4 +94,11 @@ pub enum AdsStringError {
     InvalidUtf8(#[from] std::str::Utf8Error),
     #[error("Invalid ADS string: {0}")]
     Other(String),
+}
+
+/// Error returned when parsing an [NotificationHandle](super::NotificationHandle) fails.
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum AdsNotificationHandleError {
+    #[error("unexpected length: expected {expected}, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
 }
