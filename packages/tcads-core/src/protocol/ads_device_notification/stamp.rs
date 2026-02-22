@@ -191,3 +191,205 @@ impl<'a> From<&'a AdsStampHeaderOwned> for AdsStampHeader<'a> {
         value.as_view()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_handle(val: u32) -> NotificationHandle {
+        NotificationHandle::from(val)
+    }
+
+    fn make_timestamp() -> WindowsFileTime {
+        WindowsFileTime::from_raw(133_503_504_000_000_000) // 2024-01-15 12:00:00 UTC
+    }
+
+    /// Builds a raw stamp payload for testing.
+    ///
+    /// Layout: Timestamp (8) + SampleCount (4) + [Handle (4) + Size (4) + Data (n)] * samples
+    fn build_stamp_bytes(
+        timestamp: WindowsFileTime,
+        samples: &[(NotificationHandle, &[u8])],
+    ) -> Vec<u8> {
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&timestamp.to_bytes());
+        buf.extend_from_slice(&(samples.len() as u32).to_le_bytes());
+        for (handle, data) in samples {
+            buf.extend_from_slice(&handle.to_bytes());
+            buf.extend_from_slice(&(data.len() as u32).to_le_bytes());
+            buf.extend_from_slice(data);
+        }
+        buf
+    }
+
+    #[test]
+    fn test_parse_single_sample() {
+        let ts = make_timestamp();
+        let handle = make_handle(42);
+        let data = [0x01u8, 0x02, 0x03, 0x04];
+
+        let bytes = build_stamp_bytes(ts, &[(handle, &data)]);
+        let (stamp, remaining) = AdsStampHeader::parse(&bytes).expect("Should parse");
+
+        assert_eq!(stamp.timestamp(), ts);
+        assert_eq!(stamp.samples().len(), 1);
+        assert_eq!(stamp.samples()[0].handle(), handle);
+        assert_eq!(stamp.samples()[0].data(), &data);
+        assert!(remaining.is_empty());
+    }
+
+    #[test]
+    fn test_parse_multiple_samples() {
+        let ts = make_timestamp();
+        let h1 = make_handle(1);
+        let h2 = make_handle(2);
+        let d1 = [0x01u8, 0x02, 0x03, 0x04]; // DINT
+        let d2 = [0x01u8]; // BOOL
+
+        let bytes = build_stamp_bytes(ts, &[(h1, &d1), (h2, &d2)]);
+        let (stamp, remaining) = AdsStampHeader::parse(&bytes).expect("Should parse");
+
+        assert_eq!(stamp.samples().len(), 2);
+        assert_eq!(stamp.samples()[0].handle(), h1);
+        assert_eq!(stamp.samples()[0].data(), &d1);
+        assert_eq!(stamp.samples()[1].handle(), h2);
+        assert_eq!(stamp.samples()[1].data(), &d2);
+        assert!(remaining.is_empty());
+    }
+
+    #[test]
+    fn test_parse_returns_remaining_bytes() {
+        let ts = make_timestamp();
+        let handle = make_handle(1);
+        let data = [0xAAu8; 4];
+
+        let mut bytes = build_stamp_bytes(ts, &[(handle, &data)]);
+        let trailing = [0xFFu8; 8]; // simulate a second stamp following
+        bytes.extend_from_slice(&trailing);
+
+        let (stamp, remaining) = AdsStampHeader::parse(&bytes).expect("Should parse");
+
+        assert_eq!(stamp.samples().len(), 1);
+        assert_eq!(remaining, &trailing);
+    }
+
+    #[test]
+    fn test_parse_zero_samples() {
+        let ts = make_timestamp();
+        let bytes = build_stamp_bytes(ts, &[]);
+
+        let (stamp, remaining) = AdsStampHeader::parse(&bytes).expect("Should parse");
+
+        assert_eq!(stamp.timestamp(), ts);
+        assert!(stamp.samples().is_empty());
+        assert!(remaining.is_empty());
+    }
+
+    #[test]
+    fn test_sample_data_points_into_original_bytes() {
+        let ts = make_timestamp();
+        let handle = make_handle(1);
+        let data = [0x01u8, 0x02, 0x03, 0x04];
+        let bytes = build_stamp_bytes(ts, &[(handle, &data)]);
+
+        let (stamp, _) = AdsStampHeader::parse(&bytes).expect("Should parse");
+
+        // Data offset: Timestamp (8) + SampleCount (4) + Handle (4) + SampleSize (4) = 20
+        let expected_ptr = unsafe { bytes.as_ptr().add(20) };
+        assert_eq!(stamp.samples()[0].data().as_ptr(), expected_ptr);
+    }
+
+    #[test]
+    fn test_into_owned() {
+        let ts = make_timestamp();
+        let handle = make_handle(7);
+        let data = vec![0xDE, 0xAD, 0xBE, 0xEF];
+        let bytes = build_stamp_bytes(ts, &[(handle, &data)]);
+
+        let (stamp, _) = AdsStampHeader::parse(&bytes).expect("Should parse");
+        let owned = stamp.into_owned();
+
+        assert_eq!(owned.timestamp(), ts);
+        assert_eq!(owned.samples().len(), 1);
+        assert_eq!(owned.samples()[0].handle(), handle);
+        assert_eq!(owned.samples()[0].data(), data.as_slice());
+    }
+
+    #[test]
+    fn test_owned_as_view() {
+        let ts = make_timestamp();
+        let handle = make_handle(99);
+        let data = vec![0x01u8, 0x02];
+
+        let sample = AdsNotificationSampleOwned::new(handle, data.clone());
+        let owned = AdsStampHeaderOwned::new(ts, vec![sample]);
+        let view = owned.as_view();
+
+        assert_eq!(view.timestamp(), ts);
+        assert_eq!(view.samples().len(), 1);
+        assert_eq!(view.samples()[0].data(), data.as_slice());
+    }
+
+    #[test]
+    fn test_owned_wire_size() {
+        let ts = make_timestamp();
+        let handle = make_handle(1);
+        let data = vec![0u8; 4];
+
+        let sample = AdsNotificationSampleOwned::new(handle, data);
+        let owned = AdsStampHeaderOwned::new(ts, vec![sample]);
+
+        // Timestamp (8) + SampleCount (4) + Handle (4) + SampleSize (4) + Data (4) = 24
+        assert_eq!(owned.wire_size(), 24);
+    }
+
+    #[test]
+    fn test_owned_write_into_roundtrip() {
+        let ts = make_timestamp();
+        let handle = make_handle(0x0000_001A);
+        let data = vec![0x01u8, 0x02, 0x03, 0x04];
+
+        let sample = AdsNotificationSampleOwned::new(handle, data.clone());
+        let owned = AdsStampHeaderOwned::new(ts, vec![sample]);
+
+        let mut buf = Vec::new();
+        owned.write_into(&mut buf);
+
+        // Parse back and verify
+        let (parsed, remaining) = AdsStampHeader::parse(&buf).expect("Should parse");
+        assert!(remaining.is_empty());
+        assert_eq!(parsed.timestamp(), ts);
+        assert_eq!(parsed.samples()[0].handle(), handle);
+        assert_eq!(parsed.samples()[0].data(), data.as_slice());
+    }
+
+    #[test]
+    fn test_too_short_for_header() {
+        let err = AdsStampHeader::parse(&[0u8; 8]).unwrap_err();
+        assert!(matches!(
+            err,
+            ProtocolError::Ads(AdsError::UnexpectedDataLength {
+                expected: 12,
+                got: 8
+            })
+        ));
+    }
+
+    #[test]
+    fn test_truncated_sample_data() {
+        let ts = make_timestamp();
+        let handle = make_handle(1);
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&ts.to_bytes());
+        bytes.extend_from_slice(&1u32.to_le_bytes()); // 1 sample
+        bytes.extend_from_slice(&handle.to_bytes());
+        bytes.extend_from_slice(&100u32.to_le_bytes()); // claims 100 bytes
+        bytes.extend_from_slice(&[0u8; 10]); // only 10 bytes present
+
+        let err = AdsStampHeader::parse(&bytes).unwrap_err();
+        assert!(matches!(
+            err,
+            ProtocolError::Ads(AdsError::UnexpectedDataLength { .. })
+        ));
+    }
+}
