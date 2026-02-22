@@ -1,3 +1,4 @@
+pub mod ads_add_device_notification;
 pub mod ads_read;
 pub mod ads_read_device_info;
 pub mod ads_read_state;
@@ -11,6 +12,9 @@ pub mod port_connect;
 pub mod router_notification;
 pub mod utils;
 
+pub use ads_add_device_notification::{
+    AdsAddDeviceNotificationRequest, AdsAddDeviceNotificationResponse,
+};
 pub use ads_read::{AdsReadRequest, AdsReadResponse, AdsReadResponseOwned};
 pub use ads_read_device_info::{AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse};
 pub use ads_read_state::{AdsReadStateRequest, AdsReadStateResponse};
