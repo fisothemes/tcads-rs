@@ -1,4 +1,5 @@
 pub mod ads_add_device_notification;
+pub mod ads_delete_device_notification;
 pub mod ads_read;
 pub mod ads_read_device_info;
 pub mod ads_read_state;
@@ -14,6 +15,9 @@ pub mod utils;
 
 pub use ads_add_device_notification::{
     AdsAddDeviceNotificationRequest, AdsAddDeviceNotificationResponse,
+};
+pub use ads_delete_device_notification::{
+    AdsDeleteDeviceNotificationRequest, AdsDeleteDeviceNotificationResponse,
 };
 pub use ads_read::{AdsReadRequest, AdsReadResponse, AdsReadResponseOwned};
 pub use ads_read_device_info::{AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse};
