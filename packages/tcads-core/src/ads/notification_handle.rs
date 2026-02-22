@@ -4,7 +4,7 @@ use std::fmt;
 /// A handle identifying an active ADS device notification subscription.
 ///
 /// Assigned by the ADS server in response to an
-/// [`AdsAddDeviceNotification`](crate::protocol::AdsAddDeviceNotificationResponse) request
+/// [`AdsAddDeviceNotification`](crate::protocol::AdsAddDeviceNotificationRequest) request
 /// and returned in every [`AdsDeviceNotification`](crate::protocol::AdsDeviceNotification)
 /// sample. Pass it to
 /// [`AdsDeleteDeviceNotification`](crate::protocol::AdsDeleteDeviceNotificationRequest)
