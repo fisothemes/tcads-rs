@@ -1,5 +1,6 @@
 pub mod ads_add_device_notification;
 pub mod ads_delete_device_notification;
+pub mod ads_device_notification;
 pub mod ads_read;
 pub mod ads_read_device_info;
 pub mod ads_read_state;
