@@ -64,6 +64,7 @@ impl AdsAddDeviceNotificationRequest {
     /// * `length` - the length of bytes which should be sent every notification.
     /// * `max_delay` - maximum buffering delay in milliseconds (`0` = send it immediately).
     /// * `cycle_time` - check interval in milliseconds (relevant for cyclic trans modes).
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         target: AmsAddr,
         source: AmsAddr,
@@ -94,6 +95,7 @@ impl AdsAddDeviceNotificationRequest {
     /// * `length` - the length of bytes which should be sent every notification.
     /// * `max_delay` - maximum buffering delay in milliseconds (`0` = send it immediately).
     /// * `cycle_time` - check interval in milliseconds (relevant for cyclic trans modes).
+    #[allow(clippy::too_many_arguments)]
     pub fn with_reserved(
         target: AmsAddr,
         source: AmsAddr,
@@ -189,6 +191,7 @@ impl AdsAddDeviceNotificationRequest {
     /// every notification, [Transmission Mode](AdsTransMode), maximum buffering delay in
     /// milliseconds, cyclic check interval in milliseconds, and the reserved bytes at
     /// the end of the payload.
+    #[allow(clippy::type_complexity)]
     pub fn parse_payload(
         payload: &[u8],
     ) -> Result<(IndexGroup, IndexOffset, u32, AdsTransMode, u32, u32, &[u8]), ProtocolError> {
