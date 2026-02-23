@@ -20,6 +20,10 @@ pub use ads_add_device_notification::{
 pub use ads_delete_device_notification::{
     AdsDeleteDeviceNotificationRequest, AdsDeleteDeviceNotificationResponse,
 };
+pub use ads_device_notification::{
+    AdsDeviceNotification, AdsDeviceNotificationOwned, AdsNotificationSample,
+    AdsNotificationSampleOwned, AdsStampHeader, AdsStampHeaderOwned,
+};
 pub use ads_read::{AdsReadRequest, AdsReadResponse, AdsReadResponseOwned};
 pub use ads_read_device_info::{AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse};
 pub use ads_read_state::{AdsReadStateRequest, AdsReadStateResponse};
