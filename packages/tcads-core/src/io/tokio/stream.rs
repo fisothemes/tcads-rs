@@ -72,7 +72,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AmsStream<S> {
 
     /// Splits the stream into a buffered Reader and buffered Writer.
     ///
-    /// This uses [`tokio::io::split`](tokio::io::split) internally, which wraps the stream in a `Mutex` / `Arc`
+    /// This uses [`tokio::io::split`] internally, which wraps the stream in a `Mutex` / `Arc`
     /// to allow concurrent access. For `TcpStream`, prefer using [`into_split`](AmsStream::into_split)
     /// (if available on the specific impl) for zero-overhead splitting.
     pub fn split(self) -> (AmsReader<io::ReadHalf<S>>, AmsWriter<io::WriteHalf<S>>) {

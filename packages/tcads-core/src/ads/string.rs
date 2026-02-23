@@ -60,7 +60,7 @@ impl<const N: usize> AdsString<N> {
         self.len() == 0
     }
 
-    /// Returns the total capacity of the string buffer ([N]).
+    /// Returns the total capacity of the string buffer (\[N\]).
     pub const fn capacity(&self) -> usize {
         N
     }
