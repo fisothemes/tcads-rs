@@ -2,102 +2,237 @@
 
 The fundamental building blocks for the **TwinCAT ADS** protocol in Rust.
 
-This library provides the **Data Structures**, **Serialization**, and **Deserialization** logic required to communicate with Beckhoff ADS Devices. It is designed to be **transport-agnostic**, meaning it handles the *bytes*, while you (or `tcads-client`) handle the *sockets*.
+This library is for handling AMS/ADS frame construction, parsing, and serialization. Designed to be transport-agnostic as in, it produces and consumes bytes and you provide the socket.
 
 ## Features
 
-* **Protocol Implementation**: Full implementation of AMS/TCP Header, AMS Header, and ADS Payload framing.
-* **Type Safety**: Strongly-typed wrappers for ADS primitives:
-    * `AmsNetId` & `AmsAddr` (with parsing support).
-    * `AdsState` & `AdsTransMode` enums.
-    * `NotificationHandle` new-types.
-    * `WindowsFiletime` with `std::time::SystemTime` conversion.
-* **String Handling**: `AdsString<N>` handles legacy Windows-1252 (CP1252) encoding and null-termination automatically.
-* **Zero-Copy Friendly**: The `AmsPacket` struct supports borrowed content (`&[u8]`) for high-performance parsing.
-* **Command Support**: Ready-to-use Request and Response structures for:
-    * Read / Write / ReadWrite
-    * Device Info
-    * Device Status (ReadState / WriteControl)
-    * Device Notifications (Add / Delete / Stream)
+- **Full AMS/ADS command set** - `Read`, `Write`, `ReadWrite`, `ReadState`,
+  `WriteControl`, `ReadDeviceInfo`, and the complete notification lifecycle
+  (Add, Delete, Device Notification stream)
+- **Bidirectional** - every command type supports both directions; request
+  types parse *and* construct, response types construct *and* parse
+- **Zero-copy parsing** - borrowed types (`AdsReadResponse<'a>`,
+  `AdsDeviceNotification<'a>`, etc.) slice directly into the frame buffer;
+  owned types (`AdsReadResponseOwned`, etc.) are available when you need
+  to store or send across threads
+- **Blocking and async I/O** - `blocking::AmsStream` for synchronous use;
+  async equivalents share the same protocol types
+- **Type-safe primitives** - `AmsNetId`, `AmsAddr`, `AdsState`,
+  `AdsTransMode`, `NotificationHandle`, `WindowsFileTime`, `AdsString<N>`
 
 ## Documentation
 
 Generate documentation with `cargo doc --open` and explore the API reference.
 
-## Usage Examples
+## Crate Layout
 
-### 1. Creating a Packet (Client Side)
+```
+tcads-core/
+  ads/        # ADS primitives (commands, states, error codes, strings, ...)
+  ams/        # AMS primitives (addresses, net IDs, router commands, ...)
+  io/         # Frame I/O (AmsFrame, AmsReader, AmsWriter, AmsStream)
+  protocol/   # Request/response types for every ADS command
+```
+
+## Quick Start
+
+### Frame
+
+At the lowest level, `AmsStream` sends and receives `AmsFrame`s over TCP.
+You can work directly with raw frames if you need full control:
+
+#### Blocking I/O
 
 ```rust
-use tcads_core::protocol::packet::AmsPacket;
-use tcads_core::protocol::header::AmsHeader;
-use tcads_core::protocol::commands::{CommandId, AdsReadRequest};
-use tcads_core::protocol::state_flags::StateFlag;
-use tcads_core::types::{AmsAddr, AmsNetId};
-use tcads_core::errors::AdsReturnCode;
+use tcads_core::ams::AmsCommand;
+use tcads_core::io::{AmsFrame, blocking::AmsStream};
 
-fn main() {
-    // 1. Define Routing
-    let target = AmsAddr::new(AmsNetId([5, 1, 2, 3, 1, 1]), 851);
-    let source = AmsAddr::new(AmsNetId([192, 168, 0, 10, 1, 1]), 30000);
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+  let stream = AmsStream::connect("127.0.0.1:48898")?;
+  let (reader, mut writer) = stream.try_split()?;
 
-    // 2. Create Payload (Read 4 bytes from IndexGroup 0x4020, Offset 0)
-    let request = AdsReadRequest::new(0x4020, 0, 4);
-    let mut payload = Vec::new();
-    request.write_to(&mut payload).unwrap();
+  // Send a raw frame
+  let frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
+  writer.write_frame(&frame)?;
 
-    // 3. Construct Header
-    let header = AmsHeader::new(
-        target,
-        source,
-        CommandId::AdsRead,
-        StateFlag::tcp_ads_request(),
-        payload.len() as u32,
-        AdsReturnCode::Ok,
-        0, // Invoke ID
-    );
-
-    // 4. Create Packet
-    let packet = AmsPacket::new(header, payload);
-    
-    // 5. Serialize to bytes (e.g., for TCP)
-    // Use AmsCodec::write(&mut stream, &packet) in real apps
+  // Read the response
+  let frame = reader.read_frame()?;
+  println!("Received: {:?}", frame.header().command());
 }
 ```
 
-### 2. Parsing a Notification (Server Side / Client Receive)
+#### Async I/O (Tokio)
+
+The async API is identical in shape just swap the import and add `.await`:
 
 ```rust
-use tcads_core::protocol::commands::response::{
-    AdsDeviceNotificationStreamHeader, AdsStampHeader, AdsNotificationSampleHeader
+use tcads_core::ams::AmsCommand;
+use tcads_core::io::{AmsFrame, tokio::AmsStream};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+  let stream = AmsStream::connect("127.0.0.1:48898").await?;
+  let (reader, mut writer) = stream.into_split();
+
+  let frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
+  writer.write_frame(&frame).await?;
+
+  let frame = reader.read_frame().await?;
+  println!("Received: {:?}", frame.header().command());
+}
+```
+
+> [!NOTE]
+> Support for other async runtimes (e.g. `async-std`, `smol`) is available
+> upon request.
+
+### Using the protocol layer
+
+Building frames by hand means managing byte layouts yourself, much pain such work. The protocol module has you covered. Every ADS command has a typed request and response
+that serializes to and from `AmsFrame`:
+
+```rust
+use tcads_core::ads::{AdsCommand, AdsHeader};
+use tcads_core::ams::{AmsAddr, AmsCommand};
+use tcads_core::io::blocking::AmsStream;
+use tcads_core::protocol::{
+  GetLocalNetIdRequest, GetLocalNetIdResponse,
+  PortConnectRequest, PortConnectResponse,
+  AdsReadStateRequest, AdsReadStateResponse,
+  RouterNotification,
 };
-use tcads_core::types::WindowsFiletime;
-use std::io::Cursor;
-use std::time::SystemTime;
 
-fn parse_notification(data: &[u8]) {
-    let mut reader = Cursor::new(data);
+// JetBrains RustRover is using 2 spaces for indentation on my README 😔
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+  let stream = AmsStream::connect("127.0.0.1:48898")?;
 
-    // 1. Read Stream Header
-    let stream_header = AdsDeviceNotificationStreamHeader::read_from(&mut reader).unwrap();
-    println!("Notification contains {} stamps", stream_header.stamps);
+  let (reader, mut writer) = stream.try_split()?;
 
-    for _ in 0..stream_header.stamps {
-        // 2. Read Stamp (Timestamp)
-        let stamp = AdsStampHeader::read_from(&mut reader).unwrap();
-        let time: SystemTime = stamp.timestamp.into();
-        println!("  Time: {:?}", time);
+  writer.write_frame(&PortConnectRequest::default().into_frame())?;
 
-        for _ in 0..stamp.samples {
-            // 3. Read Sample (Handle + Data Size)
-            let sample = AdsNotificationSampleHeader::read_from(&mut reader).unwrap();
-            
-            // 4. Read Data
-            let mut value = vec![0u8; sample.sample_size as usize];
-            std::io::Read::read_exact(&mut reader, &mut value).unwrap();
-            
-            println!("    Handle: {}, Data: {:?}", sample.handle, value);
+  let mut source = AmsAddr::default();
+  let mut target = AmsAddr::default();
+
+  for result in reader.incoming() {
+    let frame = result?;
+    match frame.header().command() {
+      AmsCommand::PortConnect => {
+        let resp = PortConnectResponse::try_from(frame)?;
+        source = *resp.addr();
+        println!("AMS Router has assigned us the address {}!", source);
+        writer.write_frame(&GetLocalNetIdRequest::into_frame())?;
+      }
+      AmsCommand::GetLocalNetId => {
+        let resp = GetLocalNetIdResponse::try_from(frame)?;
+        println!("Local Net ID is {}", resp.net_id());
+        target = AmsAddr::new(resp.net_id(), 851);
+        println!("Target address is {}",target);
+        writer.write_frame(
+          &AdsReadStateRequest::new(target, source, 0x01).into_frame()
+        )?;
+      }
+      AmsCommand::RouterNotification => {
+        // Received when changing between config and run mode
+        let notif = RouterNotification::try_from(frame)?;
+        println!("AMS Router state: {:?}", notif.state());
+      }
+      AmsCommand::AdsCommand => {
+        let (header, payload) = AdsHeader::parse_prefix(frame.payload())?;
+        match header.command_id() {
+          AdsCommand::AdsReadState => {
+            let (_, state, _) = AdsReadStateResponse::parse_payload(payload)?;
+            println!("PLC state: {state:?}");
+          }
+          _ => {}
         }
+      }
+      _ => {}
+    }
+  }
+
+  Ok(())
+}
+```
+
+Result:
+
+```console
+AMS Router has assigned us the address 192.168.137.1.1.1:32817!
+Local Net ID is 192.168.137.1.1.1
+Target address is 192.168.137.1.1.1:851
+PLC state: Run
+```
+
+### Zero-copy response parsing
+
+Borrowed types slice directly into the frame, no allocation for the data payload:
+
+```rust
+use tcads_core::protocol::AdsReadResponse;
+
+// Parsed response borrows from `frame`, there no copy of the data bytes
+let response = AdsReadResponse::try_from(&frame)?;
+let value = i32::from_le_bytes(response.data().try_into()?);
+
+// Need to store it? Convert explicitly
+let owned = response.into_owned();
+```
+
+### Symbol handle lookup (AdsReadWrite)
+
+```rust
+use tcads_core::protocol::AdsReadWriteRequestOwned;
+
+let request = AdsReadWriteRequestOwned::new(
+    target, source, invoke_id,
+    0xF003, // ADSIGRP_SYM_HNDBYNAME
+    0x0000,
+    4,      // handle is 4 bytes
+    b"MAIN.nCount\0",
+);
+
+writer.write_frame(&request.into_frame())?;
+```
+
+### Subscribing to variable changes
+
+```rust
+use tcads_core::ads::AdsTransMode;
+use tcads_core::protocol::{
+    AdsAddDeviceNotificationRequest,
+    AdsDeviceNotification,
+};
+
+// Subscribe
+let request = AdsAddDeviceNotificationRequest::new(
+    target, source, invoke_id,
+    0xF005, handle,   // index group + offset (value by handle)
+    4,                // variable size in bytes
+    AdsTransMode::ClientOnChange,
+    0,                // max delay (ms)
+    100,              // cycle time (ms)
+);
+writer.write_frame(&request.into_frame())?;
+
+// Receive sample data as zero-copy from the frame
+let frame = reader.read_frame()?;
+let notif = AdsDeviceNotification::try_from(&frame)?;
+for (timestamp, sample) in notif.iter_samples() {
+    if sample.handle() == my_handle {
+        let value = i32::from_le_bytes(sample.data().try_into()?);
+        println!("nCount = {value} at {}", timestamp.as_raw());
     }
 }
 ```
+
+## Borrowed vs Owned
+
+Every type that carries a variable-length data payload comes in two forms:
+
+| Type                   | Use when                                  |
+|------------------------|-------------------------------------------|
+| `AdsReadResponse<'a>`  | Parsing - borrows from the frame, no copy |
+| `AdsReadResponseOwned` | Construction or storage - owns its buffer |
+
+Convert between them with `.into_owned()`, `.to_owned()`, and `.as_view()`.
+The same pattern applies to `AdsWriteRequest`, `AdsReadWriteRequest`,
+`AdsReadWriteResponse`, `AdsWriteControlRequest`, and all notification types.
