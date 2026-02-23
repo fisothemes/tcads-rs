@@ -85,6 +85,9 @@ pub struct AdsNotificationSampleOwned {
 }
 
 impl AdsNotificationSampleOwned {
+    /// The minimum number of bytes a sample occupies on the wire: Handle (4) + Sample Size (4).
+    pub const MIN_SAMPLE_SIZE: usize = AdsNotificationSample::MIN_SAMPLE_SIZE;
+
     /// Creates a new owned notification sample.
     ///
     /// Use this on a **server** to construct notification samples to send to a client.
