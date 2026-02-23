@@ -9,7 +9,7 @@ The project is organised as a Cargo workspace with the following crates:
 - **[`tcads-core`](packages/tcads-core)**: Protocol primitives, serialization, and frame I/O
 - **[`tcads-client`](packages/tcads-client)**: High-level connection and request management for ADS devices.
 - **[`tcads-server`](packages/tcads-server)**: Framework for building custom ADS servers/devices in Rust.
-- **[`tcads`](packages/tcads)**: The top-level crate that bundles the everything together.
+- **[`tcads`](packages/tcads)**: The top-level crate that bundles everything together.
 
 ## Status
 
