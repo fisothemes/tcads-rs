@@ -26,12 +26,12 @@ Generate documentation with `cargo doc --open` and explore the API reference.
 
 ## Crate Layout
 
-```
+```text
 tcads-core/
-  ads/        # ADS primitives (commands, states, error codes, strings, ...)
-  ams/        # AMS primitives (addresses, net IDs, router commands, ...)
-  io/         # Frame I/O (AmsFrame, AmsReader, AmsWriter, AmsStream)
-  protocol/   # Request/response types for every ADS command
+  ├── ads/        # ADS primitives (commands, states, error codes, strings, ...)
+  ├── ams/        # AMS primitives (addresses, net IDs, router commands, ...)
+  ├── io/         # Frame I/O (AmsFrame, AmsReader, AmsWriter, AmsStream)
+  └── protocol/   # Request/response types for every ADS command
 ```
 
 ## Quick Start
