@@ -95,6 +95,9 @@ dependencies = [
 name = "tcads"
 version = "0.1.0"
 dependencies = [
+ "tcads-client",
+ "tcads-core",
+ "tcads-server",
  "thiserror",
 ]
 
