@@ -132,6 +132,9 @@ pub struct AdsStampHeaderOwned {
 }
 
 impl AdsStampHeaderOwned {
+    /// Fixed size of the stamp header fields (Timestamp + Sample Count).
+    pub const HEADER_SIZE: usize = AdsStampHeader::HEADER_SIZE;
+
     /// Creates a new owned stamp header.
     ///
     /// Use this on a **server** to construct notification stamps to send to a client.
