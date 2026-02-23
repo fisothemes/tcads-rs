@@ -58,6 +58,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   // Read the response
   let frame = reader.read_frame()?;
   println!("Received: {:?}", frame.header().command());
+  
+  Ok(())
 }
 ```
 
@@ -78,6 +80,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   let frame = reader.read_frame().await?;
   println!("Received: {:?}", frame.header().command());
+
+  Ok(())
 }
 ```
 
