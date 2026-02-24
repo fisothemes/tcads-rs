@@ -94,6 +94,20 @@ impl fmt::Debug for NotificationHandle {
     }
 }
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for NotificationHandle {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_u32(self.as_u32())
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for NotificationHandle {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        Ok(NotificationHandle::from(u32::deserialize(d)?))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
