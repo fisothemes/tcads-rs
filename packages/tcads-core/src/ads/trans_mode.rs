@@ -125,4 +125,12 @@ mod tests {
             AdsTransMode::ClientOnChange
         );
     }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde_trans_mode_roundtrip() {
+        let mode = AdsTransMode::ClientCycle;
+        let s = serde_json::to_string(&mode).unwrap();
+        assert_eq!(mode, serde_json::from_str(&s).unwrap());
+    }
 }
