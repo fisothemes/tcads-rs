@@ -110,7 +110,7 @@
 ///
 /// This module contains the fundamental enums and constants defined by the Beckhoff
 /// specification, including [`AdsState`], [`AdsReturnCode`], and [`AdsTransMode`].
-/// It also provides helper types for ADS-specific data like [`AdsString`] and
+/// It also provides helper types for ADS-specific data like [`AdsString`](ads::AdsString) and
 /// [`WindowsFileTime`].
 pub mod ads;
 
