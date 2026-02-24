@@ -15,6 +15,7 @@ pub type DeviceState = u16;
 /// The ADS State of the device.
 ///
 /// Describes the current operating state (e.g. Run, Stop, Config).
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u16)] // Wire format is 2 bytes
 pub enum AdsState {
