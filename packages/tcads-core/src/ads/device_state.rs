@@ -17,30 +17,29 @@ pub type DeviceState = u16;
 /// Describes the current operating state (e.g. Run, Stop, Config).
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(u16)] // Wire format is 2 bytes
 pub enum AdsState {
-    Invalid = 0,
-    Idle = 1,
-    Reset = 2,
-    Init = 3,
-    Start = 4,
-    Run = 5,
-    Stop = 6,
-    SaveCfg = 7,
-    LoadCfg = 8,
-    PowerFailure = 9,
-    PowerGood = 10,
-    Error = 11,
-    Shutdown = 12,
-    Suspend = 13,
-    Resume = 14,
-    Config = 15,
-    Reconfig = 16,
-    Stopping = 17,
+    Invalid,
+    Idle,
+    Reset,
+    Init,
+    Start,
+    Run,
+    Stop,
+    SaveCfg,
+    LoadCfg,
+    PowerFailure,
+    PowerGood,
+    Error,
+    Shutdown,
+    Suspend,
+    Resume,
+    Config,
+    Reconfig,
+    Stopping,
     /// System is incompatible.
-    Incompatible = 18,
+    Incompatible,
     /// System Exception.
-    Exception = 19,
+    Exception,
     /// A state not defined in the library.
     Unknown(u16),
 }
@@ -173,5 +172,13 @@ mod tests {
     #[test]
     fn test_ads_state_try_from_slice() {
         assert_eq!(AdsState::try_from_slice(&[1, 0]).unwrap(), AdsState::Idle);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde_ads_state_roundtrip() {
+        let state = AdsState::Run;
+        let bytes = serde_json::to_string(&state).unwrap();
+        assert_eq!(state, serde_json::from_str(&bytes).unwrap());
     }
 }
