@@ -1,5 +1,5 @@
 use super::error::WindowsFileTimeError;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use chrono::{DateTime, TimeZone, Utc};
 
 /// A timestamp encoded in the Windows FILETIME format.
 ///
@@ -9,10 +9,15 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 /// [`AdsDeviceNotification`](crate::protocol::AdsDeviceNotification) frames on a server.
 ///
 /// # Conversions
-/// - [`WindowsFileTime::now`] - construct from the current system time.
-/// - [`WindowsFileTime::to_system_time`] - convert to [`SystemTime`] for display or arithmetic.
-/// - [`WindowsFileTime::from_system_time`] - convert from [`SystemTime`].
+/// - [`WindowsFileTime::now`] - construct from the current UTC time.
+/// - [`WindowsFileTime::to_datetime`] - convert to [`DateTime<Utc>`] for display or arithmetic.
+/// - [`WindowsFileTime::from_datetime`] - convert from [`DateTime<Utc>`].
 /// - [`WindowsFileTime::as_raw`] - access the raw tick count as an escape hatch.
+///
+/// # Precision
+/// FILETIME has 100-nanosecond resolution. [`DateTime<Utc>`] has microsecond resolution,
+/// so one decimal place of sub-microsecond precision is lost on conversion. This is
+/// inconsequential for ADS notification timestamps in practice.
 ///
 /// # Wire Format
 /// 8 bytes, little-endian `u64`.
@@ -25,14 +30,14 @@ impl WindowsFileTime {
 
     /// The number of `100ns` ticks between `1601-01-01` and `1970-01-01` (the Unix epoch).
     ///
-    /// Computed as: 369 years × 365.2425 days/year × 86,400 s/day × 10_000_000 ticks/s
+    /// Computed as: 369 years × 365.2425 days/year × 86,400 s/day × 10,000,000 ticks/s
     pub const FILETIME_TO_UNIX_EPOCH_TICKS: u64 = 116_444_736_000_000_000;
 
     /// Number of 100ns ticks per second.
     pub const TICKS_PER_SEC: u64 = 10_000_000;
 
-    /// Number of 100ns ticks per nanosecond (i.e. 10 ticks = 1 microsecond = 1000ns).
-    pub const TICKS_PER_NANOS: u64 = 100;
+    /// Number of 100ns ticks per microsecond.
+    pub const TICKS_PER_MICROS: u64 = 10;
 
     /// Creates a `WindowsFileTime` from a raw tick count.
     ///
@@ -63,42 +68,32 @@ impl WindowsFileTime {
         self.0.to_le_bytes()
     }
 
-    /// Returns a `WindowsFileTime` representing the current system time.
-    ///
-    /// Saturates to zero if the system clock is somehow set before the Unix epoch.
+    /// Returns a `WindowsFileTime` representing the current UTC time.
     pub fn now() -> Self {
-        Self::from_system_time(SystemTime::now())
+        Self::from_datetime(Utc::now())
     }
 
-    /// Converts to a [`SystemTime`].
+    /// Converts to a [`DateTime<Utc>`].
     ///
-    /// Saturates to [`UNIX_EPOCH`] for timestamps before 1970-01-01, which should
-    /// never occur in practice for ADS notification timestamps.
-    pub fn to_system_time(self) -> SystemTime {
-        if self.0 < Self::FILETIME_TO_UNIX_EPOCH_TICKS {
-            return UNIX_EPOCH;
-        }
+    /// Saturates to the Unix epoch (`1970-01-01 00:00:00 UTC`) for FILETIME values
+    /// before 1970, which should never occur in practice for ADS notification timestamps.
+    pub fn to_datetime(self) -> DateTime<Utc> {
+        let ticks_since_unix = self.0.saturating_sub(Self::FILETIME_TO_UNIX_EPOCH_TICKS);
 
-        let ticks_since_unix = self.0 - Self::FILETIME_TO_UNIX_EPOCH_TICKS;
-        let secs = ticks_since_unix / Self::TICKS_PER_SEC;
-        let nanos = (ticks_since_unix % Self::TICKS_PER_SEC) * Self::TICKS_PER_NANOS;
+        let micros = (ticks_since_unix / Self::TICKS_PER_MICROS) as i64;
 
-        UNIX_EPOCH + Duration::new(secs, nanos as u32)
+        Utc.timestamp_micros(micros)
+            .single()
+            .unwrap_or(DateTime::<Utc>::UNIX_EPOCH)
     }
 
-    /// Converts from a [`SystemTime`].
+    /// Converts from a [`DateTime<Utc>`].
     ///
-    /// Saturates to the Windows FILETIME epoch (1601-01-01) for times before the
-    /// Unix epoch, which should never occur in practice.
-    pub fn from_system_time(t: SystemTime) -> Self {
-        let ticks_since_unix = match t.duration_since(UNIX_EPOCH) {
-            Ok(d) => {
-                let secs = d.as_secs() * Self::TICKS_PER_SEC;
-                let nanos = d.subsec_nanos() as u64 / Self::TICKS_PER_NANOS;
-                secs + nanos
-            }
-            Err(_) => 0, // pre-epoch: saturate to zero ticks since Unix epoch
-        };
+    /// Saturates to the FILETIME epoch (`1601-01-01`) for datetimes before the Unix
+    /// epoch, which should never occur in practice.
+    pub fn from_datetime(dt: DateTime<Utc>) -> Self {
+        let micros = dt.timestamp_micros().max(0) as u64;
+        let ticks_since_unix = micros * Self::TICKS_PER_MICROS;
 
         Self(Self::FILETIME_TO_UNIX_EPOCH_TICKS + ticks_since_unix)
     }
@@ -128,6 +123,18 @@ impl From<WindowsFileTime> for [u8; WindowsFileTime::LENGTH] {
     }
 }
 
+impl From<DateTime<Utc>> for WindowsFileTime {
+    fn from(value: DateTime<Utc>) -> Self {
+        Self::from_datetime(value)
+    }
+}
+
+impl From<WindowsFileTime> for DateTime<Utc> {
+    fn from(value: WindowsFileTime) -> Self {
+        value.to_datetime()
+    }
+}
+
 impl TryFrom<&[u8]> for WindowsFileTime {
     type Error = WindowsFileTimeError;
 
@@ -142,6 +149,16 @@ impl TryFrom<&[u8]> for WindowsFileTime {
     }
 }
 
+impl std::fmt::Display for WindowsFileTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.to_datetime().format("%Y-%m-%d %H:%M:%S%.6f UTC")
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -150,6 +167,10 @@ mod tests {
     ///
     /// Computed as: (2026-02-21 12:00:00 UTC - 1601-01-01 00:00:00 UTC) in 100ns ticks.
     const KNOWN_TICKS: u64 = 134_161_488_000_000_000;
+
+    fn known_datetime() -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(2026, 2, 21, 12, 0, 0).unwrap()
+    }
 
     #[test]
     fn test_from_raw_roundtrip() {
@@ -201,22 +222,33 @@ mod tests {
     }
 
     #[test]
-    fn test_to_system_time_known_value() {
-        // 2026-02-21 12:00:00 UTC
-        // Unix timestamp: 1771675200
+    fn test_to_datetime_known_value() {
         let ft = WindowsFileTime::from_raw(KNOWN_TICKS);
-        let st = ft.to_system_time();
-        let unix = st.duration_since(UNIX_EPOCH).unwrap();
-        assert_eq!(unix.as_secs(), 1_771_675_200);
+        let dt = ft.to_datetime();
+        assert_eq!(dt, known_datetime());
     }
 
     #[test]
-    fn test_from_system_time_roundtrip() {
-        // Truncate to 100ns precision before roundtrip since that is the wire granularity
+    fn test_from_datetime_known_value() {
+        let ft = WindowsFileTime::from_datetime(known_datetime());
+        assert_eq!(ft.as_raw(), KNOWN_TICKS);
+    }
+
+    #[test]
+    fn test_from_datetime_roundtrip() {
+        // Round-trip via a FILETIME with microsecond-aligned ticks (no sub-microsecond loss)
         let original = WindowsFileTime::from_raw(KNOWN_TICKS);
-        let st = original.to_system_time();
-        let roundtripped = WindowsFileTime::from_system_time(st);
+        let dt = original.to_datetime();
+        let roundtripped = WindowsFileTime::from_datetime(dt);
         assert_eq!(original, roundtripped);
+    }
+
+    #[test]
+    fn test_from_impl_roundtrip() {
+        let original = WindowsFileTime::from_raw(KNOWN_TICKS);
+        let dt: DateTime<Utc> = original.into();
+        let back: WindowsFileTime = dt.into();
+        assert_eq!(original, back);
     }
 
     #[test]
@@ -228,10 +260,10 @@ mod tests {
 
     #[test]
     fn test_pre_unix_epoch_saturates() {
-        // A FILETIME before the Unix epoch (e.g. year 1800)
+        // A FILETIME before the Unix epoch (raw value smaller than the offset constant)
         let pre_epoch = WindowsFileTime::from_raw(100);
-        let st = pre_epoch.to_system_time();
-        assert_eq!(st, UNIX_EPOCH);
+        let dt = pre_epoch.to_datetime();
+        assert_eq!(dt, DateTime::<Utc>::UNIX_EPOCH);
     }
 
     #[test]
@@ -253,5 +285,18 @@ mod tests {
         let ft: WindowsFileTime = KNOWN_TICKS.into();
         let back: u64 = ft.into();
         assert_eq!(back, KNOWN_TICKS);
+    }
+
+    #[test]
+    fn test_display() {
+        let ft = WindowsFileTime::from_raw(KNOWN_TICKS);
+        assert_eq!(format!("{ft}"), "2026-02-21 12:00:00.000000 UTC");
+    }
+
+    #[test]
+    fn test_display_with_subseconds() {
+        // 500ms = 500_000 microseconds = 5_000_000 ticks
+        let ft = WindowsFileTime::from_raw(KNOWN_TICKS + 5_000_000);
+        assert_eq!(format!("{ft}"), "2026-02-21 12:00:00.500000 UTC");
     }
 }
