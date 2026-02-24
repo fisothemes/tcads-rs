@@ -3,19 +3,19 @@ use super::error::AdsTransModeError;
 /// The transition mode for Device Notifications.
 ///
 /// Determines when the server sends a notification to the client.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(u32)] // Wire format is 4 bytes
 pub enum AdsTransMode {
     /// No transmission.
-    None = 0,
+    None,
     /// Cyclic transmission. The server checks the variable cyclically.
-    ClientCycle = 1,
+    ClientCycle,
     /// Transmission on change. The server checks the variable cyclically and sends only if it changed.
-    ClientOnChange = 2,
+    ClientOnChange,
     /// Cyclic transmission (Server-driven). (Not commonly used by clients).
-    ServerCycle = 3,
+    ServerCycle,
     /// Transmission on change (Server-driven). (Not commonly used by clients).
-    ServerOnChange = 4,
+    ServerOnChange,
     /// Unknown/Custom mode.
     Unknown(u32),
 }
@@ -98,10 +98,23 @@ mod tests {
 
     #[test]
     fn test_ads_trans_mode_conversion() {
+        assert_eq!(AdsTransMode::from(0), AdsTransMode::None);
+        assert_eq!(u32::from(AdsTransMode::None), 0);
+
         assert_eq!(AdsTransMode::from(1), AdsTransMode::ClientCycle);
         assert_eq!(u32::from(AdsTransMode::ClientCycle), 1);
 
+        assert_eq!(AdsTransMode::from(2), AdsTransMode::ClientOnChange);
+        assert_eq!(u32::from(AdsTransMode::ClientOnChange), 2);
+
+        assert_eq!(AdsTransMode::from(3), AdsTransMode::ServerCycle);
+        assert_eq!(u32::from(AdsTransMode::ServerCycle), 3);
+
+        assert_eq!(AdsTransMode::from(4), AdsTransMode::ServerOnChange);
+        assert_eq!(u32::from(AdsTransMode::ServerOnChange), 4);
+
         assert_eq!(AdsTransMode::from(100), AdsTransMode::Unknown(100));
+        assert_eq!(u32::from(AdsTransMode::Unknown(100)), 100);
     }
 
     #[test]
@@ -123,5 +136,13 @@ mod tests {
             AdsTransMode::try_from_slice(&[2, 0, 0, 0]).unwrap(),
             AdsTransMode::ClientOnChange
         );
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde_trans_mode_roundtrip() {
+        let mode = AdsTransMode::ClientCycle;
+        let s = serde_json::to_string(&mode).unwrap();
+        assert_eq!(mode, serde_json::from_str(&s).unwrap());
     }
 }

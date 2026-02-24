@@ -4,6 +4,7 @@ use super::error::AdsReturnCodeError;
 ///
 /// See [Beckhoff ADS Specification (TE1000)](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/374277003.html?id=4954945278371876402)
 /// for reference
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AdsReturnCode {
     #[error("No Error (0x00)")]
@@ -741,5 +742,14 @@ mod tests {
     fn test_from_ads_return_code_to_bytes() {
         let bytes: [u8; AdsReturnCode::LENGTH] = AdsReturnCode::RtErrIrqlNotLessOrEqual.into();
         assert_eq!([0x10, 0x10, 0x00, 0x00], bytes);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde_ads_return_code_roundtrip() {
+        let code = AdsReturnCode::Ok;
+        let s = serde_json::to_string(&code).unwrap();
+        let back: AdsReturnCode = serde_json::from_str(&s).unwrap();
+        assert_eq!(code, back);
     }
 }
