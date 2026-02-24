@@ -170,7 +170,7 @@ mod tests {
 
         assert_eq!(frame.header().command(), AmsCommand::GetLocalNetId);
         assert_eq!(frame.header().length(), 0);
-        assert_eq!(frame.payload(), &[]);
+        assert_eq!(frame.payload(), &[] as &[u8]);
     }
 
     #[test]
