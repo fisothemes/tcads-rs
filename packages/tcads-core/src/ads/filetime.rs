@@ -159,6 +159,22 @@ impl std::fmt::Display for WindowsFileTime {
     }
 }
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for WindowsFileTime {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        self.to_datetime().serialize(s)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for WindowsFileTime {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        Ok(WindowsFileTime::from_datetime(
+            DateTime::<Utc>::deserialize(d)?,
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
