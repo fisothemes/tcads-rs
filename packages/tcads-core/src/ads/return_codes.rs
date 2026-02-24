@@ -4,6 +4,7 @@ use super::error::AdsReturnCodeError;
 ///
 /// See [Beckhoff ADS Specification (TE1000)](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/374277003.html?id=4954945278371876402)
 /// for reference
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AdsReturnCode {
     #[error("No Error (0x00)")]

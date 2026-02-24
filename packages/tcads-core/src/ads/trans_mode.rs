@@ -3,6 +3,7 @@ use super::error::AdsTransModeError;
 /// The transition mode for Device Notifications.
 ///
 /// Determines when the server sends a notification to the client.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u32)] // Wire format is 4 bytes
 pub enum AdsTransMode {
