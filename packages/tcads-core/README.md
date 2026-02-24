@@ -1,8 +1,8 @@
 # TwinCAT ADS Core
 
-The fundamental building blocks for the **TwinCAT ADS** protocol in Rust.
+This crate contains the core building blocks for the **TwinCAT AMS/ADS** protocol.
 
-This library is for handling AMS/ADS frame construction, parsing, and serialization. Designed to be transport-agnostic as in, it produces and consumes bytes and you provide the socket.
+It handles the heavy lifting of AMS/ADS frame construction, parsing, and serialization. It is strictly **transport-agnostic**, meaning it doesn't care how you move bytes, whether you're using standard TCP, a custom serial bridge, or a high-performance async runtime, tcads-core provides the protocol logic.
 
 ## Features
 
@@ -38,7 +38,7 @@ tcads-core/
 
 ### Frame
 
-At the lowest level, `AmsStream` sends and receives `AmsFrame`s over TCP.
+At the lowest level, `AmsStream` sends and receives [`AmsFrame`](src/io/frame.rs)s over TCP.
 You can work directly with raw frames if you need full control:
 
 #### Blocking I/O
@@ -48,18 +48,18 @@ use tcads_core::ams::AmsCommand;
 use tcads_core::io::{AmsFrame, blocking::AmsStream};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-  let stream = AmsStream::connect("127.0.0.1:48898")?;
-  let (reader, mut writer) = stream.try_split()?;
+    let stream = AmsStream::connect("127.0.0.1:48898")?;
+    let (reader, mut writer) = stream.try_split()?;
 
-  // Send a raw frame
-  let frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
-  writer.write_frame(&frame)?;
+    // Send a raw frame
+    let frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
+    writer.write_frame(&frame)?;
 
-  // Read the response
-  let frame = reader.read_frame()?;
-  println!("Received: {:?}", frame.header().command());
+    // Read the response
+    let frame = reader.read_frame()?;
+    println!("Received: {:?}", frame.header().command());
   
-  Ok(())
+    Ok(())
 }
 ```
 
@@ -71,28 +71,28 @@ The async API is identical in shape just swap the import and add `.await`:
 use tcads_core::ams::AmsCommand;
 use tcads_core::io::{AmsFrame, tokio::AmsStream};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-  let stream = AmsStream::connect("127.0.0.1:48898").await?;
-  let (reader, mut writer) = stream.into_split();
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let stream = AmsStream::connect("127.0.0.1:48898").await?;
+    let (reader, mut writer) = stream.into_split();
 
-  let frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
-  writer.write_frame(&frame).await?;
+    let frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
+    writer.write_frame(&frame).await?;
 
-  let frame = reader.read_frame().await?;
-  println!("Received: {:?}", frame.header().command());
+    let frame = reader.read_frame().await?;
+    println!("Received: {:?}", frame.header().command());
 
-  Ok(())
+    Ok(())
 }
 ```
 
 > [!NOTE]
 > Support for other async runtimes (e.g. `async-std`, `smol`) is available
-> upon request.
+> upon request, open an issue or PR.
 
 ### Using the protocol layer
 
-Building frames by hand means managing byte layouts yourself, much pain such work. The protocol module has you covered. Every ADS command has a typed request and response
-that serializes to and from `AmsFrame`:
+Building frames by hand means managing byte layouts yourself is best described as `"much pain, such work"`. Luckily, the [protocol](src/protocol) module has you covered. Every AMS and ADS command has a typed request and response that serializes to and from the `AmsFrame`:
 
 ```rust
 use tcads_core::ads::{AdsCommand, AdsHeader};
@@ -105,53 +105,52 @@ use tcads_core::protocol::{
   RouterNotification,
 };
 
-// JetBrains RustRover is using 2 spaces for indentation on my README 😔
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-  let stream = AmsStream::connect("127.0.0.1:48898")?;
+    let stream = AmsStream::connect("127.0.0.1:48898")?;
 
-  let (reader, mut writer) = stream.try_split()?;
+    let (reader, mut writer) = stream.try_split()?;
 
-  writer.write_frame(&PortConnectRequest::default().into_frame())?;
+    writer.write_frame(&PortConnectRequest::default().into_frame())?;
 
-  let mut source = AmsAddr::default();
-  let mut target = AmsAddr::default();
+    let mut source = AmsAddr::default();
+    let mut target = AmsAddr::default();
 
-  for result in reader.incoming() {
-    let frame = result?;
-    match frame.header().command() {
-      AmsCommand::PortConnect => {
-        let resp = PortConnectResponse::try_from(frame)?;
-        source = *resp.addr();
-        println!("AMS Router has assigned us the address {}!", source);
-        writer.write_frame(&GetLocalNetIdRequest::into_frame())?;
-      }
-      AmsCommand::GetLocalNetId => {
-        let resp = GetLocalNetIdResponse::try_from(frame)?;
-        println!("Local Net ID is {}", resp.net_id());
-        target = AmsAddr::new(resp.net_id(), 851);
-        println!("Target address is {}",target);
-        writer.write_frame(
-          &AdsReadStateRequest::new(target, source, 0x01).into_frame()
-        )?;
-      }
-      AmsCommand::RouterNotification => {
-        // Received when changing between config and run mode
-        let notif = RouterNotification::try_from(frame)?;
-        println!("AMS Router state: {:?}", notif.state());
-      }
-      AmsCommand::AdsCommand => {
-        let (header, payload) = AdsHeader::parse_prefix(frame.payload())?;
-        match header.command_id() {
-          AdsCommand::AdsReadState => {
-            let (_, state, _) = AdsReadStateResponse::parse_payload(payload)?;
-            println!("PLC state: {state:?}");
-          }
-          _ => {}
-        }
-      }
-      _ => {}
+    for result in reader.incoming() { 
+        let frame = result?;
+        match frame.header().command() {
+            AmsCommand::PortConnect => {
+                let resp = PortConnectResponse::try_from(frame)?;
+                source = *resp.addr();
+                println!("AMS Router has assigned us the address {}!", source);
+                writer.write_frame(&GetLocalNetIdRequest::into_frame())?;
+            }
+            AmsCommand::GetLocalNetId => {
+                let resp = GetLocalNetIdResponse::try_from(frame)?;
+                println!("Local Net ID is {}", resp.net_id());
+                target = AmsAddr::new(resp.net_id(), 851);
+                println!("Target address is {}",target);
+                writer.write_frame(
+                  &AdsReadStateRequest::new(target, source, 0x01).into_frame()
+                )?;
+            }
+            AmsCommand::RouterNotification => {
+                // Received when changing between config and run mode
+                let notif = RouterNotification::try_from(frame)?;
+                println!("AMS Router state: {:?}", notif.state());
+            }
+            AmsCommand::AdsCommand => {
+                let (header, payload) = AdsHeader::parse_prefix(frame.payload())?;
+                match header.command_id() { 
+                    AdsCommand::AdsReadState => {
+                        let (_, state, _) = AdsReadStateResponse::parse_payload(payload)?;
+                        println!("PLC state: {state:?}");
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
+        } 
     }
-  }
 
   Ok(())
 }
