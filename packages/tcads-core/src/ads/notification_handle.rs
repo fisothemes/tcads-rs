@@ -175,4 +175,28 @@ mod tests {
         assert_eq!(map[&h2], "handler_a");
         assert!(!map.contains_key(&h3));
     }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde_notification_handle_serialize() {
+        let handle = NotificationHandle::from(42_u32);
+        let s = serde_json::to_string(&handle).unwrap();
+        assert_eq!(s, "42");
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde_notification_handle_deserialize() {
+        let handle: NotificationHandle = serde_json::from_str("42").unwrap();
+        assert_eq!(handle, NotificationHandle::from(42_u32));
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde_notification_handle_roundtrip() {
+        let original = NotificationHandle::from(0x0000_001A_u32);
+        let s = serde_json::to_string(&original).unwrap();
+        let back: NotificationHandle = serde_json::from_str(&s).unwrap();
+        assert_eq!(original, back);
+    }
 }

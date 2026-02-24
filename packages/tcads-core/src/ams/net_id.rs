@@ -173,4 +173,35 @@ mod tests {
         let err = AmsNetId::try_from(&bytes[..]).unwrap_err();
         assert!(matches!(err, NetIdError::InvalidBufferSize { .. }));
     }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde_ams_net_id_serialize() {
+        let id = AmsNetId::new(192, 168, 0, 1, 1, 1);
+        let s = serde_json::to_string(&id).unwrap();
+        assert_eq!(s, r#""192.168.0.1.1.1""#);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde_ams_net_id_deserialize() {
+        let id: AmsNetId = serde_json::from_str(r#""192.168.0.1.1.1""#).unwrap();
+        assert_eq!(id, AmsNetId::new(192, 168, 0, 1, 1, 1));
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde_ams_net_id_roundtrip() {
+        let original = AmsNetId::new(10, 0, 0, 1, 1, 1);
+        let s = serde_json::to_string(&original).unwrap();
+        let roundtripped: AmsNetId = serde_json::from_str(&s).unwrap();
+        assert_eq!(original, roundtripped);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde_ams_net_id_invalid_string() {
+        let err = serde_json::from_str::<AmsNetId>(r#""not.a.valid.netid""#);
+        assert!(err.is_err());
+    }
 }

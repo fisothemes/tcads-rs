@@ -743,4 +743,13 @@ mod tests {
         let bytes: [u8; AdsReturnCode::LENGTH] = AdsReturnCode::RtErrIrqlNotLessOrEqual.into();
         assert_eq!([0x10, 0x10, 0x00, 0x00], bytes);
     }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde_ads_return_code_roundtrip() {
+        let code = AdsReturnCode::Ok;
+        let s = serde_json::to_string(&code).unwrap();
+        let back: AdsReturnCode = serde_json::from_str(&s).unwrap();
+        assert_eq!(code, back);
+    }
 }

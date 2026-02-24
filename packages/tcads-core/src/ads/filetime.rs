@@ -315,4 +315,24 @@ mod tests {
         let ft = WindowsFileTime::from_raw(KNOWN_TICKS + 5_000_000);
         assert_eq!(format!("{ft}"), "2026-02-21 12:00:00.500000 UTC");
     }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_windows_file_time_serialize_is_iso8601() {
+        let ft = WindowsFileTime::from_raw(134_161_488_000_000_000); // 2026-02-21 12:00:00 UTC
+        let s = serde_json::to_string(&ft).unwrap();
+        // chrono emits RFC 3339, verify it contains the expected datetime
+        assert!(s.contains("2026-02-21"));
+        assert!(s.contains("12:00:00"));
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_windows_file_time_roundtrip() {
+        // Use microsecond-aligned ticks to avoid sub-microsecond precision loss
+        let original = WindowsFileTime::from_raw(134_161_488_000_000_000);
+        let s = serde_json::to_string(&original).unwrap();
+        let back: WindowsFileTime = serde_json::from_str(&s).unwrap();
+        assert_eq!(original, back);
+    }
 }

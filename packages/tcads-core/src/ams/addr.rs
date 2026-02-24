@@ -181,4 +181,28 @@ mod tests {
         let addr: AmsAddr = original.parse().unwrap();
         assert_eq!(addr.to_string(), original);
     }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde_ams_addr_serialize() {
+        let addr = AmsAddr::new(AmsNetId::new(192, 168, 0, 1, 1, 1), 851);
+        let s = serde_json::to_string(&addr).unwrap();
+        assert_eq!(s, r#""192.168.0.1.1.1:851""#);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde_ams_addr_deserialize() {
+        let addr: AmsAddr = serde_json::from_str(r#""192.168.0.1.1.1:851""#).unwrap();
+        assert_eq!(addr, AmsAddr::new(AmsNetId::new(192, 168, 0, 1, 1, 1), 851));
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_serde_ams_addr_roundtrip() {
+        let original = AmsAddr::new(AmsNetId::new(172, 16, 0, 1, 1, 1), 30000);
+        let s = serde_json::to_string(&original).unwrap();
+        let roundtripped: AmsAddr = serde_json::from_str(&s).unwrap();
+        assert_eq!(original, roundtripped);
+    }
 }
