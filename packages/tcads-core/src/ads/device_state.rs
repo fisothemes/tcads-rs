@@ -178,7 +178,7 @@ mod tests {
     #[test]
     fn test_serde_ads_state_roundtrip() {
         let state = AdsState::Run;
-        let bytes = serde_json::to_string(&state).unwrap();
-        assert_eq!(state, serde_json::from_str(&bytes).unwrap());
+        let s = serde_json::to_string(&state).unwrap();
+        assert_eq!(state, serde_json::from_str(&s).unwrap());
     }
 }
