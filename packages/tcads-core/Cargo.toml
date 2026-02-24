@@ -10,9 +10,13 @@ keywords = ["twincat", "beckhoff", "ads"]
 categories = ["api-bindings", "network-programming"]
 readme = "README.md"
 
+[features]
+serde = ["dep:serde", "chrono/serde"]
+
 [dependencies]
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "net", "macros"] }
 tokio-test = { workspace = true }
+serde = { workspace = true, features = ["derive"], optional = true }
 encoding_rs = { workspace = true }
 chrono = { workspace = true }
