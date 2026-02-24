@@ -54,7 +54,7 @@
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! let stream = AmsStream::connect("127.0.0.1:48898")?;
-//! let (reader, mut writer) = stream.try_split()?;
+//! let (mut reader, mut writer) = stream.try_split()?;
 //!
 //! // Send a raw "Port Connect" command
 //! let frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
@@ -73,10 +73,10 @@
 //! use tcads_core::ams::AmsCommand;
 //! use tcads_core::io::{AmsFrame, tokio::AmsStream};
 //!
-//! # #[tokio::main]
+//! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let stream = AmsStream::connect("127.0.0.1:48898")?;
-//! let (reader, mut writer) = stream.into_split()?;
+//! let stream = AmsStream::connect("127.0.0.1:48898").await?;
+//! let (mut reader, mut writer) = stream.into_split();
 //!
 //! let frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
 //! writer.write_frame(&frame).await?;

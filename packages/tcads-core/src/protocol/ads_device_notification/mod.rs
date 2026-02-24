@@ -76,13 +76,24 @@ impl<'a> AdsDeviceNotification<'a> {
     /// by handle regardless of which stamp group they belong to.
     ///
     /// # Example
-    /// ```ignore
+    /// ```no_run
+    /// # use tcads_core::protocol::{AdsDeviceNotification, AdsStampHeader, AdsNotificationSample};
+    /// # use tcads_core::ams::AmsCommand;
+    /// # use tcads_core::ads::NotificationHandle;
+    /// # use tcads_core::io::AmsFrame;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let ncount_notif_handle = NotificationHandle::from(1);
+    /// # let frame = AmsFrame::new(AmsCommand::AdsCommand, vec![]);
+    /// # let notif = AdsDeviceNotification::try_from_frame(&frame)?;
     /// for (timestamp, sample) in notif.iter_samples() {
     ///     if sample.handle() == ncount_notif_handle {
     ///         let value = i32::from_le_bytes(sample.data().try_into()?);
-    ///         println!("nCount = {value} at {}", timestamp.as_raw());
+    ///         println!("nCount = {value} at {timestamp}");
     ///     }
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn iter_samples(
         &self,
