@@ -49,7 +49,7 @@ use tcads_core::io::{AmsFrame, blocking::AmsStream};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stream = AmsStream::connect("127.0.0.1:48898")?;
-    let (reader, mut writer) = stream.try_split()?;
+    let (mut reader, mut writer) = stream.try_split()?;
 
     // Send a raw frame
     let frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
@@ -74,7 +74,7 @@ use tcads_core::io::{AmsFrame, tokio::AmsStream};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let stream = AmsStream::connect("127.0.0.1:48898").await?;
-    let (reader, mut writer) = stream.into_split();
+    let (mut reader, mut writer) = stream.into_split();
 
     let frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
     writer.write_frame(&frame).await?;
@@ -222,7 +222,7 @@ let notif = AdsDeviceNotification::try_from(&frame)?;
 for (timestamp, sample) in notif.iter_samples() {
     if sample.handle() == my_handle {
         let value = i32::from_le_bytes(sample.data().try_into()?);
-        println!("nCount = {value} at {}", timestamp.as_raw());
+        println!("nCount = {value} at {timestamp}");
     }
 }
 ```
