@@ -123,14 +123,12 @@ impl fmt::Debug for AmsNetId {
     }
 }
 
-#[cfg(feature = "serde")]
 impl serde::Serialize for AmsNetId {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         s.collect_str(self)
     }
 }
 
-#[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for AmsNetId {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let s = <&str>::deserialize(d)?;
@@ -174,7 +172,6 @@ mod tests {
         assert!(matches!(err, NetIdError::InvalidBufferSize { .. }));
     }
 
-    #[cfg(feature = "serde")]
     #[test]
     fn test_serde_ams_net_id_serialize() {
         let id = AmsNetId::new(192, 168, 0, 1, 1, 1);
@@ -182,14 +179,12 @@ mod tests {
         assert_eq!(s, r#""192.168.0.1.1.1""#);
     }
 
-    #[cfg(feature = "serde")]
     #[test]
     fn test_serde_ams_net_id_deserialize() {
         let id: AmsNetId = serde_json::from_str(r#""192.168.0.1.1.1""#).unwrap();
         assert_eq!(id, AmsNetId::new(192, 168, 0, 1, 1, 1));
     }
 
-    #[cfg(feature = "serde")]
     #[test]
     fn test_serde_ams_net_id_roundtrip() {
         let original = AmsNetId::new(10, 0, 0, 1, 1, 1);
@@ -198,7 +193,6 @@ mod tests {
         assert_eq!(original, roundtripped);
     }
 
-    #[cfg(feature = "serde")]
     #[test]
     fn test_serde_ams_net_id_invalid_string() {
         let err = serde_json::from_str::<AmsNetId>(r#""not.a.valid.netid""#);

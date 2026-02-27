@@ -3,15 +3,16 @@ use super::error::RouterStateError;
 /// AMS Router state codes.
 ///
 /// Represents the operational state of the AMS Router.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(u32)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
 pub enum RouterState {
     /// Router is stopped (0)
-    Stop = 0,
+    Stop,
     /// Router is started/running (1)
-    Start = 1,
+    Start,
     /// Router/route was removed (2)
-    Removed = 2,
+    Removed,
     /// Unknown state
     Unknown(u32),
 }
@@ -105,5 +106,51 @@ mod tests {
         assert_eq!(RouterState::from(1), RouterState::Start);
         assert_eq!(RouterState::from(2), RouterState::Removed);
         assert_eq!(RouterState::from(3), RouterState::Unknown(3));
+    }
+
+    #[test]
+    fn test_state_bytes() {
+        assert_eq!(RouterState::Stop.to_bytes(), [0, 0, 0, 0]);
+        assert_eq!(RouterState::Start.to_bytes(), [1, 0, 0, 0]);
+        assert_eq!(RouterState::Removed.to_bytes(), [2, 0, 0, 0]);
+        assert_eq!(RouterState::Unknown(100).to_bytes(), [100, 0, 0, 0]);
+    }
+
+    #[test]
+    fn test_state_from_bytes() {
+        assert_eq!(RouterState::from_bytes([0, 0, 0, 0]), RouterState::Stop);
+        assert_eq!(RouterState::from_bytes([1, 0, 0, 0]), RouterState::Start);
+        assert_eq!(RouterState::from_bytes([2, 0, 0, 0]), RouterState::Removed);
+        assert_eq!(
+            RouterState::from_bytes([100, 0, 0, 0]),
+            RouterState::Unknown(100)
+        );
+    }
+
+    #[test]
+    fn test_state_try_from_slice() {
+        assert_eq!(
+            RouterState::try_from_slice(&[0, 0, 0, 0]).unwrap(),
+            RouterState::Stop
+        );
+        assert_eq!(
+            RouterState::try_from_slice(&[1, 0, 0, 0]).unwrap(),
+            RouterState::Start
+        );
+        assert_eq!(
+            RouterState::try_from_slice(&[2, 0, 0, 0]).unwrap(),
+            RouterState::Removed
+        );
+        assert_eq!(
+            RouterState::try_from_slice(&[100, 0, 0, 0]).unwrap(),
+            RouterState::Unknown(100)
+        );
+    }
+
+    #[test]
+    fn test_serde_router_state_roundtrip() {
+        let state = RouterState::Start;
+        let s = serde_json::to_string(&state).unwrap();
+        assert_eq!(state, serde_json::from_str(&s).unwrap());
     }
 }

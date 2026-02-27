@@ -159,14 +159,12 @@ impl std::fmt::Display for WindowsFileTime {
     }
 }
 
-#[cfg(feature = "serde")]
 impl serde::Serialize for WindowsFileTime {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         self.to_datetime().serialize(s)
     }
 }
 
-#[cfg(feature = "serde")]
 impl<'de> serde::Deserialize<'de> for WindowsFileTime {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         Ok(WindowsFileTime::from_datetime(
@@ -316,7 +314,6 @@ mod tests {
         assert_eq!(format!("{ft}"), "2026-02-21 12:00:00.500000 UTC");
     }
 
-    #[cfg(feature = "serde")]
     #[test]
     fn test_windows_file_time_serialize_is_iso8601() {
         let ft = WindowsFileTime::from_raw(134_161_488_000_000_000); // 2026-02-21 12:00:00 UTC
@@ -326,7 +323,6 @@ mod tests {
         assert!(s.contains("12:00:00"));
     }
 
-    #[cfg(feature = "serde")]
     #[test]
     fn test_windows_file_time_roundtrip() {
         // Use microsecond-aligned ticks to avoid sub-microsecond precision loss

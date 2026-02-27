@@ -4,8 +4,9 @@ use super::error::AdsReturnCodeError;
 ///
 /// See [Beckhoff ADS Specification (TE1000)](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/374277003.html?id=4954945278371876402)
 /// for reference
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(
+    serde::Serialize, serde::Deserialize, thiserror::Error, Debug, Clone, Copy, PartialEq, Eq, Hash,
+)]
 pub enum AdsReturnCode {
     #[error("No Error (0x00)")]
     Ok,
@@ -744,7 +745,6 @@ mod tests {
         assert_eq!([0x10, 0x10, 0x00, 0x00], bytes);
     }
 
-    #[cfg(feature = "serde")]
     #[test]
     fn test_serde_ads_return_code_roundtrip() {
         let code = AdsReturnCode::Ok;

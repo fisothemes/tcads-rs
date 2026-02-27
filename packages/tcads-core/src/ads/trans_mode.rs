@@ -3,8 +3,9 @@ use super::error::AdsTransModeError;
 /// The transition mode for Device Notifications.
 ///
 /// Determines when the server sends a notification to the client.
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
 pub enum AdsTransMode {
     /// No transmission.
     None,
@@ -138,7 +139,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "serde")]
     #[test]
     fn test_serde_trans_mode_roundtrip() {
         let mode = AdsTransMode::ClientCycle;

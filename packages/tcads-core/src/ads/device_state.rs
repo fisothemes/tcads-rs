@@ -15,8 +15,9 @@ pub type DeviceState = u16;
 /// The ADS State of the device.
 ///
 /// Describes the current operating state (e.g. Run, Stop, Config).
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
 pub enum AdsState {
     Invalid,
     Idle,
@@ -174,7 +175,6 @@ mod tests {
         assert_eq!(AdsState::try_from_slice(&[1, 0]).unwrap(), AdsState::Idle);
     }
 
-    #[cfg(feature = "serde")]
     #[test]
     fn test_serde_ads_state_roundtrip() {
         let state = AdsState::Run;
