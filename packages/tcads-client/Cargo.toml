@@ -9,3 +9,4 @@ repository.workspace = true
 [dependencies]
 tcads-core = { workspace = true }
 thiserror = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
