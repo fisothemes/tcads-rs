@@ -1,3 +1,4 @@
+use super::InvokeId;
 use super::command::AdsCommand;
 use super::error::AdsHeaderError;
 use super::return_codes::AdsReturnCode;
@@ -22,7 +23,7 @@ pub struct AdsHeader {
     state_flags: StateFlag,
     length: u32,
     error_code: AdsReturnCode,
-    invoke_id: u32,
+    invoke_id: InvokeId,
 }
 
 impl AdsHeader {
@@ -37,7 +38,7 @@ impl AdsHeader {
         state_flags: StateFlag,
         length: u32,
         error_code: AdsReturnCode,
-        invoke_id: u32,
+        invoke_id: InvokeId,
     ) -> Self {
         Self {
             target,
@@ -82,7 +83,7 @@ impl AdsHeader {
 
     /// Free usable 32-bit array. Usually this array serves to send an ID.
     /// This ID makes it possible to assign a received response to a request.
-    pub fn invoke_id(&self) -> u32 {
+    pub fn invoke_id(&self) -> InvokeId {
         self.invoke_id
     }
 
@@ -146,7 +147,7 @@ impl From<&[u8; AdsHeader::LENGTH]> for AdsHeader {
         let state_flags = StateFlag::from_bytes(value[18..20].try_into().unwrap());
         let length = u32::from_le_bytes(value[20..24].try_into().unwrap());
         let error_code = AdsReturnCode::from_bytes(value[24..28].try_into().unwrap());
-        let invoke_id = u32::from_le_bytes(value[28..32].try_into().unwrap());
+        let invoke_id = InvokeId::from_le_bytes(value[28..32].try_into().unwrap());
 
         Self {
             target,

@@ -1,6 +1,6 @@
 use super::{ProtocolError, parse_ads_frame};
 use crate::ads::{
-    AdsCommand, AdsError, AdsHeader, AdsReturnCode, IndexGroup, IndexOffset, StateFlag,
+    AdsCommand, AdsError, AdsHeader, AdsReturnCode, IndexGroup, IndexOffset, InvokeId, StateFlag,
 };
 use crate::ams::{AmsAddr, AmsCommand};
 use crate::io::AmsFrame;
@@ -164,7 +164,7 @@ impl AdsWriteRequestOwned {
     pub fn new(
         target: AmsAddr,
         source: AmsAddr,
-        invoke_id: u32,
+        invoke_id: InvokeId,
         index_group: IndexGroup,
         index_offset: IndexOffset,
         data: impl Into<Vec<u8>>,
@@ -295,7 +295,12 @@ impl AdsWriteResponse {
     pub const PAYLOAD_SIZE: usize = 4;
 
     /// Creates a new Write Response.
-    pub fn new(target: AmsAddr, source: AmsAddr, invoke_id: u32, result: AdsReturnCode) -> Self {
+    pub fn new(
+        target: AmsAddr,
+        source: AmsAddr,
+        invoke_id: InvokeId,
+        result: AdsReturnCode,
+    ) -> Self {
         let header = AdsHeader::new(
             target,
             source,

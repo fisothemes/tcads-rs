@@ -1,6 +1,6 @@
 use super::{ProtocolError, parse_ads_frame};
 use crate::ads::{
-    AdsCommand, AdsError, AdsHeader, AdsReturnCode, AdsState, DeviceState, StateFlag,
+    AdsCommand, AdsError, AdsHeader, AdsReturnCode, AdsState, DeviceState, InvokeId, StateFlag,
 };
 use crate::ams::{AmsAddr, AmsCommand};
 use crate::io::AmsFrame;
@@ -25,7 +25,7 @@ pub struct AdsReadStateRequest {
 
 impl AdsReadStateRequest {
     /// Creates a new Read State Request over TCP.
-    pub fn new(target: AmsAddr, source: AmsAddr, invoke_id: u32) -> Self {
+    pub fn new(target: AmsAddr, source: AmsAddr, invoke_id: InvokeId) -> Self {
         let header = AdsHeader::new(
             target,
             source,
@@ -40,7 +40,7 @@ impl AdsReadStateRequest {
     }
 
     /// Creates a new Read State Request over UDP.
-    pub fn new_udp(target: AmsAddr, source: AmsAddr, invoke_id: u32) -> Self {
+    pub fn new_udp(target: AmsAddr, source: AmsAddr, invoke_id: InvokeId) -> Self {
         let header = AdsHeader::new(
             target,
             source,
@@ -143,7 +143,7 @@ impl AdsReadStateResponse {
     pub fn new(
         target: AmsAddr,
         source: AmsAddr,
-        invoke_id: u32,
+        invoke_id: InvokeId,
         result: AdsReturnCode,
         ads_state: AdsState,
         device_state: DeviceState,
@@ -170,7 +170,7 @@ impl AdsReadStateResponse {
     pub fn new_udp(
         target: AmsAddr,
         source: AmsAddr,
-        invoke_id: u32,
+        invoke_id: InvokeId,
         result: AdsReturnCode,
         ads_state: AdsState,
         device_state: DeviceState,

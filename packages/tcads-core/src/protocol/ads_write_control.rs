@@ -1,6 +1,6 @@
 use super::{ProtocolError, parse_ads_frame};
 use crate::ads::{
-    AdsCommand, AdsError, AdsHeader, AdsReturnCode, AdsState, DeviceState, StateFlag,
+    AdsCommand, AdsError, AdsHeader, AdsReturnCode, AdsState, DeviceState, InvokeId, StateFlag,
 };
 use crate::ams::{AmsAddr, AmsCommand};
 use crate::io::AmsFrame;
@@ -167,7 +167,7 @@ impl AdsWriteControlRequestOwned {
     pub fn new(
         target: AmsAddr,
         source: AmsAddr,
-        invoke_id: u32,
+        invoke_id: InvokeId,
         ads_state: AdsState,
         device_state: DeviceState,
     ) -> Self {
@@ -188,7 +188,7 @@ impl AdsWriteControlRequestOwned {
     pub fn with_data(
         target: AmsAddr,
         source: AmsAddr,
-        invoke_id: u32,
+        invoke_id: InvokeId,
         ads_state: AdsState,
         device_state: DeviceState,
         data: impl Into<Vec<u8>>,
@@ -319,7 +319,12 @@ impl AdsWriteControlResponse {
     pub const PAYLOAD_SIZE: usize = 4;
 
     /// Creates a new Write Control Response.
-    pub fn new(target: AmsAddr, source: AmsAddr, invoke_id: u32, result: AdsReturnCode) -> Self {
+    pub fn new(
+        target: AmsAddr,
+        source: AmsAddr,
+        invoke_id: InvokeId,
+        result: AdsReturnCode,
+    ) -> Self {
         Self {
             header: AdsHeader::new(
                 target,

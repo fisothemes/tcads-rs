@@ -5,7 +5,9 @@ pub use sample::{AdsNotificationSample, AdsNotificationSampleOwned};
 pub use stamp::{AdsStampHeader, AdsStampHeaderOwned};
 
 use super::{ProtocolError, parse_ads_frame};
-use crate::ads::{AdsCommand, AdsError, AdsHeader, AdsReturnCode, StateFlag, WindowsFileTime};
+use crate::ads::{
+    AdsCommand, AdsError, AdsHeader, AdsReturnCode, InvokeId, StateFlag, WindowsFileTime,
+};
 use crate::ams::{AmsAddr, AmsCommand};
 use crate::io::AmsFrame;
 
@@ -207,7 +209,7 @@ impl AdsDeviceNotificationOwned {
     pub fn with_invoke_id(
         target: AmsAddr,
         source: AmsAddr,
-        invoke_id: u32,
+        invoke_id: InvokeId,
         stamps: impl Into<Vec<AdsStampHeaderOwned>>,
     ) -> Self {
         let stamps = stamps.into();

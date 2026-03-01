@@ -1,6 +1,7 @@
 use super::{ProtocolError, parse_ads_frame};
 use crate::ads::{
-    AdsCommand, AdsDeviceVersion, AdsError, AdsHeader, AdsReturnCode, AdsString, StateFlag,
+    AdsCommand, AdsDeviceVersion, AdsError, AdsHeader, AdsReturnCode, AdsString, InvokeId,
+    StateFlag,
 };
 use crate::ams::{AmsAddr, AmsCommand};
 use crate::io::AmsFrame;
@@ -25,7 +26,7 @@ pub struct AdsReadDeviceInfoRequest {
 
 impl AdsReadDeviceInfoRequest {
     /// Creates a new Read Device Info Request over TCP.
-    pub fn new(target: AmsAddr, source: AmsAddr, invoke_id: u32) -> Self {
+    pub fn new(target: AmsAddr, source: AmsAddr, invoke_id: InvokeId) -> Self {
         let header = AdsHeader::new(
             target,
             source,
@@ -40,7 +41,7 @@ impl AdsReadDeviceInfoRequest {
     }
 
     /// Creates a new Read Device Info Request over UDP.
-    pub fn new_udp(target: AmsAddr, source: AmsAddr, invoke_id: u32) -> Self {
+    pub fn new_udp(target: AmsAddr, source: AmsAddr, invoke_id: InvokeId) -> Self {
         let header = AdsHeader::new(
             target,
             source,
@@ -137,7 +138,7 @@ impl AdsReadDeviceInfoResponse {
     pub fn try_new(
         target: AmsAddr,
         source: AmsAddr,
-        invoke_id: u32,
+        invoke_id: InvokeId,
         result: AdsReturnCode,
         version: AdsDeviceVersion,
         device_name: impl AsRef<str>,

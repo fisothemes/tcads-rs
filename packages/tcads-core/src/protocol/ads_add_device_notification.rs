@@ -1,7 +1,7 @@
 use super::{ProtocolError, parse_ads_frame};
 use crate::ads::{
     AdsCommand, AdsError, AdsHeader, AdsReturnCode, AdsTransMode, IndexGroup, IndexOffset,
-    NotificationHandle, StateFlag,
+    InvokeId, NotificationHandle, StateFlag,
 };
 use crate::ams::{AmsAddr, AmsCommand};
 use crate::io::AmsFrame;
@@ -68,7 +68,7 @@ impl AdsAddDeviceNotificationRequest {
     pub fn new(
         target: AmsAddr,
         source: AmsAddr,
-        invoke_id: u32,
+        invoke_id: InvokeId,
         index_group: IndexGroup,
         index_offset: IndexOffset,
         length: u32,
@@ -99,7 +99,7 @@ impl AdsAddDeviceNotificationRequest {
     pub fn with_reserved(
         target: AmsAddr,
         source: AmsAddr,
-        invoke_id: u32,
+        invoke_id: InvokeId,
         index_group: IndexGroup,
         index_offset: IndexOffset,
         length: u32,
