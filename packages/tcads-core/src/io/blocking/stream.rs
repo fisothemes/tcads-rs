@@ -102,6 +102,27 @@ impl AmsStream<TcpStream> {
         Ok(Self::new(stream))
     }
 
+    /// Connects to an AMS router at a specified address with a timeout.
+    ///
+    /// Unlike [`connect`](Self::connect), `connect_timeout` takes a single [`SocketAddr`]
+    /// since timeout must be applied to individual addresses.
+    ///
+    /// It is an error to pass a zero Duration to this function.
+    ///
+    /// This method uses the [`TcpStream::connect_timeout`] internally and disables Nagle's algorithm
+    /// via [`set_nodelay(true)`](TcpStream::set_nodelay).
+    ///
+    /// # Note
+    ///
+    /// [`TcpStream::connect_timeout`] does not correspond to a single system call.
+    /// It instead calls [`TcpStream::connect`] in nonblocking mode and then uses an OS-specific
+    /// mechanism to await the completion of the connection request.
+    pub fn connect_timeout(addr: &SocketAddr, timeout: Duration) -> io::Result<Self> {
+        let stream = TcpStream::connect_timeout(addr, timeout)?;
+        stream.set_nodelay(true)?;
+        Ok(Self::new(stream))
+    }
+
     /// Splits the `TcpStream` into a buffered Reader and buffered Writer.
     ///
     /// This allows reading and writing to occur on separate threads or logic paths.
