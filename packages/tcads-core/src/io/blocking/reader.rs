@@ -1,12 +1,13 @@
 use crate::ams::AmsTcpHeader;
 use crate::io::frame::{AMS_FRAME_MAX_LEN, AmsFrame};
 use std::io::{self, BufRead, BufReader, Read};
+use std::net::TcpStream;
 
 /// A buffered reader specialised for parsing AMS frames from a byte stream.
 ///
 /// This struct wraps an underlying reader in a [`BufReader`] to minimise system calls
 /// when reading the [AMS/TCP header](AmsTcpHeader) (6 bytes) and variable-length payload.
-pub struct AmsReader<R: Read> {
+pub struct AmsReader<R: Read = TcpStream> {
     reader: BufReader<R>,
 }
 

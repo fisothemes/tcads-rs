@@ -1,6 +1,7 @@
 use super::traits::WriteAllVectored;
 use crate::io::frame::AmsFrame;
 use std::io::{self, BufWriter, IntoInnerError, IoSlice, Write};
+use std::net::TcpStream;
 
 /// A buffered writer specialised for serializing AMS frames to a byte stream.
 ///
@@ -12,7 +13,7 @@ use std::io::{self, BufWriter, IntoInnerError, IoSlice, Write};
 /// **automatically flushes** the buffer after writing each frame.
 ///
 /// This prevents commands from sitting in the buffer waiting for 8KB of data to accumulate.
-pub struct AmsWriter<W: Write> {
+pub struct AmsWriter<W: Write = TcpStream> {
     writer: BufWriter<W>,
 }
 
