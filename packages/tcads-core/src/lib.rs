@@ -139,5 +139,5 @@ pub use ads::{
     AdsCommand, AdsError, AdsHeader, AdsReturnCode, AdsState, AdsTransMode, IndexGroup,
     IndexOffset, InvokeId, WindowsFileTime,
 };
-pub use ams::{AmsAddr, AmsCommand, AmsNetId, AmsPort, AmsTcpHeader};
+pub use ams::{AmsAddr, AmsCommand, AmsNetId, AmsPort, AmsTcpHeader, RouterState};
 pub use io::AmsFrame;
