@@ -3,20 +3,34 @@ use std::net::ToSocketAddrs;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::{Sender, channel};
 use std::sync::{Arc, Mutex};
-use std::{io, thread};
+use std::thread::{self, JoinHandle};
 use tcads_core::ads::{DeviceState, NotificationHandle};
-use tcads_core::io::blocking::{AmsStream, AmsWriter};
-use tcads_core::protocol::{PortConnectRequest, PortConnectResponse, ProtocolError};
+use tcads_core::io::blocking::{AmsReader, AmsStream, AmsWriter};
+use tcads_core::protocol::{
+    AdsReadRequest, AdsReadResponse, AdsReadStateRequest, AdsReadStateResponse,
+    AdsWriteControlRequestOwned, AdsWriteControlResponse, AdsWriteRequestOwned, AdsWriteResponse,
+    GetLocalNetIdRequest, GetLocalNetIdResponse, PortCloseRequest, PortConnectRequest,
+    PortConnectResponse, ProtocolError, RouterNotification,
+};
 use tcads_core::{
-    AdsHeader, AdsState, AmsAddr, AmsCommand, AmsFrame, IndexGroup, IndexOffset, InvokeId,
+    AdsHeader, AdsReturnCode, AdsState, AmsAddr, AmsCommand, AmsFrame, AmsNetId, IndexGroup,
+    IndexOffset, InvokeId, RouterState,
 };
 
-/// A map of pending requests awaiting a response from the PLC.
-/// Keyed by invoke ID; value is a one-shot sender.
-type PendingMap = HashMap<InvokeId, Sender<AmsFrame>>;
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub enum PendingKey {
+    AdsCommand(InvokeId),
+    GetLocalNetId,
+}
 
-pub trait FrameHandler {
-    fn handle(&self, frame: AmsFrame, pending: &Mutex<PendingMap>);
+/// A map of pending requests awaiting a response from the PLC.
+pub type PendingMap = HashMap<PendingKey, Sender<AmsFrame>>;
+
+struct AdsDeviceInner {
+    writer: Mutex<AmsWriter>,
+    pending: Mutex<PendingMap>,
+    invoke_id: AtomicU32,
+    source: AmsAddr,
 }
 
 #[derive(Clone)]
@@ -27,7 +41,7 @@ pub struct AdsDevice {
 impl AdsDevice {
     /// Connects to the local TwinCAT AMS Router (`127.0.0.1:48898`)
     /// and automatically requests an [AMS address](AmsAddr).
-    pub fn connect() -> Result<Self, ProtocolError> {
+    pub fn connect() -> crate::Result<Self> {
         Self::connect_to("127.0.0.1:48898")
     }
 
@@ -35,61 +49,23 @@ impl AdsDevice {
     ///
     /// Useful if you are connecting to a remote PLC router but still want
     /// the router to assign your client an address.
-    pub fn connect_to<A: ToSocketAddrs>(addr: A) -> Result<Self, ProtocolError> {
+    pub fn connect_to<A: ToSocketAddrs>(addr: A) -> crate::Result<Self> {
         let mut stream = AmsStream::connect(addr)?;
 
-        let (mut reader, mut writer) = stream.try_split()?;
+        let source = request_ams_addr(&mut stream)?;
 
-        writer.write_frame(&PortConnectRequest::default().into())?;
-
-        let source = *PortConnectResponse::try_from(reader.read_frame()?)?.addr();
-
-        let (write_tx, write_rx) = channel::<WriteRequest>();
+        let (reader, writer) = stream.try_split()?;
 
         let pending = Mutex::new(HashMap::new());
 
         let inner = Arc::new(AdsDeviceInner {
-            write_tx,
+            writer: Mutex::new(writer),
             pending,
             invoke_id: AtomicU32::new(1),
             source,
         });
 
-        // Spawn writer thread that will serialise frames from a channel onto the TCP socket.
-        // This should guarantee fairness because callers submit requests via a channel, FIFO ordering.
-        thread::spawn(move || {
-            for req in write_rx {
-                if writer.write_frame(&req.frame).is_err() {
-                    break;
-                }
-            }
-        });
-
-        // Spawn reader thread for handling incoming frames.
-        let inner_reading = inner.clone();
-        thread::spawn(move || {
-            for result in reader.incoming() {
-                let frame = match result {
-                    Ok(f) => f,
-                    Err(_) => break,
-                };
-
-                if frame.header().command() != AmsCommand::AdsCommand {
-                    break;
-                }
-
-                let invoke_id = match AdsHeader::parse_prefix(frame.payload()) {
-                    Ok((header, _)) => header.invoke_id(),
-                    Err(_) => break,
-                };
-
-                let mut map = inner_reading.pending.lock().unwrap();
-                if let Some(tx) = map.remove(&invoke_id) {
-                    let _ = tx.send(frame);
-                }
-            }
-            inner_reading.pending.lock().unwrap().clear();
-        });
+        let _ = spawn_reader_thread(reader, inner.clone());
 
         Ok(Self { inner })
     }
@@ -98,10 +74,7 @@ impl AdsDevice {
     ///
     /// This bypasses the handshake entirely. Necessary for clients where you must explicitly
     /// match the "Static Route" configured on the target PLC.
-    pub fn connect_with_source<A: ToSocketAddrs>(
-        addr: A,
-        source: AmsAddr,
-    ) -> Result<Self, ProtocolError> {
+    pub fn connect_with_source<A: ToSocketAddrs>(addr: A, source: AmsAddr) -> crate::Result<Self> {
         todo!()
     }
 
@@ -112,8 +85,21 @@ impl AdsDevice {
         index_group: IndexGroup,
         index_offset: IndexOffset,
         len: u32,
-    ) -> io::Result<Vec<u8>> {
-        todo!()
+    ) -> crate::Result<Vec<u8>> {
+        let invoke_id = self.next_invoke_id();
+        let frame = AdsReadRequest::new(
+            target,
+            self.inner.source,
+            invoke_id,
+            index_group,
+            index_offset,
+            len,
+        )
+        .into_frame();
+        let frame = self.send_and_wait(frame, invoke_id)?;
+        let resp = AdsReadResponse::try_from(&frame)?;
+        check_result(resp.result())?;
+        Ok(resp.data().to_vec())
     }
 
     /// Sends a generic Write request to the target.
@@ -123,8 +109,19 @@ impl AdsDevice {
         index_group: IndexGroup,
         index_offset: IndexOffset,
         data: &[u8],
-    ) -> io::Result<()> {
-        todo!()
+    ) -> crate::Result<()> {
+        let invoke_id = self.next_invoke_id();
+        let frame = AdsWriteRequestOwned::new(
+            target,
+            self.inner.source,
+            invoke_id,
+            index_group,
+            index_offset,
+            data,
+        )
+        .into_frame();
+        let resp = AdsWriteResponse::try_from(&self.send_and_wait(frame, invoke_id)?)?;
+        check_result(resp.result())
     }
 
     /// Sends an atomic ReadWrite request to the target.
@@ -135,18 +132,23 @@ impl AdsDevice {
         index_offset: IndexOffset,
         read_len: u32,
         write_data: &[u8],
-    ) -> io::Result<Vec<u8>> {
+    ) -> crate::Result<Vec<u8>> {
         todo!()
     }
 
     /// Reads the name and version of the target ADS device.
-    pub fn read_device_info(&self, target: AmsAddr) -> io::Result<()> {
+    pub fn read_device_info(&self, target: AmsAddr) -> crate::Result<()> {
         todo!()
     }
 
     /// Reads the ADS State and Device State of the target.
-    pub fn read_state(&self, target: AmsAddr) -> io::Result<(AdsState, DeviceState)> {
-        todo!()
+    pub fn read_state(&self, target: AmsAddr) -> crate::Result<(AdsState, DeviceState)> {
+        let invoke_id = self.next_invoke_id();
+        let frame = AdsReadStateRequest::new(target, self.inner.source, invoke_id).into_frame();
+        let resp = AdsReadStateResponse::try_from(&self.send_and_wait(frame, invoke_id)?)?;
+
+        check_result(resp.result())?;
+        Ok((resp.ads_state(), resp.device_state()))
     }
 
     /// Changes the ADS State and Device State of the target.
@@ -156,8 +158,19 @@ impl AdsDevice {
         ads_state: AdsState,
         device_state: DeviceState,
         data: &[u8],
-    ) -> io::Result<()> {
-        todo!()
+    ) -> crate::Result<()> {
+        let invoke_id = self.next_invoke_id();
+        let frame = AdsWriteControlRequestOwned::with_data(
+            target,
+            self.inner.source,
+            invoke_id,
+            ads_state,
+            device_state,
+            data,
+        )
+        .into_frame();
+        let resp = AdsWriteControlResponse::try_from(&self.send_and_wait(frame, invoke_id)?)?;
+        check_result(resp.result())
     }
 
     /// Subscribes to changes on a specific IndexGroup/IndexOffset.
@@ -167,7 +180,7 @@ impl AdsDevice {
         index_group: IndexGroup,
         index_offset: IndexOffset,
         // Define a `NotificationAttributes` struct later probably...
-    ) -> io::Result<NotificationHandle> {
+    ) -> crate::Result<NotificationHandle> {
         todo!()
     }
 
@@ -176,7 +189,7 @@ impl AdsDevice {
         &self,
         target: AmsAddr,
         handle: NotificationHandle,
-    ) -> io::Result<()> {
+    ) -> crate::Result<()> {
         todo!()
     }
 
@@ -185,7 +198,31 @@ impl AdsDevice {
         self.inner.source
     }
 
-    fn next_invoke_id(&self) -> u32 {
+    /// Fetches the AMS Router's Local [Net ID](AmsNetId).
+    pub fn get_local_net_id(&self) -> crate::Result<AmsNetId> {
+        let (tx, rx) = channel();
+
+        {
+            self.inner
+                .writer
+                .lock()
+                .expect("Writer lock should be held")
+                .write_frame(&GetLocalNetIdRequest::into_frame())?;
+
+            self.inner
+                .pending
+                .lock()
+                .expect("Pending lock should be held")
+                .insert(PendingKey::GetLocalNetId, tx);
+        }
+
+        let frame = rx.recv().map_err(|_| crate::Error::Disconnected)?;
+        let net_id = GetLocalNetIdResponse::try_from(frame)?.net_id();
+        Ok(net_id)
+    }
+
+    /// Generates the next [Invoke ID](InvokeId)
+    fn next_invoke_id(&self) -> InvokeId {
         let id = self.inner.invoke_id.fetch_add(1, Ordering::Relaxed);
         if id == 0 {
             self.inner.invoke_id.fetch_add(1, Ordering::Relaxed)
@@ -193,16 +230,101 @@ impl AdsDevice {
             id
         }
     }
+
+    fn send_and_wait(&self, frame: AmsFrame, invoke_id: InvokeId) -> crate::Result<AmsFrame> {
+        let (tx, rx) = channel();
+
+        {
+            self.inner
+                .pending
+                .lock()
+                .expect("Pending lock should be held")
+                .insert(PendingKey::AdsCommand(invoke_id), tx);
+
+            self.inner
+                .writer
+                .lock()
+                .expect("Writer lock should be held")
+                .write_frame(&frame)?;
+        }
+
+        rx.recv().map_err(|_| crate::Error::Disconnected)
+    }
 }
 
-struct WriteRequest {
-    frame: AmsFrame,
-    invoke_id: InvokeId,
+fn request_ams_addr(stream: &mut AmsStream) -> Result<AmsAddr, ProtocolError> {
+    stream.write_frame(&PortConnectRequest::default().into())?;
+
+    let addr = *PortConnectResponse::try_from(stream.read_frame()?)?.addr();
+
+    Ok(addr)
 }
 
-struct AdsDeviceInner {
-    write_tx: Sender<WriteRequest>,
-    pending: Mutex<PendingMap>,
-    invoke_id: AtomicU32,
-    source: AmsAddr,
+fn check_result(code: AdsReturnCode) -> crate::Result<()> {
+    match code {
+        AdsReturnCode::Ok => Ok(()),
+        code => Err(code.into()),
+    }
+}
+
+fn spawn_reader_thread(
+    reader: AmsReader,
+    inner: Arc<AdsDeviceInner>,
+) -> JoinHandle<crate::Result<()>> {
+    let handle = thread::spawn(move || -> crate::Result<()> {
+        for result in reader.incoming() {
+            if let Ok(frame) = result {
+                match frame.header().command() {
+                    AmsCommand::PortConnect => {
+                        panic!("Port connect should not be received on the reader thread!")
+                    }
+                    AmsCommand::GetLocalNetId => {
+                        let mut map = inner.pending.lock().unwrap();
+                        if let Some(tx) = map.remove(&PendingKey::GetLocalNetId) {
+                            let _ = tx.send(frame);
+                        }
+                    }
+                    AmsCommand::PortClose => break,
+                    AmsCommand::RouterNotification => {
+                        if let Ok(resp) = RouterNotification::try_from(frame) {
+                            match resp.state() {
+                                RouterState::Removed => {
+                                    inner
+                                        .writer
+                                        .lock()
+                                        .expect("Writer lock should be held")
+                                        .write_frame(
+                                            &PortCloseRequest::new(inner.source.port()).into(),
+                                        )?;
+                                }
+                                _ => {} // TODO: Handle other states
+                            }
+                        }
+                    }
+                    AmsCommand::AdsCommand => {
+                        if let Ok((header, _)) = AdsHeader::parse_prefix(frame.payload()) {
+                            let mut map =
+                                inner.pending.lock().expect("Pending lock should be held");
+                            if let Some(tx) =
+                                map.remove(&PendingKey::AdsCommand(header.invoke_id()))
+                            {
+                                let _ = tx.send(frame);
+                            }
+                        };
+                    }
+                    other => todo!("Handle Unknown command: {other:?}"),
+                }
+            }
+        }
+
+        inner
+            .pending
+            .lock()
+            .expect("Pending lock should be held")
+            .clear();
+
+        Ok(())
+    });
+
+    handle
 }
