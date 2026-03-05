@@ -97,6 +97,14 @@ impl<R: Read> AmsReader<R> {
         AmsIncoming { reader: self }
     }
 
+    /// Unlike [`AmsReader::incoming`], this borrows the reader mutably, returning an iterator
+    /// over incoming frames.
+    ///
+    /// Useful for temporary read loops where you need the socket back.
+    pub fn incoming_mut(&mut self) -> AmsIncomingMut<'_, R> {
+        AmsIncomingMut { reader: self }
+    }
+
     /// Consumes the AmsReader, returning the underlying reader.
     ///
     /// # Note
@@ -139,6 +147,23 @@ impl<R: Read> Iterator for AmsIncoming<R> {
         match self.reader.read_frame() {
             Ok(frame) => Some(Ok(frame)),
             // EOF is expected when the connection is closed
+            Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
+}
+
+/// A borrowing iterator that yields `std::io::Result<AmsFrame>` from the underlying stream.
+pub struct AmsIncomingMut<'a, R: Read> {
+    reader: &'a mut AmsReader<R>,
+}
+
+impl<'a, R: Read> Iterator for AmsIncomingMut<'a, R> {
+    type Item = io::Result<AmsFrame>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.reader.read_frame() {
+            Ok(frame) => Some(Ok(frame)),
             Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => None,
             Err(e) => Some(Err(e)),
         }
