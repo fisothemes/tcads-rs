@@ -1,7 +1,8 @@
 use crate::ams::AmsTcpHeader;
 use crate::io::frame::{AMS_FRAME_MAX_LEN, AmsFrame};
 use std::io::{self, BufRead, BufReader, Read};
-use std::net::TcpStream;
+use std::net::{SocketAddr, TcpStream};
+use std::time::Duration;
 
 /// A buffered reader specialised for parsing AMS frames from a byte stream.
 ///
@@ -104,6 +105,26 @@ impl<R: Read> AmsReader<R> {
     /// Therefore, a following read from the underlying reader may lead to data loss
     pub fn into_inner(self) -> R {
         self.reader.into_inner()
+    }
+}
+
+impl AmsReader<TcpStream> {
+    /// Set read timeout for [`TcpStream`].
+    ///
+    /// If the value specified is [`None`], then read calls will block indefinitely.
+    /// An [`Err`] is returned if the zero [`Duration`] is passed to this method.
+    pub fn set_read_timeout(&mut self, dur: Option<Duration>) -> io::Result<()> {
+        self.reader.get_mut().set_read_timeout(dur)
+    }
+
+    /// Returns the socket address of the remote peer of this TCP connection.
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+        self.reader.get_ref().peer_addr()
+    }
+
+    /// Returns the socket address of the local half of this TCP connection
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.reader.get_ref().local_addr()
     }
 }
 

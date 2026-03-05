@@ -1,7 +1,8 @@
 use super::traits::WriteAllVectored;
 use crate::io::frame::AmsFrame;
 use std::io::{self, BufWriter, IntoInnerError, IoSlice, Write};
-use std::net::TcpStream;
+use std::net::{SocketAddr, TcpStream};
+use std::time::Duration;
 
 /// A buffered writer specialised for serializing AMS frames to a byte stream.
 ///
@@ -52,6 +53,26 @@ impl<W: Write> AmsWriter<W> {
     /// The buffer is written out (flushed) before returning the writer.
     pub fn into_inner(self) -> Result<W, IntoInnerError<BufWriter<W>>> {
         self.writer.into_inner()
+    }
+}
+
+impl AmsWriter<TcpStream> {
+    /// Set write timeout for [`TcpStream`].
+    ///
+    /// If the value specified is [`None`], then read calls will block indefinitely.
+    /// An [`Err`] is returned if the zero [`Duration`] is passed to this method.
+    pub fn set_write_timeout(&mut self, dur: Option<Duration>) -> io::Result<()> {
+        self.writer.get_mut().set_write_timeout(dur)
+    }
+
+    /// Returns the socket address of the remote peer of this TCP connection.
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+        self.writer.get_ref().peer_addr()
+    }
+
+    /// Returns the socket address of the local half of this TCP connection
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.writer.get_ref().local_addr()
     }
 }
 
