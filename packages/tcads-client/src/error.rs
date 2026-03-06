@@ -1,5 +1,5 @@
 use std::io;
-use std::sync::mpsc::SendError;
+use std::sync::mpsc::{RecvError, SendError};
 use std::sync::{Arc, PoisonError};
 use tcads_core::ads::AdsReturnCode;
 use tcads_core::protocol::ProtocolError;
@@ -7,22 +7,22 @@ use tcads_core::protocol::ProtocolError;
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum Error {
     #[error("I/O error: {0}")]
-    Io(Arc<io::Error>),
+    Io(#[from] Arc<io::Error>),
     #[error(transparent)]
     Protocol(#[from] ProtocolError),
     #[error(transparent)]
     AdsReturnCode(#[from] AdsReturnCode),
     #[error("Disconnected")]
     Disconnected,
-    #[error("Poisoned Lock: {0}")]
-    PoisonedLock(String),
+    #[error("Poisoned lock")]
+    PoisonedLock,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
 
 impl<T> From<PoisonError<T>> for Error {
-    fn from(err: PoisonError<T>) -> Self {
-        Error::PoisonedLock(err.to_string())
+    fn from(_: PoisonError<T>) -> Self {
+        Error::PoisonedLock
     }
 }
 
@@ -34,6 +34,12 @@ impl From<io::Error> for Error {
 
 impl<T> From<SendError<T>> for Error {
     fn from(_: SendError<T>) -> Self {
+        Error::Disconnected
+    }
+}
+
+impl From<RecvError> for Error {
+    fn from(_: RecvError) -> Self {
         Error::Disconnected
     }
 }
@@ -59,6 +65,6 @@ mod tests {
             panic!("poison the lock");
         });
         let err = Error::from(mutex.lock().unwrap_err());
-        assert!(matches!(err, Error::PoisonedLock(_)));
+        assert!(matches!(err, Error::PoisonedLock));
     }
 }
