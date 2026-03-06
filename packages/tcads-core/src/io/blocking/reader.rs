@@ -1,7 +1,7 @@
 use crate::ams::AmsTcpHeader;
 use crate::io::frame::{AMS_FRAME_MAX_LEN, AmsFrame};
 use std::io::{self, BufRead, BufReader, Read};
-use std::net::{SocketAddr, TcpStream};
+use std::net::{Shutdown, SocketAddr, TcpStream};
 use std::time::Duration;
 
 /// A buffered reader specialised for parsing AMS frames from a byte stream.
@@ -133,6 +133,14 @@ impl AmsReader<TcpStream> {
     /// Returns the socket address of the local half of this TCP connection
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
         self.reader.get_ref().local_addr()
+    }
+
+    /// Shuts down the read, write, or both halves of this connection.
+    /// This function will cause all pending and future I/O on the specified
+    /// portions to return immediately with an appropriate value
+    /// (see documentation for [`Shutdown`]).
+    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
+        self.reader.get_ref().shutdown(how)
     }
 }
 
