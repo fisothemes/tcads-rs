@@ -15,7 +15,7 @@ pub enum DispatchKey {
 
 /// Tracks pending requests and dispatches frames to the writer thread.
 ///
-/// The single entry point for sending an ADS request — [`AmsRequestDispatcher::dispatch`]
+/// The single entry point for sending an AMS request. [`AmsRequestDispatcher::dispatch`]
 /// registers the caller's response channel then forwards the frame to the writer.
 /// When the reader thread receives a response, it calls [`AmsRequestDispatcher::complete`]
 /// to route the frame back to the waiting caller.
