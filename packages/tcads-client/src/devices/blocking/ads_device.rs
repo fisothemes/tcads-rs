@@ -252,7 +252,7 @@ impl AdsDevice {
     }
 }
 
-fn request_ams_addr(stream: &mut AmsStream) -> Result<AmsAddr, ProtocolError> {
+fn request_ams_addr(stream: &mut AmsStream) -> crate::Result<AmsAddr> {
     stream.write_frame(&PortConnectRequest::default().into())?;
 
     let addr = *PortConnectResponse::try_from(stream.read_frame()?)?.addr();
