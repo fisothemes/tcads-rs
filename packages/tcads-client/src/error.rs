@@ -1,12 +1,12 @@
 use std::io;
-use std::sync::PoisonError;
+use std::sync::{Arc, PoisonError};
 use tcads_core::ads::AdsReturnCode;
 use tcads_core::protocol::ProtocolError;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
-    Io(#[from] io::Error),
+    Io(Arc<io::Error>),
     #[error(transparent)]
     Protocol(#[from] ProtocolError),
     #[error(transparent)]
@@ -22,5 +22,11 @@ pub type Result<T> = std::result::Result<T, Error>;
 impl<T> From<PoisonError<T>> for Error {
     fn from(err: PoisonError<T>) -> Self {
         Error::PoisonedLock(err.to_string())
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(err: io::Error) -> Self {
+        Error::Io(Arc::new(err))
     }
 }
