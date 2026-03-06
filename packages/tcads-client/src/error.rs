@@ -1,4 +1,5 @@
 use std::io;
+use std::sync::mpsc::SendError;
 use std::sync::{Arc, PoisonError};
 use tcads_core::ads::AdsReturnCode;
 use tcads_core::protocol::ProtocolError;
@@ -28,6 +29,12 @@ impl<T> From<PoisonError<T>> for Error {
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
         Error::Io(Arc::new(err))
+    }
+}
+
+impl<T> From<SendError<T>> for Error {
+    fn from(_: SendError<T>) -> Self {
+        Error::Disconnected
     }
 }
 
