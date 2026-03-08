@@ -128,7 +128,7 @@ impl<'a> AdsDeviceNotification<'a> {
     ///
     /// Returns the parsed stamps and validates the outer length field against
     /// the actual payload length.
-    fn parse_payload(payload: &'a [u8]) -> Result<Vec<AdsStampHeader<'a>>, ProtocolError> {
+    pub fn parse_payload(payload: &'a [u8]) -> Result<Vec<AdsStampHeader<'a>>, ProtocolError> {
         if payload.len() < Self::MIN_PAYLOAD_SIZE {
             return Err(AdsError::UnexpectedDataLength {
                 expected: Self::MIN_PAYLOAD_SIZE,
@@ -141,10 +141,10 @@ impl<'a> AdsDeviceNotification<'a> {
 
         let stamps_data = &payload[Self::MIN_PAYLOAD_SIZE..];
 
-        if stamps_data.len() != length {
+        if stamps_data.len() != length.saturating_sub(4) {
             return Err(AdsError::UnexpectedDataLength {
-                expected: Self::MIN_PAYLOAD_SIZE + length,
-                got: payload.len(),
+                expected: length.saturating_sub(4),
+                got: stamps_data.len(),
             })?;
         }
 
@@ -284,7 +284,7 @@ impl From<&AdsDeviceNotificationOwned> for AmsFrame {
         let mut payload = Vec::with_capacity(AdsHeader::LENGTH + ads_payload_size);
 
         payload.extend_from_slice(&value.header.to_bytes());
-        payload.extend_from_slice(&(stamps_wire_size as u32).to_le_bytes());
+        payload.extend_from_slice(&(stamps_wire_size.saturating_add(4) as u32).to_le_bytes());
         payload.extend_from_slice(&(value.stamps.len() as u32).to_le_bytes());
 
         for stamp in &value.stamps {
