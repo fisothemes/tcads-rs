@@ -1,7 +1,9 @@
+use tcads_core::AdsTransMode;
 use tcads_core::ads::{AdsCommand, AdsHeader, AdsReturnCode, AdsState};
 use tcads_core::ams::{AmsAddr, AmsCommand};
 use tcads_core::io::blocking::AmsStream;
 use tcads_core::protocol::{
+    AdsAddDeviceNotificationRequest, AdsAddDeviceNotificationResponse, AdsDeviceNotification,
     AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse, AdsReadRequest, AdsReadResponse,
     AdsReadStateRequest, AdsReadStateResponse, AdsReadWriteRequestOwned,
     AdsWriteControlRequestOwned, AdsWriteControlResponse, AdsWriteRequestOwned, AdsWriteResponse,
@@ -18,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut source = AmsAddr::default();
     let mut target = AmsAddr::default();
-    let mut var_handle;
+    let mut var_handle = 0;
 
     for result in reader.incoming() {
         let frame = result?;
@@ -187,6 +189,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 u32::from_le_bytes(data.try_into()?)
                             ),
                             _ => panic!("Read failed! ({:?}, {:?})", code, data),
+                        }
+                        writer.write_frame(
+                            &AdsAddDeviceNotificationRequest::new(
+                                target,
+                                source,
+                                0x999,
+                                0xF005,
+                                var_handle,
+                                size_of::<u32>() as u32,
+                                AdsTransMode::ServerOnChange,
+                                0,
+                                10,
+                            )
+                            .into(),
+                        )?;
+                    }
+                    AdsCommand::AdsAddDeviceNotification => {
+                        let resp = AdsAddDeviceNotificationResponse::parse_payload(payload)?;
+                        println!("Device notification added: {:?}", resp);
+                    }
+                    AdsCommand::AdsDeviceNotification => {
+                        let headers = AdsDeviceNotification::parse_payload(payload)?;
+
+                        for header in headers {
+                            println!("Received Device Notification at {}", header.timestamp());
+                            println!("Device notification(s): {:?}", header.samples());
                         }
                     }
                     _ => todo!(),
