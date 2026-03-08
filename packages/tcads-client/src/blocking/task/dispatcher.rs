@@ -9,8 +9,9 @@ use crate::Error;
 /// Identifies the type of pending request for routing incoming responses.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum DispatchKey {
-    AdsCommand(InvokeId),
+    PortConnect,
     GetLocalNetId,
+    AdsCommand(InvokeId),
 }
 
 /// Tracks pending requests and dispatches frames to the writer thread.
@@ -20,10 +21,11 @@ pub enum DispatchKey {
 /// When the reader thread receives a response, it calls [`AmsRequestDispatcher::complete`]
 /// to route the frame back to the waiting caller.
 pub struct AmsRequestDispatcher {
+    /// Pending [PortConnect](tcads_core::protocol::PortConnectResponse) responses.
+    port_connect: Mutex<VecDeque<Sender<AmsFrame>>>,
     /// Pending ADS command responses, keyed by [invoke ID](InvokeId).
     ads: Mutex<HashMap<InvokeId, Sender<AmsFrame>>>,
     /// Pending [GetLocalNetId](tcads_core::protocol::GetLocalNetIdResponse) responses;
-    /// queue handles concurrent callers.
     net_id: Mutex<VecDeque<Sender<AmsFrame>>>,
     /// Channel to the writer thread.
     write_tx: Sender<AmsFrame>,
@@ -33,6 +35,7 @@ impl AmsRequestDispatcher {
     /// Creates a new dispatcher with the given writer channel sender.
     pub fn new(write_tx: Sender<AmsFrame>) -> Self {
         Self {
+            port_connect: Mutex::new(VecDeque::new()),
             ads: Mutex::new(HashMap::new()),
             net_id: Mutex::new(VecDeque::new()),
             write_tx,
@@ -63,6 +66,7 @@ impl AmsRequestDispatcher {
     /// Dropping the senders causes all waiting [`rx.recv()`](Receiver::recv) calls
     /// to return [`Err`], which maps to [`Error::Disconnected`].
     pub fn clear(&self) -> crate::Result<()> {
+        self.port_connect.lock()?.clear();
         self.ads.lock()?.clear();
         self.net_id.lock()?.clear();
         Ok(())
@@ -70,11 +74,14 @@ impl AmsRequestDispatcher {
 
     fn register(&self, key: DispatchKey, sender: Sender<AmsFrame>) -> crate::Result<()> {
         match key {
-            DispatchKey::AdsCommand(id) => {
-                self.ads.lock()?.insert(id, sender);
+            DispatchKey::PortConnect => {
+                self.port_connect.lock()?.push_back(sender);
             }
             DispatchKey::GetLocalNetId => {
                 self.net_id.lock()?.push_back(sender);
+            }
+            DispatchKey::AdsCommand(id) => {
+                self.ads.lock()?.insert(id, sender);
             }
         }
         Ok(())
@@ -82,8 +89,9 @@ impl AmsRequestDispatcher {
 
     fn take(&self, key: DispatchKey) -> crate::Result<Option<Sender<AmsFrame>>> {
         let value = match key {
-            DispatchKey::AdsCommand(id) => self.ads.lock()?.remove(&id),
+            DispatchKey::PortConnect => self.port_connect.lock()?.pop_front(),
             DispatchKey::GetLocalNetId => self.net_id.lock()?.pop_front(),
+            DispatchKey::AdsCommand(id) => self.ads.lock()?.remove(&id),
         };
 
         Ok(value)
