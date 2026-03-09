@@ -1,4 +1,4 @@
-use super::{AmsRequestDispatcher, DispatchKey};
+use super::{AmsRequestDispatchKey, AmsRequestDispatcher};
 use std::io::Read;
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
@@ -39,8 +39,12 @@ fn handle<R: Read>(reader: AmsReader<R>, requests: &AmsRequestDispatcher) -> cra
         };
 
         match frame.header().command() {
-            AmsCommand::PortConnect => requests.complete(DispatchKey::PortConnect, frame)?,
-            AmsCommand::GetLocalNetId => requests.complete(DispatchKey::GetLocalNetId, frame)?,
+            AmsCommand::PortConnect => {
+                requests.complete(AmsRequestDispatchKey::PortConnect, frame)?
+            }
+            AmsCommand::GetLocalNetId => {
+                requests.complete(AmsRequestDispatchKey::GetLocalNetId, frame)?
+            }
             AmsCommand::AdsCommand => {
                 if let Ok((header, _)) = AdsHeader::parse_prefix(frame.payload()) {
                     match header.command_id() {
@@ -49,9 +53,10 @@ fn handle<R: Read>(reader: AmsReader<R>, requests: &AmsRequestDispatcher) -> cra
                                 "Create an ADS notification dispatcher to handle ADS device notifications."
                             )
                         }
-                        _ => {
-                            requests.complete(DispatchKey::AdsCommand(header.invoke_id()), frame)?
-                        }
+                        _ => requests.complete(
+                            AmsRequestDispatchKey::AdsCommand(header.invoke_id()),
+                            frame,
+                        )?,
                     }
                 }
             }

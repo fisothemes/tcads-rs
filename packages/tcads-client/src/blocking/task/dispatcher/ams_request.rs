@@ -8,7 +8,7 @@ use crate::Error;
 
 /// Identifies the type of pending request for routing incoming responses.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum DispatchKey {
+pub enum AmsRequestDispatchKey {
     PortConnect,
     GetLocalNetId,
     AdsCommand(InvokeId),
@@ -45,7 +45,11 @@ impl AmsRequestDispatcher {
     /// Registers a waiter, enqueues the frame for writing, and returns the response receiver.
     ///
     /// Registration and dispatch happen together, closing the window between the two.
-    pub fn dispatch(&self, key: DispatchKey, frame: AmsFrame) -> Result<Receiver<AmsFrame>, Error> {
+    pub fn dispatch(
+        &self,
+        key: AmsRequestDispatchKey,
+        frame: AmsFrame,
+    ) -> Result<Receiver<AmsFrame>, Error> {
         let (tx, rx) = mpsc::channel();
         self.register(key, tx)?;
         self.write_tx.send(frame)?;
@@ -53,7 +57,7 @@ impl AmsRequestDispatcher {
     }
 
     /// Called by the reader thread to complete a pending request.
-    pub fn complete(&self, key: DispatchKey, frame: AmsFrame) -> crate::Result<()> {
+    pub fn complete(&self, key: AmsRequestDispatchKey, frame: AmsFrame) -> crate::Result<()> {
         if let Some(tx) = self.take(key)? {
             tx.send(frame)?;
         }
@@ -72,26 +76,26 @@ impl AmsRequestDispatcher {
         Ok(())
     }
 
-    fn register(&self, key: DispatchKey, sender: Sender<AmsFrame>) -> crate::Result<()> {
+    fn register(&self, key: AmsRequestDispatchKey, sender: Sender<AmsFrame>) -> crate::Result<()> {
         match key {
-            DispatchKey::PortConnect => {
+            AmsRequestDispatchKey::PortConnect => {
                 self.port_connect.lock()?.push_back(sender);
             }
-            DispatchKey::GetLocalNetId => {
+            AmsRequestDispatchKey::GetLocalNetId => {
                 self.net_id.lock()?.push_back(sender);
             }
-            DispatchKey::AdsCommand(id) => {
+            AmsRequestDispatchKey::AdsCommand(id) => {
                 self.ads.lock()?.insert(id, sender);
             }
         }
         Ok(())
     }
 
-    fn take(&self, key: DispatchKey) -> crate::Result<Option<Sender<AmsFrame>>> {
+    fn take(&self, key: AmsRequestDispatchKey) -> crate::Result<Option<Sender<AmsFrame>>> {
         let value = match key {
-            DispatchKey::PortConnect => self.port_connect.lock()?.pop_front(),
-            DispatchKey::GetLocalNetId => self.net_id.lock()?.pop_front(),
-            DispatchKey::AdsCommand(id) => self.ads.lock()?.remove(&id),
+            AmsRequestDispatchKey::PortConnect => self.port_connect.lock()?.pop_front(),
+            AmsRequestDispatchKey::GetLocalNetId => self.net_id.lock()?.pop_front(),
+            AmsRequestDispatchKey::AdsCommand(id) => self.ads.lock()?.remove(&id),
         };
 
         Ok(value)
@@ -114,7 +118,7 @@ mod tests {
         let frame = AmsFrame::empty(AmsCommand::AdsCommand);
 
         let rx = dispatcher
-            .dispatch(DispatchKey::AdsCommand(1), frame.clone())
+            .dispatch(AmsRequestDispatchKey::AdsCommand(1), frame.clone())
             .expect("dispatch should succeed");
 
         let sent = write_rx.recv().expect("writer should receive frame");
@@ -129,11 +133,11 @@ mod tests {
         let response = AmsFrame::empty(AmsCommand::AdsCommand);
 
         let rx = dispatcher
-            .dispatch(DispatchKey::AdsCommand(42), frame)
+            .dispatch(AmsRequestDispatchKey::AdsCommand(42), frame)
             .expect("dispatch should succeed");
 
         dispatcher
-            .complete(DispatchKey::AdsCommand(42), response.clone())
+            .complete(AmsRequestDispatchKey::AdsCommand(42), response.clone())
             .expect("complete should succeed");
 
         assert_eq!(rx.recv().expect("should receive response"), response);
@@ -145,7 +149,7 @@ mod tests {
         let frame = AmsFrame::empty(AmsCommand::AdsCommand);
 
         let rx = dispatcher
-            .dispatch(DispatchKey::AdsCommand(1), frame)
+            .dispatch(AmsRequestDispatchKey::AdsCommand(1), frame)
             .expect("dispatch should succeed");
 
         dispatcher.clear().expect("clear should succeed");
@@ -159,20 +163,20 @@ mod tests {
         let frame = AmsFrame::empty(AmsCommand::GetLocalNetId);
 
         let rx1 = dispatcher
-            .dispatch(DispatchKey::GetLocalNetId, frame.clone())
+            .dispatch(AmsRequestDispatchKey::GetLocalNetId, frame.clone())
             .expect("first dispatch");
         let rx2 = dispatcher
-            .dispatch(DispatchKey::GetLocalNetId, frame)
+            .dispatch(AmsRequestDispatchKey::GetLocalNetId, frame)
             .expect("second dispatch");
 
         let resp1 = AmsFrame::empty(AmsCommand::GetLocalNetId);
         let resp2 = AmsFrame::empty(AmsCommand::GetLocalNetId);
 
         dispatcher
-            .complete(DispatchKey::GetLocalNetId, resp1.clone())
+            .complete(AmsRequestDispatchKey::GetLocalNetId, resp1.clone())
             .expect("complete should succeed");
         dispatcher
-            .complete(DispatchKey::GetLocalNetId, resp2.clone())
+            .complete(AmsRequestDispatchKey::GetLocalNetId, resp2.clone())
             .expect("complete should succeed");
 
         assert_eq!(rx1.recv().unwrap(), resp1);
