@@ -1,9 +1,10 @@
 use tcads_core::AdsTransMode;
-use tcads_core::ads::{AdsCommand, AdsHeader, AdsReturnCode, AdsState};
+use tcads_core::ads::{AdsCommand, AdsHeader, AdsReturnCode, AdsState, NotificationHandle};
 use tcads_core::ams::{AmsAddr, AmsCommand};
 use tcads_core::io::blocking::AmsStream;
 use tcads_core::protocol::{
-    AdsAddDeviceNotificationRequest, AdsAddDeviceNotificationResponse, AdsDeviceNotification,
+    AdsAddDeviceNotificationRequest, AdsAddDeviceNotificationResponse,
+    AdsDeleteDeviceNotificationRequest, AdsDeleteDeviceNotificationResponse, AdsDeviceNotification,
     AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse, AdsReadRequest, AdsReadResponse,
     AdsReadStateRequest, AdsReadStateResponse, AdsReadWriteRequestOwned,
     AdsWriteControlRequestOwned, AdsWriteControlResponse, AdsWriteRequestOwned, AdsWriteResponse,
@@ -21,6 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut source = AmsAddr::default();
     let mut target = AmsAddr::default();
     let mut var_handle = 0;
+    let mut notif_handle = NotificationHandle::from(999);
 
     for result in reader.incoming() {
         let frame = result?;
@@ -207,15 +209,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     AdsCommand::AdsAddDeviceNotification => {
                         let resp = AdsAddDeviceNotificationResponse::parse_payload(payload)?;
+
                         println!("Device notification added: {:?}", resp);
+
+                        notif_handle = resp.1;
+                    }
+                    AdsCommand::AdsDeleteDeviceNotification => {
+                        let resp = AdsDeleteDeviceNotificationResponse::parse_payload(payload)?;
+                        println!("Delete Device notification response: {:?}", resp);
                     }
                     AdsCommand::AdsDeviceNotification => {
                         let headers = AdsDeviceNotification::parse_payload(payload)?;
+                        println!(
+                            "Received Device Notification with {} header(s)",
+                            headers.len()
+                        );
+
+                        let ams_cmd = frame.header().command();
+                        let ads_cmd = header.command_id();
 
                         for header in headers {
-                            println!("Received Device Notification at {}", header.timestamp());
-                            println!("Device notification(s): {:?}", header.samples());
+                            println!(
+                                "{ams_cmd:?}:\t{ads_cmd:?} -> Received Device Notification at {}",
+                                header.timestamp()
+                            );
+                            println!(
+                                "{ams_cmd:?}:\t{ads_cmd:?} -> Device notification(s): {:?}",
+                                header.samples()
+                            );
                         }
+
+                        writer.write_frame(
+                            &AdsDeleteDeviceNotificationRequest::new(
+                                target,
+                                source,
+                                0x1337,
+                                notif_handle,
+                            )
+                            .into(),
+                        )?;
                     }
                     _ => todo!(),
                 }
