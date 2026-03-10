@@ -136,8 +136,8 @@ pub mod io;
 pub mod protocol;
 
 pub use ads::{
-    AdsCommand, AdsError, AdsHeader, AdsReturnCode, AdsState, AdsTransMode, IndexGroup,
-    IndexOffset, InvokeId, WindowsFileTime,
+    AdsCommand, AdsError, AdsHeader, AdsReturnCode, AdsState, AdsTransMode, DeviceState,
+    IndexGroup, IndexOffset, InvokeId, NotificationHandle, WindowsFileTime,
 };
 pub use ams::{AmsAddr, AmsCommand, AmsNetId, AmsPort, AmsTcpHeader, RouterState};
 pub use io::AmsFrame;
