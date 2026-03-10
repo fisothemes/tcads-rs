@@ -8,8 +8,8 @@ use tcads_core::protocol::{
     AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse, AdsReadRequest, AdsReadResponse,
     AdsReadStateRequest, AdsReadStateResponse, AdsReadWriteRequestOwned,
     AdsWriteControlRequestOwned, AdsWriteControlResponse, AdsWriteRequestOwned, AdsWriteResponse,
-    GetLocalNetIdRequest, GetLocalNetIdResponse, PortConnectRequest, PortConnectResponse,
-    RouterNotification,
+    GetLocalNetIdRequest, GetLocalNetIdResponse, PortCloseRequest, PortConnectRequest,
+    PortConnectResponse, RouterNotification,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -217,25 +217,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     AdsCommand::AdsDeleteDeviceNotification => {
                         let resp = AdsDeleteDeviceNotificationResponse::parse_payload(payload)?;
                         println!("Delete Device notification response: {:?}", resp);
+
+                        writer.write_frame(&PortCloseRequest::new(source.port()).into())?;
                     }
                     AdsCommand::AdsDeviceNotification => {
-                        let headers = AdsDeviceNotification::parse_payload(payload)?;
+                        let notif = AdsDeviceNotification::try_from(&frame)?;
                         println!(
                             "Received Device Notification with {} header(s)",
-                            headers.len()
+                            notif.stamps().len()
                         );
 
                         let ams_cmd = frame.header().command();
                         let ads_cmd = header.command_id();
 
-                        for header in headers {
+                        for (ts, sample) in notif.iter_samples() {
                             println!(
-                                "{ams_cmd:?}:\t{ads_cmd:?} -> Received Device Notification at {}",
-                                header.timestamp()
+                                "{ams_cmd:?}:\t{ads_cmd:?} -> Received Device Notification at {ts}"
                             );
                             println!(
-                                "{ams_cmd:?}:\t{ads_cmd:?} -> Device notification(s): {:?}",
-                                header.samples()
+                                "{ams_cmd:?}:\t{ads_cmd:?} -> Device notification(s): {sample:?}"
                             );
                         }
 
