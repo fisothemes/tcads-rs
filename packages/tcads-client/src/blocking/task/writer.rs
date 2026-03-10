@@ -1,16 +1,23 @@
 use std::io::Write;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::{self, JoinHandle};
+use tcads_core::AmsCommand;
 use tcads_core::io::AmsFrame;
 use tcads_core::io::blocking::AmsWriter;
 
 /// Spawns a dedicated writer thread for serializing [AMS frames](AmsFrame) onto a byte stream.
 ///
 /// Returns a [`Sender`] for enqueuing frames and a [`JoinHandle`] for awaiting
-/// thread completion. The thread exits cleanly when all [`Sender`] clones are dropped.
+/// thread completion. TThe thread exits cleanly when all [`Sender`] clones are dropped,
+/// or immediately after writing a [`PortClose`](AmsCommand::PortClose) frame.
 ///
 /// Frames are written in FIFO order, eliminating lock contention between
 /// concurrent callers.
+///
+/// # Note
+///
+/// Dropping the last [`Sender`] also drops the [`Receiver`] and invalidates all
+/// remaining [`Sender`] clones, causing future [`send`](Sender::send) calls to return [`Err`].
 pub struct AmsRequestWriter;
 
 impl AmsRequestWriter {
@@ -30,7 +37,11 @@ impl AmsRequestWriter {
     ) -> JoinHandle<()> {
         thread::spawn(move || {
             for frame in rx {
+                let is_close = frame.header().command() == AmsCommand::PortClose;
                 if writer.write_frame(&frame).is_err() {
+                    break;
+                }
+                if is_close {
                     break;
                 }
             }
