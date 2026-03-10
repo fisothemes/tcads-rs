@@ -1,5 +1,5 @@
 use std::io;
-use std::sync::mpsc::{RecvError, SendError};
+use std::sync::mpsc::{RecvError, RecvTimeoutError, SendError};
 use std::sync::{Arc, PoisonError};
 use tcads_core::ads::AdsReturnCode;
 use tcads_core::protocol::ProtocolError;
@@ -14,6 +14,8 @@ pub enum Error {
     AdsReturnCode(#[from] AdsReturnCode),
     #[error("Disconnected")]
     Disconnected,
+    #[error("Timed out")]
+    Timeout,
     #[error("Poisoned lock")]
     PoisonedLock,
 }
@@ -41,6 +43,15 @@ impl<T> From<SendError<T>> for Error {
 impl From<RecvError> for Error {
     fn from(_: RecvError) -> Self {
         Error::Disconnected
+    }
+}
+
+impl From<RecvTimeoutError> for Error {
+    fn from(err: RecvTimeoutError) -> Self {
+        match err {
+            RecvTimeoutError::Timeout => Error::Timeout,
+            RecvTimeoutError::Disconnected => Error::Disconnected,
+        }
     }
 }
 
