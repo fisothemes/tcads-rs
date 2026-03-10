@@ -114,6 +114,24 @@ impl<R: Read> AmsReader<R> {
     pub fn into_inner(self) -> R {
         self.reader.into_inner()
     }
+
+    /// Returns a reference to the underlying reader.
+    ///
+    /// # Note
+    ///
+    /// It is inadvisable to directly read from the underlying reader
+    pub fn get_ref(&self) -> &R {
+        self.reader.get_ref()
+    }
+
+    /// Returns a mutable reference to the underlying reader.
+    ///
+    /// # Note
+    ///
+    /// It is inadvisable to directly read from the underlying reader.
+    pub fn get_mut(&mut self) -> &mut R {
+        self.reader.get_mut()
+    }
 }
 
 impl AmsReader<TcpStream> {
@@ -123,6 +141,13 @@ impl AmsReader<TcpStream> {
     /// An [`Err`] is returned if the zero [`Duration`] is passed to this method.
     pub fn set_read_timeout(&mut self, dur: Option<Duration>) -> io::Result<()> {
         self.reader.get_mut().set_read_timeout(dur)
+    }
+
+    /// Returns the read timeout of the underlying stream.
+    ///
+    /// If the timeout is [`None`], then [`read_frame`](Self::read_frame) calls will block indefinitely
+    pub fn timeout(&self) -> io::Result<Option<Duration>> {
+        self.reader.get_ref().read_timeout()
     }
 
     /// Returns the socket address of the remote peer of this TCP connection.

@@ -54,6 +54,20 @@ impl<W: Write> AmsWriter<W> {
     pub fn into_inner(self) -> Result<W, IntoInnerError<BufWriter<W>>> {
         self.writer.into_inner()
     }
+
+    /// Returns a reference to the underlying writer.
+    pub fn get_ref(&self) -> &W {
+        self.writer.get_ref()
+    }
+
+    /// Returns a mutable reference to the underlying writer.
+    ///
+    /// # Note
+    ///
+    /// It is inadvisable to directly write to the underlying writer.
+    pub fn get_mut(&mut self) -> &mut W {
+        self.writer.get_mut()
+    }
 }
 
 impl AmsWriter<TcpStream> {
@@ -63,6 +77,13 @@ impl AmsWriter<TcpStream> {
     /// An [`Err`] is returned if the zero [`Duration`] is passed to this method.
     pub fn set_write_timeout(&mut self, dur: Option<Duration>) -> io::Result<()> {
         self.writer.get_mut().set_write_timeout(dur)
+    }
+
+    /// Returns the write timeout of the underlying stream.
+    ///
+    /// If the timeout is [`None`], then [`write_frame`](Self::write_frame) calls will block indefinitely
+    pub fn timeout(&self) -> io::Result<Option<Duration>> {
+        self.writer.get_ref().write_timeout()
     }
 
     /// Returns the socket address of the remote peer of this TCP connection.
