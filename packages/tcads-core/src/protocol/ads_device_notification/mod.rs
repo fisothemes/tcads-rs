@@ -4,9 +4,10 @@ mod stamp;
 pub use sample::{AdsNotificationSample, AdsNotificationSampleOwned};
 pub use stamp::{AdsStampHeader, AdsStampHeaderOwned};
 
-use super::{ProtocolError, parse_ads_frame};
+use super::{ProtocolError, validate_ads_command, validate_ams_command};
 use crate::ads::{
-    AdsCommand, AdsError, AdsHeader, AdsReturnCode, InvokeId, StateFlag, WindowsFileTime,
+    AdsCommand, AdsError, AdsHeader, AdsReturnCode, InvokeId, StateFlag, StateFlagError,
+    WindowsFileTime,
 };
 use crate::ams::{AmsAddr, AmsCommand};
 use crate::io::AmsFrame;
@@ -165,7 +166,21 @@ impl<'a> TryFrom<&'a AmsFrame> for AdsDeviceNotification<'a> {
     type Error = ProtocolError;
 
     fn try_from(value: &'a AmsFrame) -> Result<Self, Self::Error> {
-        let (header, data) = parse_ads_frame(value, AdsCommand::AdsDeviceNotification, false)?;
+        validate_ams_command(value, AmsCommand::AdsCommand)?;
+
+        let (header, data) = AdsHeader::parse_prefix(value.payload()).map_err(AdsError::from)?;
+
+        validate_ads_command(&header, AdsCommand::AdsDeviceNotification)?;
+
+        let flags = header.state_flags();
+
+        if !flags.is_ads_command() {
+            return Err(AdsError::from(StateFlagError::UnexpectedStateFlag {
+                expected: vec![StateFlag::from(StateFlag::ADS_COMMAND)],
+                got: flags,
+            })
+            .into());
+        }
 
         let stamps = Self::parse_payload(data)?;
 
