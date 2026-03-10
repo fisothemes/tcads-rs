@@ -137,4 +137,48 @@ mod tests {
         // Both frames serialized, exact order is not guaranteed across threads
         assert_eq!(mock.bytes().len(), 14); // 2 * (6 byte header + 1 byte payload)
     }
+
+    #[test]
+    fn port_close_exits_thread_and_invalidates_sender() {
+        let (tx, handle, mock) = spawn_mock();
+
+        let before = AmsFrame::new(AmsCommand::AdsCommand, vec![0xAA]);
+        let close = AmsFrame::empty(AmsCommand::PortClose);
+        let after = AmsFrame::new(AmsCommand::AdsCommand, vec![0xBB]);
+
+        tx.send(before.clone()).unwrap();
+        tx.send(close.clone()).unwrap();
+
+        thread::sleep(Duration::from_millis(100));
+
+        assert!(handle.is_finished());
+        assert!(
+            tx.send(after).is_err(),
+            "Frame after PortClose was never enqueued, tx is now invalid"
+        );
+        assert_eq!(
+            mock.bytes(),
+            [before.to_vec(), close.to_vec()].concat(),
+            "Only the two frames before and including PortClose were written"
+        );
+    }
+
+    #[test]
+    fn frames_after_port_close_are_never_written() {
+        let (tx, handle, mock) = spawn_mock();
+
+        tx.send(AmsFrame::empty(AmsCommand::PortClose)).unwrap();
+
+        thread::sleep(Duration::from_millis(100));
+
+        assert!(handle.is_finished());
+        assert!(
+            tx.send(AmsFrame::empty(AmsCommand::AdsCommand)).is_err(),
+            "Only PortClose written, sender now invalid"
+        );
+        assert_eq!(
+            mock.bytes(),
+            AmsFrame::empty(AmsCommand::PortClose).to_vec()
+        );
+    }
 }
