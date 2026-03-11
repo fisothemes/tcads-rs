@@ -1,6 +1,6 @@
-pub mod blocking;
+pub mod devices;
 pub mod error;
-pub mod tokio;
+pub mod tasks;
 
 pub use tcads_core::{
     ads::{AdsReturnCode, AdsState, AdsTransMode, DeviceState, IndexGroup, IndexOffset, InvokeId},

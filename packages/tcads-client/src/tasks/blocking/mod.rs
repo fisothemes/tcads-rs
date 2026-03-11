@@ -2,9 +2,9 @@ pub mod dispatcher;
 pub mod reader;
 pub mod writer;
 
+pub use super::AmsRequestDispatchKey;
 pub use dispatcher::{
-    AdsNotificationDispatcher, AmsRequestDispatchKey, AmsRequestDispatcher,
-    RouterNotificationDispatcher,
+    AdsNotificationDispatcher, AmsRequestDispatcher, RouterNotificationDispatcher,
 };
 pub use reader::AmsResponseReader;
 pub use writer::AmsRequestWriter;

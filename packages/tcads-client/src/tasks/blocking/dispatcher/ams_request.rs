@@ -1,18 +1,9 @@
+use super::AmsRequestDispatchKey;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Mutex;
 use std::sync::mpsc::{self, Receiver, Sender};
 use tcads_core::InvokeId;
 use tcads_core::io::AmsFrame;
-
-use crate::Error;
-
-/// Identifies the type of pending request for routing incoming responses.
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum AmsRequestDispatchKey {
-    AdsCommand(InvokeId),
-    PortConnect,
-    GetLocalNetId,
-}
 
 /// Tracks pending requests and dispatches frames to the writer thread.
 ///
@@ -49,7 +40,7 @@ impl AmsRequestDispatcher {
         &self,
         key: AmsRequestDispatchKey,
         frame: AmsFrame,
-    ) -> Result<Receiver<AmsFrame>, Error> {
+    ) -> Result<Receiver<AmsFrame>, crate::Error> {
         let (tx, rx) = mpsc::channel();
         self.register(key, tx)?;
         self.write_tx.send(frame)?;
