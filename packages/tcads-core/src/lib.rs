@@ -141,3 +141,4 @@ pub use ads::{
 };
 pub use ams::{AmsAddr, AmsCommand, AmsNetId, AmsPort, AmsTcpHeader, RouterState};
 pub use io::AmsFrame;
+pub use protocol::AdsNotificationSampleOwned;
