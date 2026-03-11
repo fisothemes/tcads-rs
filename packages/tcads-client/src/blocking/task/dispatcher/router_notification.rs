@@ -49,6 +49,12 @@ impl RouterNotificationDispatcher {
     }
 }
 
+impl Default for RouterNotificationDispatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

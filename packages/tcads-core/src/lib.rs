@@ -12,14 +12,14 @@
 //! This crate is organised into layers that mirror the protocol stack:
 //!
 //! - **The AMS Layer ([`ams`]):** Handles network addressing ([`AmsNetId`]),
-//!     routing logic, and AMS-specific commands like port connection.
+//!   routing logic, and AMS-specific commands like port connection.
 //! - **The ADS Layer ([`ads`]):** Contains the protocol primitives, including
-//!     command IDs, device states, and error codes.
+//!   command IDs, device states, and error codes.
 //! - **The Protocol Layer ([`protocol`]):** Provides strongly typed Request and
-//!     Response structures for every ADS command (e.g., `Read`, `Write`, `AddNotification`).
+//!   Response structures for every ADS command (e.g., `Read`, `Write`, `AddNotification`).
 //! - **The I/O Layer ([`io`]):** Defines the [`AmsFrame`]—the primary container
-//!     for wire communication—and provides concrete streams for both blocking
-//!     and async (Tokio) runtimes.
+//!   for wire communication—and provides concrete streams for both blocking and async (Tokio)
+//!   runtimes.
 //!
 //! ## Memory Efficiency: Borrowed vs. Owned
 //!

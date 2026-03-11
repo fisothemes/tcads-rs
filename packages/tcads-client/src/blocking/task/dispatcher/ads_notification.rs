@@ -113,6 +113,12 @@ impl AdsNotificationDispatcher {
     }
 }
 
+impl Default for AdsNotificationDispatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

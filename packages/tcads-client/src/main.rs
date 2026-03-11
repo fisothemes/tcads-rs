@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Local Net ID is {}", local_net_id);
 
-    let target = AmsAddr::new(local_net_id, 851).into();
+    let target = AmsAddr::new(local_net_id, 851);
 
     println!("Target address is {}", target);
     println!("Device info: {:?}", device.read_device_info(target)?);
