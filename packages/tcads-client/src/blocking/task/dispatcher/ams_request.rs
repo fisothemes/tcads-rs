@@ -9,9 +9,9 @@ use crate::Error;
 /// Identifies the type of pending request for routing incoming responses.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum AmsRequestDispatchKey {
+    AdsCommand(InvokeId),
     PortConnect,
     GetLocalNetId,
-    AdsCommand(InvokeId),
 }
 
 /// Tracks pending requests and dispatches frames to the writer thread.
@@ -21,10 +21,10 @@ pub enum AmsRequestDispatchKey {
 /// When the reader thread receives a response, it calls [`AmsRequestDispatcher::complete`]
 /// to route the frame back to the waiting caller.
 pub struct AmsRequestDispatcher {
-    /// Pending [PortConnect](tcads_core::protocol::PortConnectResponse) responses.
-    port_connect: Mutex<VecDeque<Sender<AmsFrame>>>,
     /// Pending ADS command responses, keyed by [invoke ID](InvokeId).
     ads: Mutex<HashMap<InvokeId, Sender<AmsFrame>>>,
+    /// Pending [PortConnect](tcads_core::protocol::PortConnectResponse) responses.
+    port_connect: Mutex<VecDeque<Sender<AmsFrame>>>,
     /// Pending [GetLocalNetId](tcads_core::protocol::GetLocalNetIdResponse) responses;
     net_id: Mutex<VecDeque<Sender<AmsFrame>>>,
     /// Channel to the writer thread.
@@ -61,7 +61,21 @@ impl AmsRequestDispatcher {
         if let Some(tx) = self.take(key)? {
             tx.send(frame)?;
         }
+        Ok(())
+    }
 
+    /// Sends `frame` directly to the writer thread without registering a response waiter.
+    ///
+    /// Use this for frames where no response is expected i.e.
+    /// [`PortClose`](tcads_core::protocol::PortCloseRequest). For all other frames
+    /// use [`dispatch`](Self::dispatch), which registers a waiter before sending to
+    /// close the window between send and response arrival.
+    ///
+    /// Returns [`Err`] if the writer channel is already closed, which means the
+    /// connection is already gone. Callers should generally ignore this error
+    /// since the goal (closing the connection) is already achieved.
+    pub fn send_only(&self, frame: AmsFrame) -> crate::Result<()> {
+        self.write_tx.send(frame)?;
         Ok(())
     }
 
@@ -78,14 +92,14 @@ impl AmsRequestDispatcher {
 
     fn register(&self, key: AmsRequestDispatchKey, sender: Sender<AmsFrame>) -> crate::Result<()> {
         match key {
+            AmsRequestDispatchKey::AdsCommand(id) => {
+                self.ads.lock()?.insert(id, sender);
+            }
             AmsRequestDispatchKey::PortConnect => {
                 self.port_connect.lock()?.push_back(sender);
             }
             AmsRequestDispatchKey::GetLocalNetId => {
                 self.net_id.lock()?.push_back(sender);
-            }
-            AmsRequestDispatchKey::AdsCommand(id) => {
-                self.ads.lock()?.insert(id, sender);
             }
         }
         Ok(())
