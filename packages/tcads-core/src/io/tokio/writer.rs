@@ -1,6 +1,7 @@
 use super::traits::WriteAllVectored;
 use crate::io::frame::AmsFrame;
 use std::io::IoSlice;
+use std::net::SocketAddr;
 use tokio::io::{self, AsyncWrite, AsyncWriteExt, BufWriter};
 use tokio::net::TcpStream;
 
@@ -46,6 +47,39 @@ impl<W: AsyncWrite + Unpin> AmsWriter<W> {
     /// Any leftover data in the internal buffer is lost.
     pub fn into_inner(self) -> W {
         self.writer.into_inner()
+    }
+
+    /// Returns a reference to the underlying writer.
+    pub fn get_ref(&self) -> &W {
+        self.writer.get_ref()
+    }
+
+    /// Returns a mutable reference to the underlying writer.
+    ///
+    /// # Note
+    ///
+    /// It is inadvisable to directly write to the underlying writer.
+    pub fn get_mut(&mut self) -> &mut W {
+        self.writer.get_mut()
+    }
+}
+
+impl AmsWriter<TcpStream> {
+    /// Returns the socket address of the remote peer of this TCP connection.
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+        self.writer.get_ref().peer_addr()
+    }
+
+    /// Returns the socket address of the local half of this TCP connection
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.writer.get_ref().local_addr()
+    }
+
+    /// Shuts down the output stream, ensuring that the value can be dropped cleanly.
+    ///
+    /// See [`TcpStream::shutdown`] for more details.
+    pub async fn shutdown(&mut self) -> io::Result<()> {
+        self.writer.get_mut().shutdown().await
     }
 }
 

@@ -1,6 +1,7 @@
 use crate::ams::AmsTcpHeader;
 use crate::io::frame::{AMS_FRAME_MAX_LEN, AmsFrame};
-use tokio::io::{self, AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
+use std::net::SocketAddr;
+use tokio::io::{self, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 
 /// A buffered reader specialised for parsing AMS frames from an asynchronous byte stream.
@@ -66,6 +67,43 @@ impl<R: AsyncRead + Unpin> AmsReader<R> {
     /// Any leftover data in the internal buffer is lost.
     pub fn into_inner(self) -> R {
         self.reader.into_inner()
+    }
+
+    /// Returns a reference to the underlying reader.
+    ///
+    /// # Note
+    ///
+    /// It is inadvisable to directly read from the underlying reader
+    pub fn get_ref(&self) -> &R {
+        self.reader.get_ref()
+    }
+
+    /// Returns a mutable reference to the underlying reader.
+    ///
+    /// # Note
+    ///
+    /// It is inadvisable to directly read from the underlying reader.
+    pub fn get_mut(&mut self) -> &mut R {
+        self.reader.get_mut()
+    }
+}
+
+impl AmsReader<TcpStream> {
+    /// Returns the socket address of the remote peer of this TCP connection.
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+        self.reader.get_ref().peer_addr()
+    }
+
+    /// Returns the socket address of the local half of this TCP connection
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.reader.get_ref().local_addr()
+    }
+
+    /// Shuts down the output stream, ensuring that the value can be dropped cleanly.
+    ///
+    /// See [`TcpStream::shutdown`] for more details.
+    pub async fn shutdown(&mut self) -> io::Result<()> {
+        self.reader.get_mut().shutdown().await
     }
 }
 
