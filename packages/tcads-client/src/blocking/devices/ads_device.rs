@@ -1,168 +1,286 @@
-use std::collections::HashMap;
+use crate::blocking::task::{
+    AdsNotificationDispatcher, AmsRequestDispatchKey, AmsRequestDispatcher, AmsRequestWriter,
+    AmsResponseReader, RouterNotificationDispatcher,
+};
 use std::net::ToSocketAddrs;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::mpsc::{Sender, channel};
-use std::sync::{Arc, Mutex};
-use std::thread::{self, JoinHandle};
-use tcads_core::ads::{DeviceState, NotificationHandle};
-use tcads_core::io::blocking::{AmsReader, AmsStream, AmsWriter};
+use std::sync::mpsc::Receiver;
+use std::sync::{Arc, RwLock};
+use std::time::Duration;
+use tcads_core::io::blocking::AmsStream;
 use tcads_core::protocol::{
+    AdsAddDeviceNotificationRequest, AdsAddDeviceNotificationResponse,
+    AdsDeleteDeviceNotificationRequest, AdsDeleteDeviceNotificationResponse,
+    AdsNotificationSampleOwned, AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse,
     AdsReadRequest, AdsReadResponse, AdsReadStateRequest, AdsReadStateResponse,
-    AdsWriteControlRequestOwned, AdsWriteControlResponse, AdsWriteRequestOwned, AdsWriteResponse,
-    GetLocalNetIdRequest, GetLocalNetIdResponse, PortCloseRequest, PortConnectRequest,
-    PortConnectResponse, ProtocolError, RouterNotification,
+    AdsReadWriteRequestOwned, AdsReadWriteResponse, AdsWriteControlRequestOwned,
+    AdsWriteControlResponse, AdsWriteRequestOwned, AdsWriteResponse, GetLocalNetIdRequest,
+    GetLocalNetIdResponse, PortCloseRequest, PortConnectRequest, PortConnectResponse,
 };
 use tcads_core::{
-    AdsHeader, AdsReturnCode, AdsState, AmsAddr, AmsCommand, AmsFrame, AmsNetId, IndexGroup,
-    IndexOffset, InvokeId, RouterState,
+    AdsDeviceVersion, AdsReturnCode, AdsState, AdsTransMode, AmsAddr, AmsFrame, AmsNetId,
+    DeviceState, IndexGroup, IndexOffset, InvokeId, NotificationHandle, RouterState,
 };
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub enum PendingKey {
-    AdsCommand(InvokeId),
-    GetLocalNetId,
+/// Shared state for an [`AdsDevice`] connection.
+///
+/// Held behind an [`Arc`] so all [`AdsDevice`] clones share the same connection.
+/// Exposed as `pub` for power users who need direct access to the underlying
+/// dispatchers to build custom device abstractions on top of the
+/// same connection without going through the [`AdsDevice`] API.
+///
+/// # Lifetime
+///
+/// The reader and writer threads are tied to the lifetime of this struct.
+/// When the last [`AdsDevice`] clone is dropped, `AdsDeviceInner` drops,
+/// which drops [`AmsRequestDispatcher`] and its `write_tx`. The writer thread
+/// exits when `write_tx` is dropped, the TCP stream closes, and the reader
+/// thread exits on the next read returning EO
+pub struct AdsDeviceInner {
+    pub ams_requests: Arc<AmsRequestDispatcher>,
+    pub ads_notifs: Arc<AdsNotificationDispatcher>,
+    pub router_notifs: Arc<RouterNotificationDispatcher>,
+    pub source: RwLock<AmsAddr>,
+    pub invoke_id: AtomicU32,
+    pub timeout: Option<Duration>,
 }
 
-/// A map of pending requests awaiting a response from the PLC.
-pub type PendingMap = HashMap<PendingKey, Sender<AmsFrame>>;
-
-struct AdsDeviceInner {
-    writer: Mutex<AmsWriter>,
-    pending: Mutex<PendingMap>,
-    invoke_id: AtomicU32,
-    source: AmsAddr,
-}
-
+/// A blocking ADS device client.
+///
+/// The `AdsDevice` manages a single TCP connection to an AMS router and exposes all standard
+/// ADS commands as blocking methods. It is cheap to clone, and all clones share the same
+/// underlying connection and state.
+///
+/// # Connection
+///
+/// Use one of the `connect` constructors:
+///
+/// ```no_run
+/// use std::time::Duration;
+/// use tcads_client::blocking::AdsDevice;
+///
+/// // Local router, auto-assigned source
+/// let device = AdsDevice::connect(Some(Duration::from_secs(5)))?;
+///
+/// // Remote router, auto-assigned source
+/// let device = AdsDevice::connect_to("192.168.1.100:48898", Some(Duration::from_secs(5)))?;
+///
+/// // Remote router, explicit source, skips PortConnect handshake
+/// let source = "192.168.1.100.1.1:32838".parse()?;
+/// let device = AdsDevice::connect_with_source("192.168.1.100:48898", source, None)?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+///
+/// # Thread Safety
+///
+/// `AdsDevice` is `Send + Sync`. Multiple threads can issue ADS commands concurrently.
+/// Responses are matched to their callers by Invoke ID with no global lock on the
+/// connection.
+///
+/// # Shutdown
+///
+/// Call [`shutdown`](AdsDevice::shutdown) for a clean disconnect. Dropping the last
+/// `AdsDevice` clone also tears down the connection automatically. The writer thread
+/// exits when its sender is dropped, the reader thread exits when the TCP stream closes,
+/// and all pending callers receive [`Error::Disconnected`](crate::Error::Disconnected).
 #[derive(Clone)]
 pub struct AdsDevice {
     inner: Arc<AdsDeviceInner>,
 }
 
 impl AdsDevice {
-    /// Connects to the local TwinCAT AMS Router (`127.0.0.1:48898`)
-    /// and automatically requests an [AMS address](AmsAddr).
-    pub fn connect() -> crate::Result<Self> {
-        Self::connect_to("127.0.0.1:48898")
+    /// Connects to the local AMS router at `127.0.0.1:48898`.
+    ///
+    /// Performs a [`PortConnect`](PortConnectRequest) handshake to get a
+    /// dynamically assigned source address.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use tcads_client::blocking::AdsDevice;
+    ///
+    /// let device = AdsDevice::connect(None)?;
+    ///
+    /// println!("Source: {}", device.source()?);
+    /// println!("Local Net ID: {}", device.get_local_net_id()?);
+    ///
+    /// device.shutdown()?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn connect(timeout: Option<Duration>) -> crate::Result<Self> {
+        Self::connect_to("127.0.0.1:48898", timeout)
     }
 
-    /// Connects to a custom AMS Router and automatically requests an [AMS address](AmsAddr).
+    /// Connects to an AMS router at `addr`.
     ///
-    /// Useful if you are connecting to a remote PLC router but still want
-    /// the router to assign your client an address.
-    pub fn connect_to<A: ToSocketAddrs>(addr: A) -> crate::Result<Self> {
-        let mut stream = AmsStream::connect(addr)?;
+    /// Performs a [`PortConnect`](PortConnectRequest) handshake to obtain a
+    /// dynamically assigned source address.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use tcads_client::blocking::AdsDevice;
+    ///
+    /// let device = AdsDevice::connect_to("192.168.1.100:48898", None)?;
+    ///
+    /// println!("Source: {}", device.source()?);
+    /// println!("Local Net ID: {}", device.get_local_net_id()?);
+    ///
+    /// device.shutdown()?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn connect_to(addr: impl ToSocketAddrs, timeout: Option<Duration>) -> crate::Result<Self> {
+        let stream = AmsStream::connect(addr)?;
+        let device = Self::new(stream, AmsAddr::default(), timeout)?;
+        let source = device.port_connect()?;
+        *device.inner.source.write()? = source;
+        Ok(device)
+    }
 
-        let source = request_ams_addr(&mut stream)?;
+    /// Connects to an AMS router at `addr` using an explicitly provided
+    /// source address, skipping the [`PortConnect`](PortConnectRequest) handshake.
+    ///
+    /// Use this when a static route is configured on the PLC and the source address
+    /// must exactly match the configured route.
+    pub fn connect_with_source(
+        addr: impl ToSocketAddrs,
+        source: AmsAddr,
+        timeout: Option<Duration>,
+    ) -> crate::Result<Self> {
+        let stream = AmsStream::connect(addr)?;
+        Self::new(stream, source, timeout)
+    }
 
+    /// Creates an [`AdsDevice`] from an existing [`AmsStream`].
+    ///
+    /// Unlike [`connect`](Self::connect) and [`connect_to`](Self::connect_to), this
+    /// constructor does **not** perform a [`PortConnect`] handshake. The caller is
+    /// responsible for providing a valid `source` address.
+    ///
+    /// This is intended for power users who need control over the underlying stream,
+    /// for example to use a custom transport, inject test streams, or reuse an
+    /// existing connection.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use tcads_core::io::blocking::AmsStream;
+    /// use tcads_client::blocking::AdsDevice;
+    ///
+    /// let stream = AmsStream::connect("192.168.1.100:48898")?;
+    /// let source = "192.168.1.100.1.1:851".parse()?;
+    /// let device = AdsDevice::new(stream, source, None)?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn new(
+        stream: AmsStream,
+        source: AmsAddr,
+        timeout: Option<Duration>,
+    ) -> crate::Result<Self> {
         let (reader, writer) = stream.try_split()?;
+        let (write_tx, _) = AmsRequestWriter::spawn(writer);
 
-        let pending = Mutex::new(HashMap::new());
+        let ams_requests = Arc::new(AmsRequestDispatcher::new(write_tx));
+        let ads_notifs = Arc::new(AdsNotificationDispatcher::new());
+        let router_notifs = Arc::new(RouterNotificationDispatcher::new());
 
-        let inner = Arc::new(AdsDeviceInner {
-            writer: Mutex::new(writer),
-            pending,
-            invoke_id: AtomicU32::new(1),
-            source,
-        });
+        AmsResponseReader::spawn(
+            reader,
+            Arc::clone(&ams_requests),
+            Arc::clone(&ads_notifs),
+            Arc::clone(&router_notifs),
+        );
 
-        let _ = spawn_reader_thread(reader, inner.clone());
-
-        Ok(Self { inner })
+        Ok(Self {
+            inner: Arc::new(AdsDeviceInner {
+                ams_requests,
+                ads_notifs,
+                router_notifs,
+                source: RwLock::new(source),
+                invoke_id: AtomicU32::new(1),
+                timeout,
+            }),
+        })
     }
 
-    /// Connects to a custom AMS Router using an explicitly provided Source Address.
+    /// Gracefully shuts down the connection.
     ///
-    /// This bypasses the handshake entirely. Necessary for clients where you must explicitly
-    /// match the "Static Route" configured on the target PLC.
-    pub fn connect_with_source<A: ToSocketAddrs>(addr: A, source: AmsAddr) -> crate::Result<Self> {
-        todo!()
+    /// Sends a [`PortClose`](PortCloseRequest) frame to the router. The writer
+    /// thread writes it and exits, dropping the channel receiver which invalidates
+    /// all senders. The router closes the TCP connection, causing the reader thread
+    /// to hit EOF and exit, clearing all pending callers and notification subscribers.
+    ///
+    /// If the send fails (already disconnected) this returns `Ok(())` meaning the
+    /// connection is already gone.
+    pub fn shutdown(&self) -> crate::Result<()> {
+        let frame = PortCloseRequest::new(self.source()?.port()).into_frame();
+        let _ = self.inner.ams_requests.send_only(frame);
+        Ok(())
     }
 
-    /// Sends a generic Read request to the target.
-    pub fn read(
-        &self,
-        target: AmsAddr,
-        index_group: IndexGroup,
-        index_offset: IndexOffset,
-        len: u32,
-    ) -> crate::Result<Vec<u8>> {
+    /// Returns the source [`AmsAddr`] currently assigned to this connection.
+    pub fn source(&self) -> crate::Result<AmsAddr> {
+        Ok(*self.inner.source.read()?)
+    }
+
+    /// Queries the router's local AMS Net ID.
+    pub fn get_local_net_id(&self) -> crate::Result<AmsNetId> {
+        let frame = GetLocalNetIdRequest::into_frame();
+        let rx = self
+            .inner
+            .ams_requests
+            .dispatch(AmsRequestDispatchKey::GetLocalNetId, frame)?;
+        let resp = GetLocalNetIdResponse::try_from(self.wait(rx)?)?;
+
+        Ok(resp.net_id())
+    }
+
+    /// Subscribes to router state changes.
+    ///
+    /// Returns a [`Receiver`] that yields each [`RouterState`] transition.
+    /// The receiver yields [`Err`] when the connection is lost or all
+    /// `AdsDevice` clones are dropped.
+    pub fn subscribe_router(&self) -> crate::Result<Receiver<RouterState>> {
+        self.inner.router_notifs.subscribe()
+    }
+
+    /// Reads the device name and version from `target`.
+    pub fn read_device_info(&self, target: AmsAddr) -> crate::Result<(AdsDeviceVersion, String)> {
         let invoke_id = self.next_invoke_id();
-        let frame = AdsReadRequest::new(
-            target,
-            self.inner.source,
-            invoke_id,
-            index_group,
-            index_offset,
-            len,
-        )
-        .into_frame();
-        let frame = self.send_and_wait(frame, invoke_id)?;
-        let resp = AdsReadResponse::try_from(&frame)?;
-        check_result(resp.result())?;
-        Ok(resp.data().to_vec())
+
+        let frame = AdsReadDeviceInfoRequest::new(target, self.source()?, invoke_id).into_frame();
+        let resp = AdsReadDeviceInfoResponse::try_from(self.send_and_wait(frame, invoke_id)?)?;
+
+        Self::check_result(resp.result())?;
+
+        Ok((resp.version(), resp.device_name().into_owned()))
     }
 
-    /// Sends a generic Write request to the target.
-    pub fn write(
-        &self,
-        target: AmsAddr,
-        index_group: IndexGroup,
-        index_offset: IndexOffset,
-        data: &[u8],
-    ) -> crate::Result<()> {
-        let invoke_id = self.next_invoke_id();
-        let frame = AdsWriteRequestOwned::new(
-            target,
-            self.inner.source,
-            invoke_id,
-            index_group,
-            index_offset,
-            data,
-        )
-        .into_frame();
-        let resp = AdsWriteResponse::try_from(&self.send_and_wait(frame, invoke_id)?)?;
-        check_result(resp.result())
-    }
-
-    /// Sends an atomic ReadWrite request to the target.
-    pub fn read_write(
-        &self,
-        target: AmsAddr,
-        index_group: IndexGroup,
-        index_offset: IndexOffset,
-        read_len: u32,
-        write_data: &[u8],
-    ) -> crate::Result<Vec<u8>> {
-        todo!()
-    }
-
-    /// Reads the name and version of the target ADS device.
-    pub fn read_device_info(&self, target: AmsAddr) -> crate::Result<()> {
-        todo!()
-    }
-
-    /// Reads the ADS State and Device State of the target.
+    /// Reads the ADS and device state of `target`.
     pub fn read_state(&self, target: AmsAddr) -> crate::Result<(AdsState, DeviceState)> {
         let invoke_id = self.next_invoke_id();
-        let frame = AdsReadStateRequest::new(target, self.inner.source, invoke_id).into_frame();
-        let resp = AdsReadStateResponse::try_from(&self.send_and_wait(frame, invoke_id)?)?;
 
-        check_result(resp.result())?;
+        let frame = AdsReadStateRequest::new(target, self.source()?, invoke_id).into_frame();
+        let resp = AdsReadStateResponse::try_from(self.send_and_wait(frame, invoke_id)?)?;
+
+        Self::check_result(resp.result())?;
+
         Ok((resp.ads_state(), resp.device_state()))
     }
 
-    /// Changes the ADS State and Device State of the target.
+    /// Changes the ADS and device state of `target`.
     pub fn write_control(
         &self,
         target: AmsAddr,
         ads_state: AdsState,
         device_state: DeviceState,
-        data: &[u8],
+        data: impl Into<Vec<u8>>,
     ) -> crate::Result<()> {
         let invoke_id = self.next_invoke_id();
+
         let frame = AdsWriteControlRequestOwned::with_data(
             target,
-            self.inner.source,
+            self.source()?,
             invoke_id,
             ads_state,
             device_state,
@@ -170,161 +288,199 @@ impl AdsDevice {
         )
         .into_frame();
         let resp = AdsWriteControlResponse::try_from(&self.send_and_wait(frame, invoke_id)?)?;
-        check_result(resp.result())
+
+        Self::check_result(resp.result())?;
+
+        Ok(())
     }
 
-    /// Subscribes to changes on a specific IndexGroup/IndexOffset.
+    /// Reads `length` of bytes from `target` at specified a `index_group` and `index_offset`.
+    pub fn read(
+        &self,
+        target: AmsAddr,
+        index_group: IndexGroup,
+        index_offset: IndexOffset,
+        length: u32,
+    ) -> crate::Result<Vec<u8>> {
+        let invoke_id = self.next_invoke_id();
+
+        let frame = AdsReadRequest::new(
+            target,
+            self.source()?,
+            invoke_id,
+            index_group,
+            index_offset,
+            length,
+        )
+        .into_frame();
+        let frame = self.send_and_wait(frame, invoke_id)?;
+        let resp = AdsReadResponse::try_from_frame(&frame)?;
+
+        Self::check_result(resp.result())?;
+
+        Ok(resp.data().to_vec())
+    }
+
+    /// Writes `data` to `target` at a specified `index_group` and `index_offset`.
+    pub fn write(
+        &self,
+        target: AmsAddr,
+        index_group: IndexGroup,
+        index_offset: IndexOffset,
+        data: impl Into<Vec<u8>>,
+    ) -> crate::Result<()> {
+        let invoke_id = self.next_invoke_id();
+        let frame = AdsWriteRequestOwned::new(
+            target,
+            self.source()?,
+            invoke_id,
+            index_group,
+            index_offset,
+            data,
+        )
+        .into_frame();
+        let resp = AdsWriteResponse::try_from(self.send_and_wait(frame, invoke_id)?)?;
+
+        Self::check_result(resp.result())?;
+
+        Ok(())
+    }
+
+    /// Sends a combined read/write to `target` in a single round trip.
+    ///
+    /// Writes `write_data` then reads `read_length` bytes back.
+    pub fn read_write(
+        &self,
+        target: AmsAddr,
+        index_group: IndexGroup,
+        index_offset: IndexOffset,
+        read_length: u32,
+        write_data: impl Into<Vec<u8>>,
+    ) -> crate::Result<Vec<u8>> {
+        let invoke_id = self.next_invoke_id();
+        let frame = AdsReadWriteRequestOwned::new(
+            target,
+            self.source()?,
+            invoke_id,
+            index_group,
+            index_offset,
+            read_length,
+            write_data,
+        )
+        .into_frame();
+        let frame = self.send_and_wait(frame, invoke_id)?;
+        let resp = AdsReadWriteResponse::try_from_frame(&frame)?;
+
+        Self::check_result(resp.result())?;
+
+        Ok(resp.data().to_vec())
+    }
+
+    /// Registers a device notification on `target`.
+    ///
+    /// Returns a [`Receiver`] for incoming samples and the [`NotificationHandle`]
+    /// assigned by the PLC.
+    ///
+    /// The receiver yields [`Err`] after [`delete_notification`](Self::delete_notification)
+    /// is called, or when the router transitions to [`RouterState::Stop`] or [`RouterState::Removed`].
+    ///
+    /// # Note
+    ///
+    /// The target device may fire an initial sample upon registration.
+    #[allow(clippy::too_many_arguments)]
     pub fn add_notification(
         &self,
         target: AmsAddr,
         index_group: IndexGroup,
         index_offset: IndexOffset,
-        // Define a `NotificationAttributes` struct later probably...
-    ) -> crate::Result<NotificationHandle> {
-        todo!()
+        length: u32,
+        trans_mode: AdsTransMode,
+        max_delay: u32,
+        cycle_time: u32,
+    ) -> crate::Result<(Receiver<AdsNotificationSampleOwned>, NotificationHandle)> {
+        let invoke_id = self.next_invoke_id();
+
+        let rx = self.inner.ads_notifs.pre_register(invoke_id)?;
+
+        let frame = AdsAddDeviceNotificationRequest::new(
+            target,
+            self.source()?,
+            invoke_id,
+            index_group,
+            index_offset,
+            length,
+            trans_mode,
+            max_delay,
+            cycle_time,
+        )
+        .into_frame();
+        let resp =
+            AdsAddDeviceNotificationResponse::try_from(self.send_and_wait(frame, invoke_id)?)?;
+
+        Self::check_result(resp.result())?;
+
+        let handle = resp.handle();
+        self.inner.ads_notifs.promote(invoke_id, handle)?;
+
+        Ok((rx, handle))
     }
 
-    /// Deletes an active notification.
+    /// Deletes a device notification on `target`.
+    ///
+    /// The receiver obtained from [`add_notification`](Self::add_notification)
+    /// will yield [`Err`] on its next [`recv`](Receiver::recv) call.
     pub fn delete_notification(
         &self,
         target: AmsAddr,
         handle: NotificationHandle,
     ) -> crate::Result<()> {
-        todo!()
+        let invoke_id = self.next_invoke_id();
+
+        let frame =
+            AdsDeleteDeviceNotificationRequest::new(target, self.source()?, invoke_id, handle)
+                .into_frame();
+        let resp =
+            AdsDeleteDeviceNotificationResponse::try_from(self.send_and_wait(frame, invoke_id)?)?;
+
+        Self::check_result(resp.result())?;
+
+        self.inner.ads_notifs.remove(handle)
     }
 
-    /// Returns the Source Address of this device.
-    pub fn source(&self) -> AmsAddr {
-        self.inner.source
-    }
+    fn port_connect(&self) -> crate::Result<AmsAddr> {
+        let frame = PortConnectRequest::default().into_frame();
+        let rx = self
+            .inner
+            .ams_requests
+            .dispatch(AmsRequestDispatchKey::PortConnect, frame)?;
+        let resp = PortConnectResponse::try_from(self.wait(rx)?)?;
 
-    /// Fetches the AMS Router's Local [Net ID](AmsNetId).
-    pub fn get_local_net_id(&self) -> crate::Result<AmsNetId> {
-        let (tx, rx) = channel();
-
-        {
-            self.inner
-                .writer
-                .lock()
-                .expect("Writer lock should be held")
-                .write_frame(&GetLocalNetIdRequest::into_frame())?;
-
-            self.inner
-                .pending
-                .lock()
-                .expect("Pending lock should be held")
-                .insert(PendingKey::GetLocalNetId, tx);
-        }
-
-        let frame = rx.recv().map_err(|_| crate::Error::Disconnected)?;
-        let net_id = GetLocalNetIdResponse::try_from(frame)?.net_id();
-        Ok(net_id)
-    }
-
-    /// Generates the next [Invoke ID](InvokeId)
-    fn next_invoke_id(&self) -> InvokeId {
-        let id = self.inner.invoke_id.fetch_add(1, Ordering::Relaxed);
-        if id == 0 {
-            self.inner.invoke_id.fetch_add(1, Ordering::Relaxed)
-        } else {
-            id
-        }
+        Ok(*resp.addr())
     }
 
     fn send_and_wait(&self, frame: AmsFrame, invoke_id: InvokeId) -> crate::Result<AmsFrame> {
-        let (tx, rx) = channel();
-
-        {
-            self.inner
-                .pending
-                .lock()
-                .expect("Pending lock should be held")
-                .insert(PendingKey::AdsCommand(invoke_id), tx);
-
-            self.inner
-                .writer
-                .lock()
-                .expect("Writer lock should be held")
-                .write_frame(&frame)?;
-        }
-
-        rx.recv().map_err(|_| crate::Error::Disconnected)
+        let rx = self
+            .inner
+            .ams_requests
+            .dispatch(AmsRequestDispatchKey::AdsCommand(invoke_id), frame)?;
+        self.wait(rx)
     }
-}
 
-fn request_ams_addr(stream: &mut AmsStream) -> crate::Result<AmsAddr> {
-    stream.write_frame(&PortConnectRequest::default().into())?;
-
-    let addr = *PortConnectResponse::try_from(stream.read_frame()?)?.addr();
-
-    Ok(addr)
-}
-
-fn check_result(code: AdsReturnCode) -> crate::Result<()> {
-    match code {
-        AdsReturnCode::Ok => Ok(()),
-        code => Err(code.into()),
-    }
-}
-
-fn spawn_reader_thread(
-    reader: AmsReader,
-    inner: Arc<AdsDeviceInner>,
-) -> JoinHandle<crate::Result<()>> {
-    let handle = thread::spawn(move || -> crate::Result<()> {
-        for result in reader.incoming() {
-            if let Ok(frame) = result {
-                match frame.header().command() {
-                    AmsCommand::PortConnect => {
-                        panic!("Port connect should not be received on the reader thread!")
-                    }
-                    AmsCommand::GetLocalNetId => {
-                        let mut map = inner.pending.lock().unwrap();
-                        if let Some(tx) = map.remove(&PendingKey::GetLocalNetId) {
-                            let _ = tx.send(frame);
-                        }
-                    }
-                    AmsCommand::PortClose => break,
-                    AmsCommand::RouterNotification => {
-                        if let Ok(resp) = RouterNotification::try_from(frame) {
-                            match resp.state() {
-                                RouterState::Removed => {
-                                    inner
-                                        .writer
-                                        .lock()
-                                        .expect("Writer lock should be held")
-                                        .write_frame(
-                                            &PortCloseRequest::new(inner.source.port()).into(),
-                                        )?;
-                                }
-                                _ => {} // TODO: Handle other states
-                            }
-                        }
-                    }
-                    AmsCommand::AdsCommand => {
-                        if let Ok((header, _)) = AdsHeader::parse_prefix(frame.payload()) {
-                            let mut map =
-                                inner.pending.lock().expect("Pending lock should be held");
-                            if let Some(tx) =
-                                map.remove(&PendingKey::AdsCommand(header.invoke_id()))
-                            {
-                                let _ = tx.send(frame);
-                            }
-                        };
-                    }
-                    other => todo!("Handle Unknown command: {other:?}"),
-                }
-            }
+    fn wait(&self, rx: Receiver<AmsFrame>) -> crate::Result<AmsFrame> {
+        match self.inner.timeout {
+            Some(duration) => Ok(rx.recv_timeout(duration)?),
+            None => Ok(rx.recv()?),
         }
+    }
 
-        inner
-            .pending
-            .lock()
-            .expect("Pending lock should be held")
-            .clear();
+    fn next_invoke_id(&self) -> InvokeId {
+        self.inner.invoke_id.fetch_add(1, Ordering::Relaxed)
+    }
 
-        Ok(())
-    });
-
-    handle
+    fn check_result(code: AdsReturnCode) -> crate::Result<()> {
+        match code {
+            AdsReturnCode::Ok => Ok(()),
+            code => Err(code.into()),
+        }
+    }
 }
