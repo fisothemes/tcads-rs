@@ -1,5 +1,5 @@
 use std::time::Duration;
-use tcads_client::devices::blocking::AdsDevice;
+use tcads_client::devices::ads_device::blocking::AdsDevice;
 use tcads_client::{AdsState, AdsTransMode, AmsAddr};
 
 const GET_SYMHANDLE_BYNAME: u32 = 0xF003;
