@@ -3,7 +3,7 @@ pub mod error;
 pub mod tokio;
 
 pub use tcads_core::{
-    ads::{AdsReturnCode, AdsState, AdsTransMode, IndexGroup, IndexOffset, InvokeId},
+    ads::{AdsReturnCode, AdsState, AdsTransMode, DeviceState, IndexGroup, IndexOffset, InvokeId},
     ams::{AmsAddr, AmsNetId, AmsPort, RouterState},
     protocol::{AdsNotificationSampleOwned, ProtocolError},
 };
