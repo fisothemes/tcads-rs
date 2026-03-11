@@ -57,7 +57,7 @@ pub struct AdsDeviceInner {
 ///
 /// ```no_run
 /// use std::time::Duration;
-/// use tcads_client::blocking::AdsDevice;
+/// use tcads_client::devices::blocking::AdsDevice;
 ///
 /// // Local router, auto-assigned source
 /// let device = AdsDevice::connect(Some(Duration::from_secs(5)))?;
@@ -97,7 +97,7 @@ impl AdsDevice {
     /// # Example
     ///
     /// ```no_run
-    /// use tcads_client::blocking::AdsDevice;
+    /// use tcads_client::devices::blocking::AdsDevice;
     ///
     /// let device = AdsDevice::connect(None)?;
     ///
@@ -119,7 +119,7 @@ impl AdsDevice {
     /// # Example
     ///
     /// ```no_run
-    /// use tcads_client::blocking::AdsDevice;
+    /// use tcads_client::devices::blocking::AdsDevice;
     ///
     /// let device = AdsDevice::connect_to("192.168.1.100:48898", None)?;
     ///
@@ -165,7 +165,7 @@ impl AdsDevice {
     ///
     /// ```no_run
     /// use tcads_core::io::blocking::AmsStream;
-    /// use tcads_client::blocking::AdsDevice;
+    /// use tcads_client::devices::blocking::AdsDevice;
     ///
     /// let stream = AmsStream::connect("192.168.1.100:48898")?;
     /// let source = "192.168.1.100.1.1:851".parse()?;
