@@ -2,12 +2,13 @@ use super::traits::WriteAllVectored;
 use crate::io::frame::AmsFrame;
 use std::io::IoSlice;
 use tokio::io::{self, AsyncWrite, AsyncWriteExt, BufWriter};
+use tokio::net::TcpStream;
 
 /// A buffered writer specialised for serializing AMS frames to an asynchronous byte stream.
 ///
 /// This struct wraps an underlying writer in a [`BufWriter`] to coalesce the header
 /// and payload writes, but automatically flushes after every frame to ensure low latency.
-pub struct AmsWriter<W: AsyncWrite + Unpin> {
+pub struct AmsWriter<W: AsyncWrite + Unpin = TcpStream> {
     writer: BufWriter<W>,
 }
 

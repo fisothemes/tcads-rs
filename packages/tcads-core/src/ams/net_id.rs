@@ -11,7 +11,7 @@ pub const AMS_PORT_LEN: usize = 2;
 ///
 /// The **AMS Net ID** is purely logical and usually has no relation to the IP address.
 /// It is configured at the target system. At the PC this TwinCAT System Control is used.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct AmsNetId([u8; AmsNetId::LENGTH]);
 
 impl AmsNetId {
@@ -28,6 +28,26 @@ impl AmsNetId {
         &self.0
     }
 
+    /// Converts the current instance into a mutable byte slice.
+    pub fn as_bytes_mut(&mut self) -> &mut [u8] {
+        &mut self.0
+    }
+
+    /// Returns the octet at the given index.
+    pub fn octet(&self, index: usize) -> u8 {
+        self.0[index]
+    }
+
+    /// Returns the mutable octet at the given index.
+    pub fn octet_mut(&mut self, index: usize) -> &mut u8 {
+        &mut self.0[index]
+    }
+
+    /// Returns the octets as a slice.
+    pub fn octets(&self) -> [u8; AmsNetId::LENGTH] {
+        self.0
+    }
+
     /// Converts the current instance into a byte array.
     pub fn to_bytes(&self) -> [u8; AmsNetId::LENGTH] {
         self.0
@@ -41,6 +61,11 @@ impl AmsNetId {
     /// Converts the given byte slice into an [`AmsNetId`].
     pub fn try_from_slice(bytes: &[u8]) -> Result<Self, NetIdError> {
         Self::try_from(bytes)
+    }
+
+    /// Returns `true` if the Net ID is unspecified (all zeros or `0.0.0.0.1.1`).
+    pub fn is_unspecified(&self) -> bool {
+        self.0 == [0; AmsNetId::LENGTH] || self.0 == [0, 0, 0, 0, 1, 1]
     }
 }
 
@@ -104,6 +129,12 @@ impl FromStr for AmsNetId {
 impl From<AmsNetId> for [u8; AmsNetId::LENGTH] {
     fn from(value: AmsNetId) -> Self {
         value.0
+    }
+}
+
+impl Default for AmsNetId {
+    fn default() -> Self {
+        Self::new(0, 0, 0, 0, 1, 1)
     }
 }
 

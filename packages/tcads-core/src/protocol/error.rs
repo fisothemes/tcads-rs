@@ -1,11 +1,8 @@
 use crate::ads::{AdsCommand, AdsError};
 use crate::ams::{AmsCommand, AmsError};
-use std::io;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum ProtocolError {
-    #[error("IO Error: {0}")]
-    Io(#[from] io::Error),
     #[error("AMS Error: {0}")]
     Ams(#[from] AmsError),
     #[error("ADS Error: {0}")]

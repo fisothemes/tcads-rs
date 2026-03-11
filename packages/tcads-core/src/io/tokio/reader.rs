@@ -1,12 +1,13 @@
 use crate::ams::AmsTcpHeader;
 use crate::io::frame::{AMS_FRAME_MAX_LEN, AmsFrame};
 use tokio::io::{self, AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
+use tokio::net::TcpStream;
 
 /// A buffered reader specialised for parsing AMS frames from an asynchronous byte stream.
 ///
 /// This struct wraps an underlying async reader in a [`BufReader`] to minimise system calls
 /// when reading the 6-byte [AMS/TCP header](AmsTcpHeader) and the variable-length payload.
-pub struct AmsReader<R: AsyncRead> {
+pub struct AmsReader<R: AsyncRead = TcpStream> {
     reader: BufReader<R>,
 }
 

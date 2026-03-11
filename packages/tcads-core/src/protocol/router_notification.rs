@@ -25,7 +25,7 @@ use crate::protocol::ProtocolError;
 /// use tcads_core::protocol::ProtocolError;
 /// use std::net::TcpStream;
 ///
-/// fn example(mut stream: AmsStream<TcpStream>) -> Result<(), ProtocolError> {
+/// fn example(mut stream: AmsStream<TcpStream>) -> Result<(), Box<dyn std::error::Error>> {
 ///     let (reader, mut writer) = stream.try_split()?;
 ///     // Send Port Connect request
 ///     writer.write_frame(&PortConnectRequest::default().to_frame())?;

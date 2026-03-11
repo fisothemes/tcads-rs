@@ -4,8 +4,11 @@ mod stamp;
 pub use sample::{AdsNotificationSample, AdsNotificationSampleOwned};
 pub use stamp::{AdsStampHeader, AdsStampHeaderOwned};
 
-use super::{ProtocolError, parse_ads_frame};
-use crate::ads::{AdsCommand, AdsError, AdsHeader, AdsReturnCode, StateFlag, WindowsFileTime};
+use super::{ProtocolError, validate_ads_command, validate_ams_command};
+use crate::ads::{
+    AdsCommand, AdsError, AdsHeader, AdsReturnCode, InvokeId, StateFlag, StateFlagError,
+    WindowsFileTime,
+};
 use crate::ams::{AmsAddr, AmsCommand};
 use crate::io::AmsFrame;
 
@@ -126,7 +129,7 @@ impl<'a> AdsDeviceNotification<'a> {
     ///
     /// Returns the parsed stamps and validates the outer length field against
     /// the actual payload length.
-    fn parse_payload(payload: &'a [u8]) -> Result<Vec<AdsStampHeader<'a>>, ProtocolError> {
+    pub fn parse_payload(payload: &'a [u8]) -> Result<Vec<AdsStampHeader<'a>>, ProtocolError> {
         if payload.len() < Self::MIN_PAYLOAD_SIZE {
             return Err(AdsError::UnexpectedDataLength {
                 expected: Self::MIN_PAYLOAD_SIZE,
@@ -139,10 +142,10 @@ impl<'a> AdsDeviceNotification<'a> {
 
         let stamps_data = &payload[Self::MIN_PAYLOAD_SIZE..];
 
-        if stamps_data.len() != length {
+        if stamps_data.len() != length.saturating_sub(4) {
             return Err(AdsError::UnexpectedDataLength {
-                expected: Self::MIN_PAYLOAD_SIZE + length,
-                got: payload.len(),
+                expected: length.saturating_sub(4),
+                got: stamps_data.len(),
             })?;
         }
 
@@ -163,7 +166,21 @@ impl<'a> TryFrom<&'a AmsFrame> for AdsDeviceNotification<'a> {
     type Error = ProtocolError;
 
     fn try_from(value: &'a AmsFrame) -> Result<Self, Self::Error> {
-        let (header, data) = parse_ads_frame(value, AdsCommand::AdsDeviceNotification, false)?;
+        validate_ams_command(value, AmsCommand::AdsCommand)?;
+
+        let (header, data) = AdsHeader::parse_prefix(value.payload()).map_err(AdsError::from)?;
+
+        validate_ads_command(&header, AdsCommand::AdsDeviceNotification)?;
+
+        let flags = header.state_flags();
+
+        if !flags.is_ads_command() {
+            return Err(AdsError::from(StateFlagError::UnexpectedStateFlag {
+                expected: vec![StateFlag::from(StateFlag::ADS_COMMAND)],
+                got: flags,
+            })
+            .into());
+        }
 
         let stamps = Self::parse_payload(data)?;
 
@@ -207,7 +224,7 @@ impl AdsDeviceNotificationOwned {
     pub fn with_invoke_id(
         target: AmsAddr,
         source: AmsAddr,
-        invoke_id: u32,
+        invoke_id: InvokeId,
         stamps: impl Into<Vec<AdsStampHeaderOwned>>,
     ) -> Self {
         let stamps = stamps.into();
@@ -282,7 +299,7 @@ impl From<&AdsDeviceNotificationOwned> for AmsFrame {
         let mut payload = Vec::with_capacity(AdsHeader::LENGTH + ads_payload_size);
 
         payload.extend_from_slice(&value.header.to_bytes());
-        payload.extend_from_slice(&(stamps_wire_size as u32).to_le_bytes());
+        payload.extend_from_slice(&(stamps_wire_size.saturating_add(4) as u32).to_le_bytes());
         payload.extend_from_slice(&(value.stamps.len() as u32).to_le_bytes());
 
         for stamp in &value.stamps {

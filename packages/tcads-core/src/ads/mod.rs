@@ -28,3 +28,5 @@ pub use trans_mode::AdsTransMode;
 
 pub type IndexGroup = u32;
 pub type IndexOffset = u32;
+
+pub type InvokeId = u32;

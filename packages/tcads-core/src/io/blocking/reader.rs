@@ -1,12 +1,14 @@
 use crate::ams::AmsTcpHeader;
 use crate::io::frame::{AMS_FRAME_MAX_LEN, AmsFrame};
 use std::io::{self, BufRead, BufReader, Read};
+use std::net::{Shutdown, SocketAddr, TcpStream};
+use std::time::Duration;
 
 /// A buffered reader specialised for parsing AMS frames from a byte stream.
 ///
 /// This struct wraps an underlying reader in a [`BufReader`] to minimise system calls
 /// when reading the [AMS/TCP header](AmsTcpHeader) (6 bytes) and variable-length payload.
-pub struct AmsReader<R: Read> {
+pub struct AmsReader<R: Read = TcpStream> {
     reader: BufReader<R>,
 }
 
@@ -62,7 +64,7 @@ impl<R: Read> AmsReader<R> {
     /// use tcads_core::ams::AmsCommand;
     /// use tcads_core::protocol::ProtocolError;
     ///
-    /// fn run_client(tcp: std::net::TcpStream) -> Result<(), ProtocolError> {
+    /// fn run_client(tcp: std::net::TcpStream) -> Result<(), Box<dyn std::error::Error>> {
     ///     let stream = AmsStream::new(tcp);
     ///     let (reader, mut writer) = stream.try_split()?;
     ///
@@ -95,6 +97,14 @@ impl<R: Read> AmsReader<R> {
         AmsIncoming { reader: self }
     }
 
+    /// Unlike [`AmsReader::incoming`], this borrows the reader mutably, returning an iterator
+    /// over incoming frames.
+    ///
+    /// Useful for temporary read loops where you need the socket back.
+    pub fn incoming_mut(&mut self) -> AmsIncomingMut<'_, R> {
+        AmsIncomingMut { reader: self }
+    }
+
     /// Consumes the AmsReader, returning the underlying reader.
     ///
     /// # Note
@@ -103,6 +113,59 @@ impl<R: Read> AmsReader<R> {
     /// Therefore, a following read from the underlying reader may lead to data loss
     pub fn into_inner(self) -> R {
         self.reader.into_inner()
+    }
+
+    /// Returns a reference to the underlying reader.
+    ///
+    /// # Note
+    ///
+    /// It is inadvisable to directly read from the underlying reader
+    pub fn get_ref(&self) -> &R {
+        self.reader.get_ref()
+    }
+
+    /// Returns a mutable reference to the underlying reader.
+    ///
+    /// # Note
+    ///
+    /// It is inadvisable to directly read from the underlying reader.
+    pub fn get_mut(&mut self) -> &mut R {
+        self.reader.get_mut()
+    }
+}
+
+impl AmsReader<TcpStream> {
+    /// Set read timeout for [`TcpStream`].
+    ///
+    /// If the value specified is [`None`], then read calls will block indefinitely.
+    /// An [`Err`] is returned if the zero [`Duration`] is passed to this method.
+    pub fn set_read_timeout(&mut self, dur: Option<Duration>) -> io::Result<()> {
+        self.reader.get_mut().set_read_timeout(dur)
+    }
+
+    /// Returns the read timeout of the underlying stream.
+    ///
+    /// If the timeout is [`None`], then [`read_frame`](Self::read_frame) calls will block indefinitely
+    pub fn timeout(&self) -> io::Result<Option<Duration>> {
+        self.reader.get_ref().read_timeout()
+    }
+
+    /// Returns the socket address of the remote peer of this TCP connection.
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+        self.reader.get_ref().peer_addr()
+    }
+
+    /// Returns the socket address of the local half of this TCP connection
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.reader.get_ref().local_addr()
+    }
+
+    /// Shuts down the read, write, or both halves of this connection.
+    /// This function will cause all pending and future I/O on the specified
+    /// portions to return immediately with an appropriate value
+    /// (see documentation for [`Shutdown`]).
+    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
+        self.reader.get_ref().shutdown(how)
     }
 }
 
@@ -117,6 +180,23 @@ impl<R: Read> Iterator for AmsIncoming<R> {
         match self.reader.read_frame() {
             Ok(frame) => Some(Ok(frame)),
             // EOF is expected when the connection is closed
+            Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => None,
+            Err(e) => Some(Err(e)),
+        }
+    }
+}
+
+/// A borrowing iterator that yields `std::io::Result<AmsFrame>` from the underlying stream.
+pub struct AmsIncomingMut<'a, R: Read> {
+    reader: &'a mut AmsReader<R>,
+}
+
+impl<'a, R: Read> Iterator for AmsIncomingMut<'a, R> {
+    type Item = io::Result<AmsFrame>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.reader.read_frame() {
+            Ok(frame) => Some(Ok(frame)),
             Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => None,
             Err(e) => Some(Err(e)),
         }

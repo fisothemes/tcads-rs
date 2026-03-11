@@ -1,12 +1,15 @@
-use tcads_core::ads::{AdsCommand, AdsHeader, AdsReturnCode, AdsState};
+use tcads_core::AdsTransMode;
+use tcads_core::ads::{AdsCommand, AdsHeader, AdsReturnCode, AdsState, NotificationHandle};
 use tcads_core::ams::{AmsAddr, AmsCommand};
 use tcads_core::io::blocking::AmsStream;
 use tcads_core::protocol::{
+    AdsAddDeviceNotificationRequest, AdsAddDeviceNotificationResponse,
+    AdsDeleteDeviceNotificationRequest, AdsDeleteDeviceNotificationResponse, AdsDeviceNotification,
     AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse, AdsReadRequest, AdsReadResponse,
     AdsReadStateRequest, AdsReadStateResponse, AdsReadWriteRequestOwned,
     AdsWriteControlRequestOwned, AdsWriteControlResponse, AdsWriteRequestOwned, AdsWriteResponse,
-    GetLocalNetIdRequest, GetLocalNetIdResponse, PortConnectRequest, PortConnectResponse,
-    RouterNotification,
+    GetLocalNetIdRequest, GetLocalNetIdResponse, PortCloseRequest, PortConnectRequest,
+    PortConnectResponse, RouterNotification,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -18,7 +21,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut source = AmsAddr::default();
     let mut target = AmsAddr::default();
-    let mut var_handle;
+    let mut var_handle = 0;
+    let mut notif_handle = NotificationHandle::from(999);
 
     for result in reader.incoming() {
         let frame = result?;
@@ -188,6 +192,62 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             ),
                             _ => panic!("Read failed! ({:?}, {:?})", code, data),
                         }
+                        writer.write_frame(
+                            &AdsAddDeviceNotificationRequest::new(
+                                target,
+                                source,
+                                0x999,
+                                0xF005,
+                                var_handle,
+                                size_of::<u32>() as u32,
+                                AdsTransMode::ServerOnChange,
+                                0,
+                                10,
+                            )
+                            .into(),
+                        )?;
+                    }
+                    AdsCommand::AdsAddDeviceNotification => {
+                        let resp = AdsAddDeviceNotificationResponse::parse_payload(payload)?;
+
+                        println!("Device notification added: {:?}", resp);
+
+                        notif_handle = resp.1;
+                    }
+                    AdsCommand::AdsDeleteDeviceNotification => {
+                        let resp = AdsDeleteDeviceNotificationResponse::parse_payload(payload)?;
+                        println!("Delete Device notification response: {:?}", resp);
+
+                        writer.write_frame(&PortCloseRequest::new(source.port()).into())?;
+                    }
+                    AdsCommand::AdsDeviceNotification => {
+                        let notif = AdsDeviceNotification::try_from(&frame)?;
+                        println!(
+                            "Received Device Notification with {} header(s)",
+                            notif.stamps().len()
+                        );
+
+                        let ams_cmd = frame.header().command();
+                        let ads_cmd = header.command_id();
+
+                        for (ts, sample) in notif.iter_samples() {
+                            println!(
+                                "{ams_cmd:?}:\t{ads_cmd:?} -> Received Device Notification at {ts}"
+                            );
+                            println!(
+                                "{ams_cmd:?}:\t{ads_cmd:?} -> Device notification(s): {sample:?}"
+                            );
+                        }
+
+                        writer.write_frame(
+                            &AdsDeleteDeviceNotificationRequest::new(
+                                target,
+                                source,
+                                0x1337,
+                                notif_handle,
+                            )
+                            .into(),
+                        )?;
                     }
                     _ => todo!(),
                 }

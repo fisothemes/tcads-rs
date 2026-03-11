@@ -39,4 +39,4 @@ pub use get_local_net_id::{GetLocalNetIdRequest, GetLocalNetIdResponse};
 pub use port_close::PortCloseRequest;
 pub use port_connect::{PortConnectRequest, PortConnectResponse};
 pub use router_notification::{RouterNotification, RouterState};
-pub use utils::parse_ads_frame;
+pub use utils::{parse_ads_frame, validate_ads_command, validate_ams_command};

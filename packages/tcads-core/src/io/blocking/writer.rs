@@ -1,6 +1,8 @@
 use super::traits::WriteAllVectored;
 use crate::io::frame::AmsFrame;
 use std::io::{self, BufWriter, IntoInnerError, IoSlice, Write};
+use std::net::{Shutdown, SocketAddr, TcpStream};
+use std::time::Duration;
 
 /// A buffered writer specialised for serializing AMS frames to a byte stream.
 ///
@@ -12,7 +14,7 @@ use std::io::{self, BufWriter, IntoInnerError, IoSlice, Write};
 /// **automatically flushes** the buffer after writing each frame.
 ///
 /// This prevents commands from sitting in the buffer waiting for 8KB of data to accumulate.
-pub struct AmsWriter<W: Write> {
+pub struct AmsWriter<W: Write = TcpStream> {
     writer: BufWriter<W>,
 }
 
@@ -51,6 +53,55 @@ impl<W: Write> AmsWriter<W> {
     /// The buffer is written out (flushed) before returning the writer.
     pub fn into_inner(self) -> Result<W, IntoInnerError<BufWriter<W>>> {
         self.writer.into_inner()
+    }
+
+    /// Returns a reference to the underlying writer.
+    pub fn get_ref(&self) -> &W {
+        self.writer.get_ref()
+    }
+
+    /// Returns a mutable reference to the underlying writer.
+    ///
+    /// # Note
+    ///
+    /// It is inadvisable to directly write to the underlying writer.
+    pub fn get_mut(&mut self) -> &mut W {
+        self.writer.get_mut()
+    }
+}
+
+impl AmsWriter<TcpStream> {
+    /// Set write timeout for [`TcpStream`].
+    ///
+    /// If the value specified is [`None`], then read calls will block indefinitely.
+    /// An [`Err`] is returned if the zero [`Duration`] is passed to this method.
+    pub fn set_write_timeout(&mut self, dur: Option<Duration>) -> io::Result<()> {
+        self.writer.get_mut().set_write_timeout(dur)
+    }
+
+    /// Returns the write timeout of the underlying stream.
+    ///
+    /// If the timeout is [`None`], then [`write_frame`](Self::write_frame) calls will block indefinitely
+    pub fn timeout(&self) -> io::Result<Option<Duration>> {
+        self.writer.get_ref().write_timeout()
+    }
+
+    /// Returns the socket address of the remote peer of this TCP connection.
+    pub fn peer_addr(&self) -> io::Result<SocketAddr> {
+        self.writer.get_ref().peer_addr()
+    }
+
+    /// Returns the socket address of the local half of this TCP connection
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.writer.get_ref().local_addr()
+    }
+
+    /// Shuts down the read, write, or both halves of this connection.
+    /// This function will cause all pending and future I/O on the specified
+    /// portions to return immediately with an appropriate value
+    /// (see documentation for [`Shutdown`]).
+    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
+        self.writer.get_ref().shutdown(how)
     }
 }
 

@@ -1,5 +1,7 @@
 use super::{ProtocolError, parse_ads_frame};
-use crate::ads::{AdsCommand, AdsError, AdsHeader, AdsReturnCode, NotificationHandle, StateFlag};
+use crate::ads::{
+    AdsCommand, AdsError, AdsHeader, AdsReturnCode, InvokeId, NotificationHandle, StateFlag,
+};
 use crate::ams::{AmsAddr, AmsCommand};
 use crate::io::AmsFrame;
 
@@ -33,7 +35,7 @@ impl AdsDeleteDeviceNotificationRequest {
     pub fn new(
         target: AmsAddr,
         source: AmsAddr,
-        invoke_id: u32,
+        invoke_id: InvokeId,
         handle: NotificationHandle,
     ) -> Self {
         let header = AdsHeader::new(
@@ -151,7 +153,12 @@ impl AdsDeleteDeviceNotificationResponse {
     pub const PAYLOAD_SIZE: usize = 4;
 
     /// Creates a new Delete Device Notification Response.
-    pub fn new(target: AmsAddr, source: AmsAddr, invoke_id: u32, result: AdsReturnCode) -> Self {
+    pub fn new(
+        target: AmsAddr,
+        source: AmsAddr,
+        invoke_id: InvokeId,
+        result: AdsReturnCode,
+    ) -> Self {
         let header = AdsHeader::new(
             target,
             source,

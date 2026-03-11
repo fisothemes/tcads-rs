@@ -1,6 +1,6 @@
 use super::{ProtocolError, parse_ads_frame};
 use crate::ads::{
-    AdsCommand, AdsError, AdsHeader, AdsReturnCode, IndexGroup, IndexOffset, StateFlag,
+    AdsCommand, AdsError, AdsHeader, AdsReturnCode, IndexGroup, IndexOffset, InvokeId, StateFlag,
 };
 use crate::ams::{AmsAddr, AmsCommand};
 use crate::io::AmsFrame;
@@ -38,7 +38,7 @@ impl AdsReadRequest {
     pub fn new(
         target: AmsAddr,
         source: AmsAddr,
-        invoke_id: u32,
+        invoke_id: InvokeId,
         index_group: u32,
         index_offset: u32,
         length: u32,
@@ -308,7 +308,7 @@ impl AdsReadResponseOwned {
     pub fn new(
         target: AmsAddr,
         source: AmsAddr,
-        invoke_id: u32,
+        invoke_id: InvokeId,
         result: AdsReturnCode,
         data: impl Into<Vec<u8>>,
     ) -> Self {

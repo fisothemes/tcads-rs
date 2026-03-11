@@ -145,10 +145,25 @@ impl AmsStream<TcpStream> {
         self.stream.set_read_timeout(dur)
     }
 
+    /// Returns the read timeout of the underlying stream.
+    ///
+    /// If the timeout is [`None`], then [`read_frame`](Self::read_frame) calls will block indefinitely
+    pub fn read_timeout(&self) -> io::Result<Option<Duration>> {
+        self.stream.read_timeout()
+    }
+
     /// Sets the write timeout for the underlying stream.
     pub fn set_write_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
         self.stream.set_write_timeout(dur)
     }
+
+    /// Returns the write timeout of the underlying stream.
+    ///
+    /// If the timeout is [`None`], then [`write_frame`](Self::write_frame) calls will block indefinitely
+    pub fn write_timeout(&self) -> io::Result<Option<Duration>> {
+        self.stream.write_timeout()
+    }
+
     /// Returns the socket address of the remote peer of this TCP connection.
     pub fn peer_addr(&self) -> io::Result<SocketAddr> {
         self.stream.peer_addr()
