@@ -20,7 +20,8 @@ The best way to learn how to use this library is by exploring the [`examples`](e
 2. **[`02_basic_frame_async`](examples/src/bin/02_basic_frame_async.rs)**: Mirroring Example 1 using the `tokio` async engine.
 3. **[`03_protocol_structs`](examples/src/bin/03_protocol_structs.rs)**: Using the strongly-typed `protocol` builders instead of manual byte-packing.
 4. **[`04_chaining_protocols`](examples/src/bin/04_chaining_protocols.rs)**: Chaining requests to perform a router handshake and read device info.
-5. **[`05_rtime_cpu_settings`](examples/src/bin/05_rtime_cpu_settings.rs)**: Querying the TwinCAT OS Real-Time system (Port 200) and parsing little-endian bytes.
+5. **[`05_rtime_cpu_settings`](examples/src/bin/05_rtime_cpu_settings.rs)**: Querying the TwinCAT OS Real-Time system (Port 200) and parsing little-endian bytes
+6. **[`06_basic_ads_device`](examples/src/bin/06_basic_ads_device.rs)**: Introducing the high-level `AdsDevice` to abstract away sockets, headers, and routing.
 
 and [more](examples/src/bin/).
 
