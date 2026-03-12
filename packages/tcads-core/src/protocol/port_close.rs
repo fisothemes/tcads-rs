@@ -33,7 +33,7 @@ impl PortCloseRequest {
     ///
     /// # Note
     /// Payload length must be exactly 2 bytes or a [`ProtocolError`] is returned.
-    pub fn try_from_frame(frame: AmsFrame) -> Result<Self, ProtocolError> {
+    pub fn try_from_frame(frame: &AmsFrame) -> Result<Self, ProtocolError> {
         Self::try_from(frame)
     }
 
@@ -65,10 +65,10 @@ impl From<&PortCloseRequest> for AmsFrame {
     }
 }
 
-impl TryFrom<AmsFrame> for PortCloseRequest {
+impl TryFrom<&AmsFrame> for PortCloseRequest {
     type Error = ProtocolError;
 
-    fn try_from(value: AmsFrame) -> Result<Self, Self::Error> {
+    fn try_from(value: &AmsFrame) -> Result<Self, Self::Error> {
         let header = value.header();
 
         if header.command() != AmsCommand::PortClose {
@@ -97,6 +97,14 @@ impl TryFrom<AmsFrame> for PortCloseRequest {
         Ok(Self {
             port: AmsPort::from_le_bytes(payload.try_into().unwrap()),
         })
+    }
+}
+
+impl TryFrom<AmsFrame> for PortCloseRequest {
+    type Error = ProtocolError;
+
+    fn try_from(value: AmsFrame) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
     }
 }
 

@@ -61,7 +61,7 @@ impl RouterNotification {
     }
 
     /// Attempts to parse an [`AmsFrame`] into a [`RouterNotification`].
-    pub fn try_from_frame(frame: AmsFrame) -> Result<Self, ProtocolError> {
+    pub fn try_from_frame(frame: &AmsFrame) -> Result<Self, ProtocolError> {
         Self::try_from(frame)
     }
 
@@ -93,10 +93,10 @@ impl From<&RouterNotification> for AmsFrame {
     }
 }
 
-impl TryFrom<AmsFrame> for RouterNotification {
+impl TryFrom<&AmsFrame> for RouterNotification {
     type Error = ProtocolError;
 
-    fn try_from(value: AmsFrame) -> Result<Self, Self::Error> {
+    fn try_from(value: &AmsFrame) -> Result<Self, Self::Error> {
         let header = value.header();
 
         if header.command() != AmsCommand::RouterNotification {
@@ -119,6 +119,14 @@ impl TryFrom<AmsFrame> for RouterNotification {
         ]));
 
         Ok(Self { state })
+    }
+}
+
+impl TryFrom<AmsFrame> for RouterNotification {
+    type Error = ProtocolError;
+
+    fn try_from(value: AmsFrame) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
     }
 }
 

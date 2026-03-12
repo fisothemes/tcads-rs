@@ -31,7 +31,7 @@ impl PortConnectRequest {
     ///
     /// # Note
     /// Payload length must be exactly 2 bytes or a [`ProtocolError`] is returned.
-    pub fn try_from_frame(frame: AmsFrame) -> Result<Self, ProtocolError> {
+    pub fn try_from_frame(frame: &AmsFrame) -> Result<Self, ProtocolError> {
         Self::try_from(frame)
     }
 
@@ -63,10 +63,10 @@ impl From<&PortConnectRequest> for AmsFrame {
     }
 }
 
-impl TryFrom<AmsFrame> for PortConnectRequest {
+impl TryFrom<&AmsFrame> for PortConnectRequest {
     type Error = ProtocolError;
 
-    fn try_from(value: AmsFrame) -> Result<Self, Self::Error> {
+    fn try_from(value: &AmsFrame) -> Result<Self, Self::Error> {
         let header = value.header();
 
         if header.command() != AmsCommand::PortConnect {
@@ -98,6 +98,14 @@ impl TryFrom<AmsFrame> for PortConnectRequest {
     }
 }
 
+impl TryFrom<AmsFrame> for PortConnectRequest {
+    type Error = ProtocolError;
+
+    fn try_from(value: AmsFrame) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
+    }
+}
+
 /// Represents an AMS Port Connect Response (Command `0x1000`).
 ///
 /// This is the reply sent by the AMS Router after a successful [`PortConnectRequest`].
@@ -121,7 +129,7 @@ impl PortConnectResponse {
     }
 
     /// Attempts to parse an [`AmsFrame`] into a [`PortConnectResponse`].
-    pub fn try_from_frame(frame: AmsFrame) -> Result<Self, ProtocolError> {
+    pub fn try_from_frame(frame: &AmsFrame) -> Result<Self, ProtocolError> {
         Self::try_from(frame)
     }
 
@@ -153,10 +161,10 @@ impl From<&PortConnectResponse> for AmsFrame {
     }
 }
 
-impl TryFrom<AmsFrame> for PortConnectResponse {
+impl TryFrom<&AmsFrame> for PortConnectResponse {
     type Error = ProtocolError;
 
-    fn try_from(value: AmsFrame) -> Result<Self, Self::Error> {
+    fn try_from(value: &AmsFrame) -> Result<Self, Self::Error> {
         let header = value.header();
 
         if header.command() != AmsCommand::PortConnect {
@@ -176,6 +184,14 @@ impl TryFrom<AmsFrame> for PortConnectResponse {
         let addr = AmsAddr::try_from_slice(value.payload()).map_err(ams::AmsError::from)?;
 
         Ok(Self { addr })
+    }
+}
+
+impl TryFrom<AmsFrame> for PortConnectResponse {
+    type Error = ProtocolError;
+
+    fn try_from(value: AmsFrame) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
     }
 }
 

@@ -44,10 +44,10 @@ impl From<&GetLocalNetIdRequest> for AmsFrame {
     }
 }
 
-impl TryFrom<AmsFrame> for GetLocalNetIdRequest {
+impl TryFrom<&AmsFrame> for GetLocalNetIdRequest {
     type Error = ProtocolError;
 
-    fn try_from(value: AmsFrame) -> Result<Self, Self::Error> {
+    fn try_from(value: &AmsFrame) -> Result<Self, Self::Error> {
         let header = value.header();
 
         if header.command() != AmsCommand::GetLocalNetId {
@@ -66,6 +66,14 @@ impl TryFrom<AmsFrame> for GetLocalNetIdRequest {
 
         // From what I have tested, router ignores payload content, so we don't validate it
         Ok(Self)
+    }
+}
+
+impl TryFrom<AmsFrame> for GetLocalNetIdRequest {
+    type Error = ProtocolError;
+
+    fn try_from(value: AmsFrame) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
     }
 }
 
@@ -89,7 +97,7 @@ impl GetLocalNetIdResponse {
     }
 
     /// Attempts to parse an [`AmsFrame`] into a [`GetLocalNetIdResponse`].
-    pub fn try_from_frame(frame: AmsFrame) -> Result<Self, ProtocolError> {
+    pub fn try_from_frame(frame: &AmsFrame) -> Result<Self, ProtocolError> {
         Self::try_from(frame)
     }
 
@@ -121,10 +129,10 @@ impl From<&GetLocalNetIdResponse> for AmsFrame {
     }
 }
 
-impl TryFrom<AmsFrame> for GetLocalNetIdResponse {
+impl TryFrom<&AmsFrame> for GetLocalNetIdResponse {
     type Error = ProtocolError;
 
-    fn try_from(value: AmsFrame) -> Result<Self, Self::Error> {
+    fn try_from(value: &AmsFrame) -> Result<Self, Self::Error> {
         let header = value.header();
 
         if header.command() != AmsCommand::GetLocalNetId {
@@ -144,6 +152,14 @@ impl TryFrom<AmsFrame> for GetLocalNetIdResponse {
         let net_id = AmsNetId::try_from_slice(value.payload()).map_err(ams::AmsError::from)?;
 
         Ok(Self { net_id })
+    }
+}
+
+impl TryFrom<AmsFrame> for GetLocalNetIdResponse {
+    type Error = ProtocolError;
+
+    fn try_from(value: AmsFrame) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
     }
 }
 
