@@ -39,8 +39,8 @@ impl AdsReadRequest {
         target: AmsAddr,
         source: AmsAddr,
         invoke_id: InvokeId,
-        index_group: u32,
-        index_offset: u32,
+        index_group: IndexGroup,
+        index_offset: IndexOffset,
         length: u32,
     ) -> Self {
         let header = AdsHeader::new(
