@@ -8,6 +8,9 @@
       <sourceFolder url="file://$MODULE_DIR$/packages/tcads/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/examples/src" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/examples/twincat/.vs" />
+      <excludeFolder url="file://$MODULE_DIR$/examples/twincat/TcAdsExamplesPlcRt/_CompileInfo" />
+      <excludeFolder url="file://$MODULE_DIR$/examples/twincat/_Boot" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+  <POU Name="MAIN" Id="{f2401578-9716-4198-93c8-43af51a84049}" SpecialFunc="None">
+    <Declaration><![CDATA[// This is an example TwinCAT Runtime project for tcads-rs demonstrations.
+PROGRAM MAIN
+VAR
+	nCount 		: UDINT := 99;
+	bIncrement 	: BOOL;
+	bDecrement 	: BOOL;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF F_ResetOnTrue(bIncrement) THEN 
+	nCount := nCount + 1;
+END_IF
+
+IF F_ResetOnTrue(bDecrement) THEN 
+	nCount := nCount - 1;
+END_IF]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>
