@@ -2,7 +2,7 @@
 
 This crate contains the core building blocks for the **TwinCAT AMS/ADS** protocol.
 
-It handles the heavy lifting of AMS/ADS frame construction, parsing, and serialization. It is strictly **transport-agnostic**, meaning it doesn't care how you move bytes, whether you're using standard TCP, a custom serial bridge, or a high-performance async runtime, tcads-core provides the protocol logic.
+It handles the heavy lifting of AMS/ADS frame construction, parsing, and serialization. It is strictly **transport-agnostic**, meaning it doesn't care how you move bytes, whether you're using standard TCP, a custom serial bridge, or a high-performance async runtime, `tcads-core` provides the protocol logic.
 
 ## Features
 
@@ -38,28 +38,33 @@ tcads-core/
 
 ### Frame
 
-At the lowest level, `AmsStream` sends and receives [`AmsFrame`](src/io/frame.rs)s over TCP.
+At the lowest level, the `AmsStream` sends and receives [`AmsFrame`](src/io/frame.rs)s over TCP.
 You can work directly with raw frames if you need full control:
 
 #### Blocking I/O
 
 ```rust
-use tcads_core::ams::AmsCommand;
-use tcads_core::io::{AmsFrame, blocking::AmsStream};
+use tcads_core::io::blocking::AmsStream;
+use tcads_core::{AmsCommand, AmsFrame};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let stream = AmsStream::connect("127.0.0.1:48898")?;
-    let (mut reader, mut writer) = stream.try_split()?;
+  // Connect to the local AMS Router
+  let mut stream = AmsStream::connect("127.0.0.1:48898")?;
 
-    // Send a raw frame
-    let frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
-    writer.write_frame(&frame)?;
+  // Construct a raw Port Connect frame
+  let port_connect_frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
 
-    // Read the response
-    let frame = reader.read_frame()?;
-    println!("Received: {:?}", frame.header().command());
-  
-    Ok(())
+  // Write and read directly on the stream
+  stream.write_frame(&port_connect_frame)?;
+  let response_frame = stream.read_frame()?;
+
+  println!(
+    "Received: {:?} -> {:?}",
+    response_frame.header().command(),
+    response_frame.payload()
+  );
+
+  Ok(())
 }
 ```
 
@@ -68,31 +73,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 The async API is identical in shape just swap the import and add `.await`:
 
 ```rust
-use tcads_core::ams::AmsCommand;
-use tcads_core::io::{AmsFrame, tokio::AmsStream};
+use tcads_core::io::tokio::AmsStream;
+use tcads_core::{AmsCommand, AmsFrame};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let stream = AmsStream::connect("127.0.0.1:48898").await?;
-    let (mut reader, mut writer) = stream.into_split();
+  // Connect to the local AMS Router
+  let mut stream = AmsStream::connect("127.0.0.1:48898").await?;
 
-    let frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
-    writer.write_frame(&frame).await?;
+  // Construct a raw Port Connect frame
+  let port_connect_frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
 
-    let frame = reader.read_frame().await?;
-    println!("Received: {:?}", frame.header().command());
+  // Write and read directly on the stream
+  stream.write_frame(&port_connect_frame).await?;
+  let response_frame = stream.read_frame().await?;
 
-    Ok(())
+  println!(
+    "Received: {:?} -> {:?}",
+    response_frame.header().command(),
+    response_frame.payload()
+  );
+
+  Ok(())
 }
 ```
 
 > [!NOTE]
 > Support for other async runtimes (e.g. `async-std`, `smol`) is available
-> upon request, open an issue or PR.
+> upon request, create an issue or open a Pull Request.
 
 ### Using the protocol layer
 
-Building frames by hand means managing byte layouts yourself is best described as `"much pain, such work"`. Luckily, the [protocol](src/protocol) module has you covered. Every AMS and ADS command has a typed request and response that serializes to and from the `AmsFrame`:
+Building frames by hand means managing byte layouts yourself. This is best described as `"much pain, such work"`. Luckily, the [protocol](src/protocol) module has you covered. Every AMS and ADS command has a typed request and response that serializes to and from the `AmsFrame`:
 
 ```rust
 use tcads_core::ads::{AdsCommand, AdsHeader};
