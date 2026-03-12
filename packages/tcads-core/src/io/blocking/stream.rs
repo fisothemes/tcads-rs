@@ -67,6 +67,16 @@ impl<S: Read + Write> AmsStream<S> {
     pub fn into_inner(self) -> S {
         self.stream
     }
+
+    /// Returns a reference to the underlying stream.
+    pub fn get_ref(&self) -> &S {
+        &self.stream
+    }
+
+    /// Returns a mutable reference to the underlying stream
+    pub fn get_mut(&mut self) -> &mut S {
+        &mut self.stream
+    }
 }
 
 impl<S: Read + Write + Clone> AmsStream<S> {
