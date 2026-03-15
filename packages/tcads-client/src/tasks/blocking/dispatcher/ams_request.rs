@@ -2,13 +2,13 @@ use super::AmsRequestDispatchKey;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Mutex;
 use std::sync::mpsc::{self, Receiver, Sender};
+use tcads_core::AmsFrame;
 use tcads_core::InvokeId;
-use tcads_core::io::AmsFrame;
 
 /// Tracks pending requests and dispatches frames to the writer thread.
 ///
 /// The single entry point for sending an AMS request. [`AmsRequestDispatcher::dispatch`]
-/// registers the caller's response channel then forwards the frame to the writer.
+/// registers the caller's response channel, then forwards the frame to the writer.
 /// When the reader thread receives a response, it calls [`AmsRequestDispatcher::complete`]
 /// to route the frame back to the waiting caller.
 pub struct AmsRequestDispatcher {
@@ -16,7 +16,7 @@ pub struct AmsRequestDispatcher {
     ads: Mutex<HashMap<InvokeId, Sender<AmsFrame>>>,
     /// Pending [PortConnect](tcads_core::protocol::PortConnectResponse) responses.
     port_connect: Mutex<VecDeque<Sender<AmsFrame>>>,
-    /// Pending [GetLocalNetId](tcads_core::protocol::GetLocalNetIdResponse) responses;
+    /// Pending [GetLocalNetId](tcads_core::protocol::GetLocalNetIdResponse) responses.
     net_id: Mutex<VecDeque<Sender<AmsFrame>>>,
     /// Channel to the writer thread.
     write_tx: Sender<AmsFrame>,
@@ -34,8 +34,6 @@ impl AmsRequestDispatcher {
     }
 
     /// Registers a waiter, enqueues the frame for writing, and returns the response receiver.
-    ///
-    /// Registration and dispatch happen together, closing the window between the two.
     pub fn dispatch(
         &self,
         key: AmsRequestDispatchKey,
@@ -55,7 +53,7 @@ impl AmsRequestDispatcher {
         Ok(())
     }
 
-    /// Sends `frame` directly to the writer thread without registering a response waiter.
+    /// Sends a `frame` directly to the writer thread without registering a response waiter.
     ///
     /// Use this for frames where no response is expected i.e.
     /// [`PortClose`](tcads_core::protocol::PortCloseRequest). For all other frames
@@ -73,7 +71,7 @@ impl AmsRequestDispatcher {
     /// Clears all pending requests, waking blocked callers with a disconnected error.
     ///
     /// Dropping the senders causes all waiting [`rx.recv()`](Receiver::recv) calls
-    /// to return [`Err`], which maps to [`Error::Disconnected`].
+    /// to return [`Err`], which maps to [`Error::Disconnected`](crate::Error::Disconnected).
     pub fn clear(&self) -> crate::Result<()> {
         self.port_connect.lock()?.clear();
         self.ads.lock()?.clear();
