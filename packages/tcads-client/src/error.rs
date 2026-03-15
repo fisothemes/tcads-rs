@@ -3,6 +3,7 @@ use std::sync::mpsc::{RecvError, RecvTimeoutError, SendError};
 use std::sync::{Arc, PoisonError};
 use tcads_core::ads::AdsReturnCode;
 use tcads_core::protocol::ProtocolError;
+use tokio::sync::mpsc::error::SendError as TokioSendError;
 
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum Error {
@@ -52,6 +53,12 @@ impl From<RecvTimeoutError> for Error {
             RecvTimeoutError::Timeout => Error::Timeout,
             RecvTimeoutError::Disconnected => Error::Disconnected,
         }
+    }
+}
+
+impl<T> From<TokioSendError<T>> for Error {
+    fn from(_: TokioSendError<T>) -> Self {
+        Error::Disconnected
     }
 }
 
