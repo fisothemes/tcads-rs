@@ -8,7 +8,7 @@ use tokio::net::TcpStream;
 ///
 /// This struct wraps an underlying async reader in a [`BufReader`] to minimise system calls
 /// when reading the 6-byte [AMS/TCP header](AmsTcpHeader) and the variable-length payload.
-pub struct AmsReader<R: AsyncRead = TcpStream> {
+pub struct AmsReader<R: AsyncRead + Unpin = TcpStream> {
     reader: BufReader<R>,
 }
 
