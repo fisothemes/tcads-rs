@@ -303,7 +303,15 @@ impl AdsDevice {
         Ok(*self.inner.source.read()?)
     }
 
-    /// Queries the router's local AMS Net ID.
+    /// Queries the local AMS router's Net ID.
+    ///
+    /// # Warning
+    ///
+    /// This command is only supported by a local AMS router. Do not call this
+    /// on a device created with [`connect_remote`](Self::connect_remote). The
+    /// remote router does not support this command and will close the TCP
+    /// connection, causing subsequent calls to return.
+    /// [`Error::Disconnected`](crate::Error::Disconnected).
     pub fn get_local_net_id(&self) -> crate::Result<AmsNetId> {
         let frame = GetLocalNetIdRequest::into_frame();
         let rx = self
