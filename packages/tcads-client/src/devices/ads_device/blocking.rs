@@ -163,7 +163,7 @@ impl AdsDevice {
     /// responsible for providing a valid `source` address.
     ///
     /// This is intended for power users who need control over the underlying stream,
-    /// for example to use a custom transport, inject test streams, or reuse an
+    /// for example, to use a custom transport, inject test streams, or reuse an
     /// existing connection.
     ///
     /// # Example
@@ -173,7 +173,7 @@ impl AdsDevice {
     /// use tcads_client::devices::blocking::AdsDevice;
     ///
     /// let stream = AmsStream::connect("192.168.1.100:48898")?;
-    /// let source = "192.168.1.100.1.1:851".parse()?;
+    /// let source = "192.168.1.100.1.1:34000".parse()?;
     /// let device = AdsDevice::new(stream, source, None)?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```

@@ -56,6 +56,35 @@ pub struct AdsDeviceInner {
 /// It is also [`Send`] + [`Sync`], so multiple tasks can issue ADS commands
 /// concurrently. Responses are matched to their callers via Invoke ID with no
 /// global lock on the connection.
+///
+/// # Example
+///
+/// ```no_run
+/// use std::time::Duration;
+/// use tcads_client::devices::tokio::AdsDevice;
+/// use tcads_client::{AdsState, AdsTransMode, AmsAddr};
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let device = AdsDevice::connect(Some(Duration::from_secs(5))).await?;
+///     let target = AmsAddr::new(device.get_local_net_id().await?, 851);
+///
+///     let (ads_state, _) = device.read_state(target).await?;
+///     println!("PLC state: {ads_state:?}");
+///
+///     let (mut rx, handle) = device.add_notification(
+///         target, 0xF005, 0, 4, AdsTransMode::ServerOnChange, 0, 10,
+///     ).await?;
+///
+///     if let Some(sample) = rx.recv().await {
+///         println!("Sample: {:?}", sample.data());
+///     }
+///
+///     device.delete_notification(target, handle).await?;
+///     device.shutdown().await;
+///     Ok(())
+/// }
+/// ```
 #[derive(Clone)]
 pub struct AdsDevice {
     inner: Arc<AdsDeviceInner>,
@@ -70,16 +99,16 @@ impl AdsDevice {
     /// # Example
     ///
     /// ```no_run
-    /// use tcads_client::tokio::AdsDevice;
+    /// use tcads_client::devices::tokio::AdsDevice;
     ///
     /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let device = AdsDevice::connect(None).await?;
     ///
-    /// println!("Source: {}", device.source().await?);
+    /// println!("Source: {}", device.source().await);
     /// println!("Local Net ID: {}", device.get_local_net_id().await?);
     ///
-    /// device.shutdown().await?;
+    /// device.shutdown().await;
     /// # Ok(())
     /// # }
     /// ```
@@ -87,6 +116,27 @@ impl AdsDevice {
         Self::connect_to("127.0.0.1:48898", timeout).await
     }
 
+    /// Connects to an AMS router at `addr`.
+    ///
+    /// Performs a [`PortConnect`](PortConnectRequest) handshake to obtain a
+    /// dynamically assigned source address.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use tcads_client::devices::tokio::AdsDevice;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let device = AdsDevice::connect_to("192.168.1.100:48898", None).await?;
+    ///
+    /// println!("Source: {}", device.source().await);
+    /// println!("Local Net ID: {}", device.get_local_net_id().await?);
+    ///
+    /// device.shutdown().await;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn connect_to(
         addr: impl ToSocketAddrs,
         timeout: Option<Duration>,
@@ -98,6 +148,11 @@ impl AdsDevice {
         Ok(device)
     }
 
+    /// Connects to an AMS router at `addr` using an explicitly provided source
+    /// address, skipping the [`PortConnect`](PortConnectRequest) handshake.
+    ///
+    /// Use this when a static route is configured on the PLC and the source
+    /// address must exactly match the configured route.
     pub async fn connect_with_source(
         addr: impl ToSocketAddrs,
         source: AmsAddr,
@@ -107,6 +162,30 @@ impl AdsDevice {
         Ok(Self::new(stream, source, timeout))
     }
 
+    /// Creates an [`AdsDevice`] from an existing [`AmsStream`].
+    ///
+    /// Unlike [`connect`](Self::connect) and [`connect_to`](Self::connect_to), this
+    /// constructor does **not** perform a [`PortConnect`] handshake. The caller is
+    /// responsible for providing a valid `source` address.
+    ///
+    /// This is intended for power users who need control over the underlying stream,
+    /// for example, to use a custom transport, inject test streams, or reuse an
+    /// existing connection.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use tcads_core::io::tokio::AmsStream;
+    /// use tcads_client::devices::tokio::AdsDevice;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let stream = AmsStream::connect("192.168.1.100:48898").await?;
+    /// let source = "192.168.1.100.1.1:34000".parse()?;
+    /// let device = AdsDevice::new(stream, source, None);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn new(stream: AmsStream, source: AmsAddr, timeout: Option<Duration>) -> Self {
         let (reader, writer) = stream.into_split();
         let (write_tx, _) = AmsRequestWriter::spawn(writer);
@@ -134,6 +213,15 @@ impl AdsDevice {
         }
     }
 
+    /// Gracefully shuts down the connection.
+    ///
+    /// Sends a [`PortClose`](PortCloseRequest) frame to the router. The writer
+    /// task writes it and exits, closing the TCP write half. The router closes
+    /// the connection, causing the reader task to hit EOF and clear all pending
+    /// callers and notification subscribers.
+    ///
+    /// If the send fails (already disconnected) this returns `Ok(())` meaning the
+    /// connection is already gone.
     pub async fn shutdown(&self) {
         let port = self.source().await.port();
         let frame = PortCloseRequest::new(port).into_frame();
