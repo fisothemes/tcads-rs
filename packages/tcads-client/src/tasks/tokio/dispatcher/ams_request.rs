@@ -47,7 +47,7 @@ impl AmsRequestDispatcher {
     /// Called by the reader task to complete a pending request.
     pub async fn complete(&self, key: AmsRequestDispatchKey, frame: AmsFrame) -> crate::Result<()> {
         if let Some(tx) = self.take(key).await {
-            let _ = tx.send(frame)?;
+            tx.send(frame)?;
         }
         Ok(())
     }
