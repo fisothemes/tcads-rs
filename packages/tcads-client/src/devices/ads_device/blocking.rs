@@ -2,12 +2,13 @@ use crate::tasks::blocking::{
     AdsNotificationDispatcher, AmsRequestDispatchKey, AmsRequestDispatcher, AmsRequestWriter,
     AmsResponseReader, RouterNotificationDispatcher,
 };
-use std::net::ToSocketAddrs;
+use std::io::{Read, Write};
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use tcads_core::io::blocking::AmsStream;
+use tcads_core::io::blocking::{AmsReader, AmsStream, AmsWriter};
 use tcads_core::protocol::{
     AdsAddDeviceNotificationRequest, AdsAddDeviceNotificationResponse,
     AdsDeleteDeviceNotificationRequest, AdsDeleteDeviceNotificationResponse,
@@ -51,43 +52,58 @@ pub struct AdsDeviceInner {
 /// standard ADS commands as async methods. It is designed to be used standalone
 /// or as a building block for higher-level device abstractions.
 ///
-/// `AdsDevice` is [`Clone`], so all clones share the same underlying connection.
-/// It is also [`Send`] + [`Sync`], so multiple tasks can issue ADS commands
-/// concurrently. Responses are matched to their callers via Invoke ID with no
-/// global lock on the connection.
-///
 /// # Connection
 ///
-/// Use one of the `connect` constructors:
+/// There are two ways to connect depending on whether an AMS router is
+/// running on the client machine.
+///
+/// ## 1. Connecting via a local router
+///
+/// Use [`connect`](Self::connect) or [`connect_to`](Self::connect_to). The
+/// local router performs a `PortConnect` handshake and dynamically assigns
+/// a source address to the client.
 ///
 /// ```no_run
+/// use tcads_client::devices::blocking::AdsDevice;
 /// use std::time::Duration;
+///
+/// // Connect to the local router at 127.0.0.1:48898
+/// let device = AdsDevice::connect(Duration::from_secs(5))?;
+///
+/// // Connect to a router at a specific address
+/// let device = AdsDevice::connect_to("192.168.1.50:48898", Duration::from_secs(5))?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+///
+/// ## 2. Connecting directly to a remote router
+///
+/// Use [`connect_remote`](Self::connect_remote) when no local router is
+/// present. The source address must be pre-configured as a static route on
+/// the remote router, see [`connect_remote`](Self::connect_remote) for
+/// details.
+///
+/// ```no_run
 /// use tcads_client::devices::blocking::AdsDevice;
 ///
-/// // Local router, auto-assigned source
-/// let device = AdsDevice::connect(Some(Duration::from_secs(5)))?;
-///
-/// // Remote router, auto-assigned source
-/// let device = AdsDevice::connect_to("192.168.1.100:48898", Some(Duration::from_secs(5)))?;
-///
-/// // Remote router, explicit source, skips PortConnect handshake
-/// let source = "192.168.1.100.1.1:32838".parse()?;
-/// let device = AdsDevice::connect_with_source("192.168.1.100:48898", source, None)?;
+/// let source = "192.168.1.10.1.1:32750".parse()?;
+/// let device = AdsDevice::connect_remote("192.168.1.120:48898", source, None)?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 ///
 /// # Thread Safety
 ///
-/// `AdsDevice` is `Send + Sync`. Multiple threads can issue ADS commands concurrently.
-/// Responses are matched to their callers by Invoke ID with no global lock on the
-/// connection.
+/// `AdsDevice` is [`Clone`], so all clones share the same underlying connection.
+/// It is also [`Send`] + [`Sync`], so multiple tasks can issue ADS commands
+/// concurrently. Responses are matched to their callers via Invoke ID with no
+/// global lock on the connection.
 ///
 /// # Shutdown
 ///
-/// Call [`shutdown`](AdsDevice::shutdown) for a clean disconnect. Dropping the last
-/// `AdsDevice` clone also tears down the connection automatically. The writer thread
-/// exits when its sender is dropped, the reader thread exits when the TCP stream closes,
-/// and all pending callers receive [`Error::Disconnected`](crate::Error::Disconnected).
+/// Call [`shutdown`](AdsDevice::shutdown) for a clean disconnect. Dropping
+/// the last `AdsDevice` clone also tears down the connection automatically.
+/// The writer thread exits when its sender is dropped, the reader thread
+/// exits when the TCP stream closes, and all pending callers receive
+/// [`Error::Disconnected`](crate::Error::Disconnected).
 #[derive(Clone)]
 pub struct AdsDevice {
     inner: Arc<AdsDeviceInner>,
@@ -96,23 +112,27 @@ pub struct AdsDevice {
 impl AdsDevice {
     /// Connects to the local AMS router at `127.0.0.1:48898`.
     ///
-    /// Performs a [`PortConnect`](PortConnectRequest) handshake to get a
+    /// Performs a [`PortConnect`](PortConnectRequest) handshake to obtain a
     /// dynamically assigned source address.
+    ///
+    /// # Note
+    ///
+    /// On Windows, connecting via `127.0.0.1` requires the
+    /// `EnableAmsTcpLoopback` registry key to be set. This is enabled by
+    /// default in TwinCAT 4024.5 and newer.
     ///
     /// # Example
     ///
     /// ```no_run
     /// use tcads_client::devices::blocking::AdsDevice;
+    /// use std::time::Duration;
     ///
-    /// let device = AdsDevice::connect(None)?;
-    ///
+    /// let device = AdsDevice::connect(Duration::from_secs(5))?;
     /// println!("Source: {}", device.source()?);
-    /// println!("Local Net ID: {}", device.get_local_net_id()?);
-    ///
     /// device.shutdown()?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn connect(timeout: Option<Duration>) -> crate::Result<Self> {
+    pub fn connect(timeout: impl Into<Option<Duration>>) -> crate::Result<Self> {
         Self::connect_to("127.0.0.1:48898", timeout)
     }
 
@@ -127,62 +147,117 @@ impl AdsDevice {
     /// use tcads_client::devices::blocking::AdsDevice;
     ///
     /// let device = AdsDevice::connect_to("192.168.1.100:48898", None)?;
-    ///
     /// println!("Source: {}", device.source()?);
-    /// println!("Local Net ID: {}", device.get_local_net_id()?);
-    ///
     /// device.shutdown()?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn connect_to(addr: impl ToSocketAddrs, timeout: Option<Duration>) -> crate::Result<Self> {
-        let stream = AmsStream::connect(addr)?;
-        let device = Self::new(stream, AmsAddr::default(), timeout)?;
+    pub fn connect_to(
+        addr: impl ToSocketAddrs,
+        timeout: impl Into<Option<Duration>>,
+    ) -> crate::Result<Self> {
+        let timeout = timeout.into();
+        let (reader, writer) = match timeout {
+            Some(duration) => {
+                let addr: SocketAddr = addr.to_socket_addrs()?.next().ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "could not resolve address",
+                    )
+                })?;
+                AmsStream::connect_timeout(&addr, duration)?.try_split()?
+            }
+            None => AmsStream::connect(addr)?.try_split()?,
+        };
+        let device = Self::new(reader, writer, AmsAddr::default(), timeout);
         let source = device.port_connect()?;
         *device.inner.source.write()? = source;
         Ok(device)
     }
 
-    /// Connects to an AMS router at `addr` using an explicitly provided
-    /// source address, skipping the [`PortConnect`](PortConnectRequest) handshake.
+    /// Connects directly to a remote AMS router without a local router.
     ///
-    /// Use this when a static route is configured on the PLC and the source address
-    /// must exactly match the configured route.
-    pub fn connect_with_source(
-        addr: impl ToSocketAddrs,
-        source: AmsAddr,
-        timeout: Option<Duration>,
-    ) -> crate::Result<Self> {
-        let stream = AmsStream::connect(addr)?;
-        Self::new(stream, source, timeout)
-    }
-
-    /// Creates an [`AdsDevice`] from an existing [`AmsStream`].
+    /// Use this when no AMS router is running on the client machine.
     ///
-    /// Unlike [`connect`](Self::connect) and [`connect_to`](Self::connect_to), this
-    /// constructor does **not** perform a [`PortConnect`] handshake. The caller is
-    /// responsible for providing a valid `source` address.
+    /// The `source` address must be pre-configured as a static route on the
+    /// remote router. The remote router identifies the client by the source
+    /// address carried in each ADS AMS frame.
     ///
-    /// This is intended for power users who need control over the underlying stream,
-    /// for example, to use a custom transport, inject test streams, or reuse an
-    /// existing connection.
+    /// # Note
+    ///
+    /// Frames from unrecognized source addresses will cause the router to close the TCP connection.
+    ///
+    /// The [`PortConnect`](PortConnectRequest) handshake is **not** performed.
+    /// Remote routers do not support this command and will also close the TCP
+    /// connection if they receive one.
     ///
     /// # Example
     ///
     /// ```no_run
-    /// use tcads_core::io::blocking::AmsStream;
     /// use tcads_client::devices::blocking::AdsDevice;
     ///
-    /// let stream = AmsStream::connect("192.168.1.100:48898")?;
-    /// let source = "192.168.1.100.1.1:34000".parse()?;
-    /// let device = AdsDevice::new(stream, source, None)?;
+    /// // Source Net ID must match the static route entry on the remote router
+    /// // The port can be any unused number.
+    /// let source = "192.168.1.10.1.1:32750".parse()?;
+    /// let device = AdsDevice::connect_remote("192.168.1.120:48898", source, None)?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn new(
-        stream: AmsStream,
+    pub fn connect_remote(
+        addr: impl ToSocketAddrs,
         source: AmsAddr,
-        timeout: Option<Duration>,
+        timeout: impl Into<Option<Duration>>,
     ) -> crate::Result<Self> {
-        let (reader, writer) = stream.try_split()?;
+        let timeout = timeout.into();
+        let (reader, writer) = match timeout {
+            Some(duration) => {
+                let addr: SocketAddr = addr.to_socket_addrs()?.next().ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "could not resolve address",
+                    )
+                })?;
+                AmsStream::connect_timeout(&addr, duration)?.try_split()?
+            }
+            None => AmsStream::connect(addr)?.try_split()?,
+        };
+        Ok(Self::new(reader, writer, source, timeout))
+    }
+
+    /// Creates an [`AdsDevice`] from an already-split reader and writer.
+    ///
+    /// This is the low-level constructor intended for power users who need
+    /// full control over the underlying transport to, for example, use a
+    /// TLS stream, a Unix socket, or inject mock streams in tests.
+    ///
+    /// Unlike the `connect_*` constructors, `new` does **not** perform a
+    /// `PortConnect` handshake. The caller is responsible for providing a
+    /// valid `source` address.
+    ///
+    /// The `timeout` applies to all ADS command round-trips. Pass a
+    /// [`Duration`] directly or `None` for no timeout.
+    ///
+    /// # Example
+    ///
+    /// ```no_run ignore
+    /// use tcads_core::io::blocking::{AmsReader, AmsWriter};
+    /// use tcads_client::devices::blocking::AdsDevice;
+    /// use std::time::Duration;
+    ///
+    /// let reader = AmsReader::new(/* your reader */);
+    /// let writer = AmsWriter::new(/* your writer */);
+    /// let source = "192.168.1.10.1.1:32750".parse()?;
+    /// let device = AdsDevice::new(reader, writer, source, Duration::from_secs(5));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn new<R, W>(
+        reader: AmsReader<R>,
+        writer: AmsWriter<W>,
+        source: AmsAddr,
+        timeout: impl Into<Option<Duration>>,
+    ) -> Self
+    where
+        R: Read + Send + 'static,
+        W: Write + Send + 'static,
+    {
         let (write_tx, _) = AmsRequestWriter::spawn(writer);
 
         let ams_requests = Arc::new(AmsRequestDispatcher::new(write_tx));
@@ -196,16 +271,16 @@ impl AdsDevice {
             Arc::clone(&router_notifs),
         );
 
-        Ok(Self {
+        Self {
             inner: Arc::new(AdsDeviceInner {
                 ams_requests,
                 ads_notifs,
                 router_notifs,
                 source: RwLock::new(source),
                 invoke_id: AtomicU32::new(1),
-                timeout,
+                timeout: timeout.into(),
             }),
-        })
+        }
     }
 
     /// Gracefully shuts down the connection.
