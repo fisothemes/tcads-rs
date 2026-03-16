@@ -151,8 +151,8 @@ impl AmsStream<TcpStream> {
     }
 
     /// Sets the read timeout for the underlying stream.
-    pub fn set_read_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
-        self.stream.set_read_timeout(dur)
+    pub fn set_read_timeout(&self, dur: impl Into<Option<Duration>>) -> io::Result<()> {
+        self.stream.set_read_timeout(dur.into())
     }
 
     /// Returns the read timeout of the underlying stream.
@@ -163,8 +163,8 @@ impl AmsStream<TcpStream> {
     }
 
     /// Sets the write timeout for the underlying stream.
-    pub fn set_write_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
-        self.stream.set_write_timeout(dur)
+    pub fn set_write_timeout(&self, dur: impl Into<Option<Duration>>) -> io::Result<()> {
+        self.stream.set_write_timeout(dur.into())
     }
 
     /// Returns the write timeout of the underlying stream.

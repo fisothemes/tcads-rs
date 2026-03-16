@@ -86,7 +86,8 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AmsStream<S> {
     }
 
     /// Sets the read timeout for the underlying stream.
-    pub fn set_read_timeout(&mut self, dur: Option<Duration>) -> io::Result<()> {
+    pub fn set_read_timeout(&mut self, dur: impl Into<Option<Duration>>) -> io::Result<()> {
+        let dur = dur.into();
         if let Some(dur) = dur
             && dur.is_zero()
         {
@@ -107,7 +108,8 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AmsStream<S> {
     }
 
     /// Sets the write timeout for the underlying stream.
-    pub fn set_write_timeout(&mut self, dur: Option<Duration>) -> io::Result<()> {
+    pub fn set_write_timeout(&mut self, dur: impl Into<Option<Duration>>) -> io::Result<()> {
+        let dur = dur.into();
         if let Some(dur) = dur
             && dur.is_zero()
         {

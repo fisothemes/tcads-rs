@@ -139,8 +139,8 @@ impl AmsReader<TcpStream> {
     ///
     /// If the value specified is [`None`], then read calls will block indefinitely.
     /// An [`Err`] is returned if the zero [`Duration`] is passed to this method.
-    pub fn set_read_timeout(&mut self, dur: Option<Duration>) -> io::Result<()> {
-        self.reader.get_mut().set_read_timeout(dur)
+    pub fn set_read_timeout(&mut self, dur: impl Into<Option<Duration>>) -> io::Result<()> {
+        self.reader.get_mut().set_read_timeout(dur.into())
     }
 
     /// Returns the read timeout of the underlying stream.

@@ -75,8 +75,8 @@ impl AmsWriter<TcpStream> {
     ///
     /// If the value specified is [`None`], then read calls will block indefinitely.
     /// An [`Err`] is returned if the zero [`Duration`] is passed to this method.
-    pub fn set_write_timeout(&mut self, dur: Option<Duration>) -> io::Result<()> {
-        self.writer.get_mut().set_write_timeout(dur)
+    pub fn set_write_timeout(&mut self, dur: impl Into<Option<Duration>>) -> io::Result<()> {
+        self.writer.get_mut().set_write_timeout(dur.into())
     }
 
     /// Returns the write timeout of the underlying stream.
