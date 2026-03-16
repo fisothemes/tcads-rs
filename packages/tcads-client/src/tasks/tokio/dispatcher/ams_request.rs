@@ -1,16 +1,15 @@
 use super::AmsRequestDispatchKey;
 use std::collections::{HashMap, VecDeque};
-use std::sync::Mutex;
-use std::sync::mpsc::{self, Receiver, Sender};
 use tcads_core::AmsFrame;
 use tcads_core::InvokeId;
+use tokio::sync::Mutex;
+use tokio::sync::mpsc::{self, UnboundedReceiver as Receiver, UnboundedSender as Sender};
 
-/// Tracks pending requests and dispatches frames to the writer thread.
+/// Tracks pending requests and dispatches frames to the writer task.
 ///
-/// The single entry point for sending an AMS request. [`AmsRequestDispatcher::dispatch`]
-/// registers the caller's response channel, then forwards the frame to the writer.
-/// When the reader thread receives a response, it calls [`AmsRequestDispatcher::complete`]
-/// to route the frame back to the waiting caller.
+/// See the [blocking equivalent](crate::tasks::blocking::AmsRequestDispatcher) for
+/// full design documentation. The tokio variant is identical in shape, and the only
+/// differences are [`tokio::sync::Mutex`] for async-safe locking and [`tokio::sync::mpsc`] channels.
 pub struct AmsRequestDispatcher {
     /// Pending ADS command responses, keyed by [invoke ID](InvokeId).
     ads: Mutex<HashMap<InvokeId, Sender<AmsFrame>>>,
@@ -27,43 +26,42 @@ impl AmsRequestDispatcher {
     pub fn new(write_tx: Sender<AmsFrame>) -> Self {
         Self {
             port_connect: Mutex::new(VecDeque::new()),
-            ads: Mutex::new(HashMap::new()),
             net_id: Mutex::new(VecDeque::new()),
+            ads: Mutex::new(HashMap::new()),
             write_tx,
         }
     }
 
     /// Registers a waiter, enqueues the frame for writing, and returns the response receiver.
-    pub fn dispatch(
+    pub async fn dispatch(
         &self,
         key: AmsRequestDispatchKey,
         frame: AmsFrame,
     ) -> Result<Receiver<AmsFrame>, crate::Error> {
-        let (tx, rx) = mpsc::channel();
-        self.register(key, tx)?;
+        let (tx, rx) = mpsc::unbounded_channel();
+        self.register(key, tx).await;
         self.write_tx.send(frame)?;
         Ok(rx)
     }
 
-    /// Called by the reader thread to complete a pending request.
-    pub fn complete(&self, key: AmsRequestDispatchKey, frame: AmsFrame) -> crate::Result<()> {
-        if let Some(tx) = self.take(key)? {
+    /// Called by the reader task to complete a pending request.
+    pub async fn complete(&self, key: AmsRequestDispatchKey, frame: AmsFrame) -> crate::Result<()> {
+        if let Some(tx) = self.take(key).await {
             tx.send(frame)?;
         }
         Ok(())
     }
 
-    /// Sends a `frame` directly to the writer thread without registering a response waiter.
+    /// Sends a `frame` directly to the writer task without registering a response waiter.
     ///
     /// Use this for frames where no response is expected i.e.
     /// [`PortClose`](tcads_core::protocol::PortCloseRequest). For all other frames
     /// use [`dispatch`](Self::dispatch), which registers a waiter before sending to
     /// close the window between send and response arrival.
     ///
-    /// Returns [`Err`] if the writer channel is already closed, which means the
-    /// connection is already gone. Callers should generally ignore this error
-    /// since the goal (closing the connection) is already achieved.
-    pub fn send_only(&self, frame: AmsFrame) -> crate::Result<()> {
+    /// Returns [`Err`] if the writer channel is already closed. Callers should
+    /// generally ignore this error since the goal (closing the connection) is already achieved.
+    pub async fn send_only(&self, frame: AmsFrame) -> crate::Result<()> {
         self.write_tx.send(frame)?;
         Ok(())
     }
@@ -71,37 +69,33 @@ impl AmsRequestDispatcher {
     /// Clears all pending requests, waking blocked callers with a disconnected error.
     ///
     /// Dropping the senders causes all waiting [`rx.recv()`](Receiver::recv) calls
-    /// to return [`Err`], which maps to [`Error::Disconnected`](crate::Error::Disconnected).
-    pub fn clear(&self) -> crate::Result<()> {
-        self.port_connect.lock()?.clear();
-        self.ads.lock()?.clear();
-        self.net_id.lock()?.clear();
-        Ok(())
+    /// to return [`None`], which maps to [`Error::Disconnected`](crate::Error::Disconnected).
+    pub async fn clear(&self) {
+        self.port_connect.lock().await.clear();
+        self.net_id.lock().await.clear();
+        self.ads.lock().await.clear();
     }
 
-    fn register(&self, key: AmsRequestDispatchKey, sender: Sender<AmsFrame>) -> crate::Result<()> {
+    async fn register(&self, key: AmsRequestDispatchKey, sender: Sender<AmsFrame>) {
         match key {
-            AmsRequestDispatchKey::AdsCommand(id) => {
-                self.ads.lock()?.insert(id, sender);
-            }
             AmsRequestDispatchKey::PortConnect => {
-                self.port_connect.lock()?.push_back(sender);
+                self.port_connect.lock().await.push_back(sender);
             }
             AmsRequestDispatchKey::GetLocalNetId => {
-                self.net_id.lock()?.push_back(sender);
+                self.net_id.lock().await.push_back(sender);
+            }
+            AmsRequestDispatchKey::AdsCommand(id) => {
+                self.ads.lock().await.insert(id, sender);
             }
         }
-        Ok(())
     }
 
-    fn take(&self, key: AmsRequestDispatchKey) -> crate::Result<Option<Sender<AmsFrame>>> {
-        let value = match key {
-            AmsRequestDispatchKey::PortConnect => self.port_connect.lock()?.pop_front(),
-            AmsRequestDispatchKey::GetLocalNetId => self.net_id.lock()?.pop_front(),
-            AmsRequestDispatchKey::AdsCommand(id) => self.ads.lock()?.remove(&id),
-        };
-
-        Ok(value)
+    async fn take(&self, key: AmsRequestDispatchKey) -> Option<Sender<AmsFrame>> {
+        match key {
+            AmsRequestDispatchKey::PortConnect => self.port_connect.lock().await.pop_front(),
+            AmsRequestDispatchKey::GetLocalNetId => self.net_id.lock().await.pop_front(),
+            AmsRequestDispatchKey::AdsCommand(id) => self.ads.lock().await.remove(&id),
+        }
     }
 }
 
@@ -111,65 +105,74 @@ mod tests {
     use tcads_core::ams::AmsCommand;
 
     fn make_dispatcher() -> (AmsRequestDispatcher, Receiver<AmsFrame>) {
-        let (write_tx, write_rx) = mpsc::channel();
+        let (write_tx, write_rx) = mpsc::unbounded_channel();
         (AmsRequestDispatcher::new(write_tx), write_rx)
     }
 
-    #[test]
-    fn dispatch_enqueues_frame_and_returns_receiver() {
-        let (dispatcher, write_rx) = make_dispatcher();
+    #[tokio::test]
+    async fn dispatch_enqueues_frame_and_returns_receiver() {
+        let (dispatcher, mut write_tx) = make_dispatcher();
         let frame = AmsFrame::empty(AmsCommand::AdsCommand);
 
-        let rx = dispatcher
+        let mut rx = dispatcher
             .dispatch(AmsRequestDispatchKey::AdsCommand(1), frame.clone())
+            .await
             .expect("dispatch should succeed");
 
-        let sent = write_rx.recv().expect("writer should receive frame");
+        let sent = write_tx
+            .recv()
+            .await
+            .expect("write_tx should have received frame");
         assert_eq!(sent, frame);
         assert!(rx.try_recv().is_err());
     }
 
-    #[test]
-    fn complete_routes_frame_to_waiting_caller() {
-        let (dispatcher, _write_rx) = make_dispatcher();
+    #[tokio::test]
+    async fn complete_routes_frame_to_waiting_caller() {
+        let (dispatcher, _write_tx) = make_dispatcher();
         let frame = AmsFrame::empty(AmsCommand::AdsCommand);
         let response = AmsFrame::empty(AmsCommand::AdsCommand);
 
-        let rx = dispatcher
+        let mut rx = dispatcher
             .dispatch(AmsRequestDispatchKey::AdsCommand(42), frame)
+            .await
             .expect("dispatch should succeed");
 
         dispatcher
             .complete(AmsRequestDispatchKey::AdsCommand(42), response.clone())
+            .await
             .expect("complete should succeed");
 
-        assert_eq!(rx.recv().expect("should receive response"), response);
+        assert_eq!(rx.recv().await.expect("should receive response"), response);
     }
 
-    #[test]
-    fn clear_wakes_waiting_callers_with_error() {
-        let (dispatcher, _write_rx) = make_dispatcher();
+    #[tokio::test]
+    async fn clear_wakes_waiting_callers_with_error() {
+        let (dispatcher, _write_tx) = make_dispatcher();
         let frame = AmsFrame::empty(AmsCommand::AdsCommand);
 
-        let rx = dispatcher
+        let mut rx = dispatcher
             .dispatch(AmsRequestDispatchKey::AdsCommand(1), frame)
+            .await
             .expect("dispatch should succeed");
 
-        dispatcher.clear().expect("clear should succeed");
+        dispatcher.clear().await;
 
-        assert!(rx.recv().is_err());
+        assert!(rx.recv().await.is_none())
     }
 
-    #[test]
-    fn netid_queue_handles_multiple_concurrent_callers() {
+    #[tokio::test]
+    async fn netid_queue_handles_multiple_concurrent_callers() {
         let (dispatcher, _write_rx) = make_dispatcher();
         let frame = AmsFrame::empty(AmsCommand::GetLocalNetId);
 
-        let rx1 = dispatcher
+        let mut rx1 = dispatcher
             .dispatch(AmsRequestDispatchKey::GetLocalNetId, frame.clone())
+            .await
             .expect("first dispatch");
-        let rx2 = dispatcher
+        let mut rx2 = dispatcher
             .dispatch(AmsRequestDispatchKey::GetLocalNetId, frame)
+            .await
             .expect("second dispatch");
 
         let resp1 = AmsFrame::empty(AmsCommand::GetLocalNetId);
@@ -177,12 +180,14 @@ mod tests {
 
         dispatcher
             .complete(AmsRequestDispatchKey::GetLocalNetId, resp1.clone())
+            .await
             .expect("complete should succeed");
         dispatcher
             .complete(AmsRequestDispatchKey::GetLocalNetId, resp2.clone())
+            .await
             .expect("complete should succeed");
 
-        assert_eq!(rx1.recv().unwrap(), resp1);
-        assert_eq!(rx2.recv().unwrap(), resp2);
+        assert_eq!(rx1.recv().await.unwrap(), resp1);
+        assert_eq!(rx2.recv().await.unwrap(), resp2);
     }
 }

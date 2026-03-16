@@ -4,4 +4,6 @@ pub mod blocking {
     pub use super::ads_device::blocking::AdsDevice;
 }
 
-pub mod tokio {}
+pub mod tokio {
+    pub use super::ads_device::tokio::AdsDevice;
+}

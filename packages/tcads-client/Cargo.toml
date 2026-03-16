@@ -9,4 +9,6 @@ repository.workspace = true
 [dependencies]
 tcads-core = { workspace = true }
 thiserror = { workspace = true }
+tokio = { workspace = true, features = ["io-util", "net", "macros"] }
+tokio-test = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
