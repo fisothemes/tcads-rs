@@ -61,10 +61,7 @@ fn handle<R: Read>(
     router_notifs: &RouterNotificationDispatcher,
 ) -> crate::Result<()> {
     for result in reader.incoming() {
-        let frame = match result {
-            Ok(frame) => frame,
-            Err(_) => continue,
-        };
+        let Ok(frame) = result else { continue };
 
         match frame.header().command() {
             AmsCommand::PortConnect => {
