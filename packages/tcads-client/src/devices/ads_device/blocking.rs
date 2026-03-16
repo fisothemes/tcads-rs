@@ -57,10 +57,10 @@ pub struct AdsDeviceInner {
 /// There are two ways to connect depending on whether an AMS router is
 /// running on the client machine.
 ///
-/// ## 1. Connecting via a local router
+/// ### 1. Connecting via a local router
 ///
 /// Use [`connect`](Self::connect) or [`connect_to`](Self::connect_to). The
-/// local router performs a `PortConnect` handshake and dynamically assigns
+/// local router performs a [`PortConnect`](cra) handshake and dynamically assigns
 /// a source address to the client.
 ///
 /// ```no_run
@@ -75,7 +75,7 @@ pub struct AdsDeviceInner {
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 ///
-/// ## 2. Connecting directly to a remote router
+/// ### 2. Connecting directly to a remote router
 ///
 /// Use [`connect_remote`](Self::connect_remote) when no local router is
 /// present. The source address must be pre-configured as a static route on
