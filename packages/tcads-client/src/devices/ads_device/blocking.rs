@@ -35,7 +35,7 @@ use tcads_core::{
 /// When the last [`AdsDevice`] clone is dropped, `AdsDeviceInner` drops,
 /// which drops [`AmsRequestDispatcher`] and its `write_tx`. The writer thread
 /// exits when `write_tx` is dropped, the TCP stream closes, and the reader
-/// thread exits on the next read returning EO
+/// thread exits on the next read returning EOF.
 pub struct AdsDeviceInner {
     pub ams_requests: Arc<AmsRequestDispatcher>,
     pub ads_notifs: Arc<AdsNotificationDispatcher>,
@@ -47,9 +47,14 @@ pub struct AdsDeviceInner {
 
 /// A blocking ADS device client.
 ///
-/// The `AdsDevice` manages a single TCP connection to an AMS router and exposes all standard
-/// ADS commands as blocking methods. It is cheap to clone, and all clones share the same
-/// underlying connection and state.
+/// `AdsDevice` manages a TCP connection to an AMS router and exposes all
+/// standard ADS commands as async methods. It is designed to be used standalone
+/// or as a building block for higher-level device abstractions.
+///
+/// `AdsDevice` is [`Clone`], so all clones share the same underlying connection.
+/// It is also [`Send`] + [`Sync`], so multiple tasks can issue ADS commands
+/// concurrently. Responses are matched to their callers via Invoke ID with no
+/// global lock on the connection.
 ///
 /// # Connection
 ///
