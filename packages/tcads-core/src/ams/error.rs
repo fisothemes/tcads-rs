@@ -18,6 +18,8 @@ pub enum AmsError {
     /// Invalid router state format or content
     #[error("Invalid router state: {0}")]
     InvalidRouterState(#[from] RouterStateError),
+    #[error("Invalid runtime type: {0}")]
+    InvalidRunTimeType(#[from] RunTimeTypeError),
 }
 
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
@@ -93,6 +95,13 @@ pub enum AmsCommandError {
 
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum RouterStateError {
+    /// Unexpected buffer size
+    #[error("Invalid buffer size: expected {} bytes, got {}", expected, got)]
+    InvalidBufferSize { expected: usize, got: usize },
+}
+
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum RunTimeTypeError {
     /// Unexpected buffer size
     #[error("Invalid buffer size: expected {} bytes, got {}", expected, got)]
     InvalidBufferSize { expected: usize, got: usize },
