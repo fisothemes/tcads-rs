@@ -3,7 +3,10 @@ pub mod error;
 pub mod tasks;
 
 pub use tcads_core::{
-    ads::{AdsReturnCode, AdsState, AdsTransMode, DeviceState, IndexGroup, IndexOffset, InvokeId},
+    ads::{
+        AdsReturnCode, AdsState, AdsTransMode, DeviceState, IndexGroup, IndexOffset, InvokeId,
+        NotificationHandle,
+    },
     ams::{AmsAddr, AmsNetId, AmsPort, RouterState},
     protocol::{AdsNotificationSampleOwned, ProtocolError},
 };
