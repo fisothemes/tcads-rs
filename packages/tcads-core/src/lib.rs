@@ -139,6 +139,6 @@ pub use ads::{
     AdsCommand, AdsDeviceVersion, AdsError, AdsHeader, AdsReturnCode, AdsState, AdsTransMode,
     DeviceState, IndexGroup, IndexOffset, InvokeId, NotificationHandle, WindowsFileTime,
 };
-pub use ams::{AmsAddr, AmsCommand, AmsNetId, AmsPort, AmsTcpHeader, RouterState};
+pub use ams::{AmsAddr, AmsCommand, AmsNetId, AmsPort, AmsTcpHeader, RouterState, RuntimeType};
 pub use io::AmsFrame;
 pub use protocol::AdsNotificationSampleOwned;
