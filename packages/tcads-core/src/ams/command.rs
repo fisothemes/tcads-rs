@@ -16,7 +16,7 @@ pub enum AmsCommand {
     RouterNotification = 0x1001,
     /// Get Local NetId (`0x1002`)
     GetLocalNetId = 0x1002,
-    /// Gets the runtime type of the router (Real-time, User-mode, TC/BSD, etc.) (`0x1003`)
+    /// Gets the runtime type of the TwinCAT system (Real-time, User-mode, TC/BSD, etc.) (`0x1003`)
     GetRuntimeType = 0x1003,
     /// Unknown/Unsupported command
     Unknown(u16),
