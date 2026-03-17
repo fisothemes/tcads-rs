@@ -16,6 +16,8 @@ pub enum AmsCommand {
     RouterNotification = 0x1001,
     /// Get Local NetId (`0x1002`)
     GetLocalNetId = 0x1002,
+    /// Gets the runtime type of the router (Real-time, User-mode, TC/BSD, etc.) (`0x1003`)
+    GetRuntimeType = 0x1003,
     /// Unknown/Unsupported command
     Unknown(u16),
 }
@@ -48,6 +50,7 @@ impl From<AmsCommand> for u16 {
             AmsCommand::PortConnect => 0x1000,
             AmsCommand::RouterNotification => 0x1001,
             AmsCommand::GetLocalNetId => 0x1002,
+            AmsCommand::GetRuntimeType => 0x1003,
             AmsCommand::Unknown(n) => n,
         }
     }
@@ -61,6 +64,7 @@ impl From<u16> for AmsCommand {
             0x1000 => Self::PortConnect,
             0x1001 => Self::RouterNotification,
             0x1002 => Self::GetLocalNetId,
+            0x1003 => Self::GetRuntimeType,
             n => Self::Unknown(n),
         }
     }
@@ -103,6 +107,7 @@ mod tests {
         assert_eq!(AmsCommand::from(0x1000), AmsCommand::PortConnect);
         assert_eq!(AmsCommand::from(0x1001), AmsCommand::RouterNotification);
         assert_eq!(AmsCommand::from(0x1002), AmsCommand::GetLocalNetId);
+        assert_eq!(AmsCommand::from(0x1003), AmsCommand::GetRuntimeType);
         assert_eq!(AmsCommand::from(0x1234), AmsCommand::Unknown(0x1234));
     }
 }
