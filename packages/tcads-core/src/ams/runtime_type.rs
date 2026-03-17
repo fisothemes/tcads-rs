@@ -1,7 +1,12 @@
+use super::error::RunTimeTypeError;
+use std::fmt::{self, Display};
+
 /// The runtime type of the TwinCAT system.
 ///
 /// Returned by [`GetRuntimeTypeResponse`](crate::protocol::GetRuntimeTypeResponse).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
 pub enum RuntimeType {
     /// Real-time runtime (standard TwinCAT on Windows).
     Rt,
@@ -23,6 +28,11 @@ impl RuntimeType {
     /// Converts the current instance into a 4-byte array (Little Endian).
     pub fn to_bytes(&self) -> [u8; RuntimeType::LENGTH] {
         (*self).into()
+    }
+
+    /// Creates a new [`RuntimeType`] from a byte slice.
+    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, RunTimeTypeError> {
+        bytes.try_into()
     }
 }
 
@@ -55,6 +65,29 @@ impl From<[u8; RuntimeType::LENGTH]> for RuntimeType {
 impl From<RuntimeType> for [u8; RuntimeType::LENGTH] {
     fn from(value: RuntimeType) -> Self {
         value.to_bytes()
+    }
+}
+
+impl TryFrom<&[u8]> for RuntimeType {
+    type Error = RunTimeTypeError;
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        if bytes.len() != RuntimeType::LENGTH {
+            return Err(RunTimeTypeError::InvalidBufferSize {
+                expected: RuntimeType::LENGTH,
+                got: bytes.len(),
+            });
+        }
+        Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]).into())
+    }
+}
+
+impl Display for RuntimeType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Rt => write!(f, "RT"),
+            Self::Um => write!(f, "UM"),
+            Self::Unknown(n) => write!(f, "Unknown ({n})"),
+        }
     }
 }
 
