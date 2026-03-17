@@ -91,7 +91,7 @@ impl std::fmt::Display for RouterState {
             Self::Stop => write!(f, "Stop"),
             Self::Start => write!(f, "Start"),
             Self::Removed => write!(f, "Removed"),
-            Self::Unknown(_) => write!(f, "Unknown"),
+            Self::Unknown(n) => write!(f, "Unknown ({n})"),
         }
     }
 }
