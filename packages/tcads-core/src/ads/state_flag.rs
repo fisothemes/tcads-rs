@@ -5,7 +5,9 @@ use std::fmt;
 /// AMS State Flags (16-bit bitfield) wrapper.
 ///
 /// Contains information about the exchange (Request/Response) and the transport (TCP/UDP).
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
+)]
 pub struct StateFlag(pub u16);
 
 impl StateFlag {
