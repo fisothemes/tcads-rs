@@ -1,6 +1,8 @@
 pub mod blocking;
+pub mod log_entry;
 pub mod message_type;
 
+pub use log_entry::LogEntry;
 pub use message_type::MessageType;
 
 use crate::{IndexGroup, IndexOffset};

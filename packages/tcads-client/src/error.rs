@@ -19,6 +19,8 @@ pub enum Error {
     Timeout,
     #[error("Poisoned lock")]
     PoisonedLock,
+    #[error("Invalid payload")]
+    InvalidPayload,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
