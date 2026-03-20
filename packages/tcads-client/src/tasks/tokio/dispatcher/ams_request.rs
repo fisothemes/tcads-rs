@@ -61,7 +61,7 @@ impl AmsRequestDispatcher {
     ///
     /// Returns [`Err`] if the writer channel is already closed. Callers should
     /// generally ignore this error since the goal (closing the connection) is already achieved.
-    pub async fn send_only(&self, frame: AmsFrame) -> crate::Result<()> {
+    pub fn send_only(&self, frame: AmsFrame) -> crate::Result<()> {
         self.write_tx.send(frame)?;
         Ok(())
     }

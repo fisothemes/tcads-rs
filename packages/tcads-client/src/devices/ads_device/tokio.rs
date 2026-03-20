@@ -310,7 +310,7 @@ impl AdsDevice {
     pub async fn shutdown(&self) {
         let port = self.source().await.port();
         let frame = PortCloseRequest::new(port).into_frame();
-        let _ = self.inner.ams_requests.send_only(frame).await;
+        let _ = self.inner.ams_requests.send_only(frame);
     }
 
     /// Returns the source [`AmsAddr`] currently assigned to this connection.
