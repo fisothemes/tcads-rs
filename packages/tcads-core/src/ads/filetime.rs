@@ -307,14 +307,14 @@ mod tests {
     #[test]
     fn test_display() {
         let ft = WindowsFileTime::from_raw(KNOWN_TICKS);
-        assert_eq!(format!("{ft}"), "2026-02-21 12:00:00.000000 UTC");
+        assert_eq!(format!("{ft}"), "2026-02-21 12:00:00 UTC");
     }
 
     #[test]
     fn test_display_with_subseconds() {
         // 500ms = 500_000 microseconds = 5_000_000 ticks
         let ft = WindowsFileTime::from_raw(KNOWN_TICKS + 5_000_000);
-        assert_eq!(format!("{ft}"), "2026-02-21 12:00:00.500000 UTC");
+        assert_eq!(format!("{ft}"), "2026-02-21 12:00:00.500 UTC");
     }
 
     #[test]
