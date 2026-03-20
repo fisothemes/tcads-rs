@@ -121,6 +121,11 @@ impl AdsNotificationSampleOwned {
         &self.data
     }
 
+    /// Splits the notification sample into a [`NotificationHandle`] and its [`data`](Vec<u8>) part.
+    pub fn into_parts(self) -> (NotificationHandle, Vec<u8>) {
+        (self.handle, self.data)
+    }
+
     /// Serializes this sample into `buf`.
     pub fn write_into(&self, buf: &mut Vec<u8>) {
         buf.extend_from_slice(&self.handle.to_bytes());
