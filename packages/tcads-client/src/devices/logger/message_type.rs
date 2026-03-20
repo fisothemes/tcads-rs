@@ -59,8 +59,13 @@ impl MessageType {
     }
 
     /// Creates a [`MessageType`] from a 4-byte array (Little Endian).
-    pub const fn from_bytes(bytes: [u8; Self::LENGTH]) -> Self {
-        Self(u32::from_le_bytes(bytes))
+    pub const fn from_bytes(bytes: &[u8; Self::LENGTH]) -> Self {
+        Self(u32::from_le_bytes(*bytes))
+    }
+
+    /// Tries to parse a [`MessageType`] from a 4-byte array (Little Endian).
+    pub fn try_from_bytes(bytes: &[u8]) -> Result<Self, crate::Error> {
+        Self::try_from(bytes)
     }
 
     /// Converts [`MessageType`] to a 4-byte array (Little Endian).
@@ -121,6 +126,12 @@ impl From<MessageType> for u32 {
 
 impl From<[u8; Self::LENGTH]> for MessageType {
     fn from(value: [u8; Self::LENGTH]) -> Self {
+        Self::from_bytes(&value)
+    }
+}
+
+impl From<&[u8; Self::LENGTH]> for MessageType {
+    fn from(value: &[u8; Self::LENGTH]) -> Self {
         Self::from_bytes(value)
     }
 }
@@ -128,6 +139,24 @@ impl From<[u8; Self::LENGTH]> for MessageType {
 impl From<MessageType> for [u8; MessageType::LENGTH] {
     fn from(value: MessageType) -> Self {
         value.to_bytes()
+    }
+}
+
+impl From<&MessageType> for [u8; MessageType::LENGTH] {
+    fn from(value: &MessageType) -> Self {
+        value.to_bytes()
+    }
+}
+
+impl TryFrom<&[u8]> for MessageType {
+    type Error = crate::Error;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() != Self::LENGTH {
+            return Err(crate::Error::InvalidPayload);
+        }
+        let raw = u32::from_le_bytes([value[0], value[1], value[2], value[3]]);
+        Ok(Self(raw))
     }
 }
 
@@ -221,7 +250,7 @@ mod tests {
     #[test]
     fn test_from_bytes() {
         let bytes = [0x21, 0x43, 0x00, 0x00];
-        let msg_type = MessageType::from_bytes(bytes);
+        let msg_type = MessageType::from_bytes(&bytes);
         assert_eq!(msg_type.as_raw(), 0x4321);
     }
 
