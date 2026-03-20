@@ -10,12 +10,22 @@ use std::ops::{Index, IndexMut};
 /// The generic parameter `N` represents the **total byte size** of the buffer,
 /// including the null terminator.
 ///
-/// # Example
+/// # Representation
 /// * PLC: `STRING(80)` (holds 80 chars + 1 null)
 /// * Rust: `AdsString<81>`
 ///
 /// # Encoding
-/// Handles conversion between Rust UTF-8 and PLC Windows-1252 (CP1252) automatically.
+/// Handles conversion between Rust `UTF-8` and `PLC Windows-1252 (CP1252)` automatically.
+///
+/// # Example
+///
+/// ```rust
+/// # use tcads_core::ads::AdsString;
+/// let mut s = AdsString::<81>::try_from("Hello")?;
+/// s.push_str(", world")?;
+/// assert_eq!(s.as_str(), "Hello, world");
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct AdsString<const N: usize>([u8; N]);
 
@@ -26,17 +36,22 @@ impl<const N: usize> AdsString<N> {
     }
 
     /// Returns the raw byte array (Windows-1252 encoded).
+    ///
+    /// Prefer [`as_bytes_until_nul`](Self::as_bytes_until_nul) for the logical string content.
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
 
-    /// Returns the bytes up to the first null terminator.
+    /// Returns the bytes up to (but not including) the first null terminator.
+    ///
+    /// This represents the actual string content as stored in the buffer.
     pub fn as_bytes_until_nul(&self) -> &[u8] {
         let end = self.0.iter().position(|&b| b == 0).unwrap_or(N);
         &self.0[..end]
     }
 
-    /// Iterates over the raw bytes of the string.
+    /// Returns an iterator over the `CP1252`-encoded bytes of the string content,
+    /// excluding the null terminator.
     pub fn bytes(&self) -> std::slice::Iter<'_, u8> {
         self.as_bytes_until_nul().iter()
     }
@@ -57,12 +72,15 @@ impl<const N: usize> AdsString<N> {
 
     /// Returns `true` if the string is empty (contains no characters).
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.0[0] == 0
     }
 
-    /// Returns the total capacity of the string buffer (\[N\]).
+    /// Returns the maximum number of characters the buffer can hold.
+    ///
+    /// This is `N - 1`, reserving one byte for the null terminator.
+    /// A `STRING(80)` PLC type corresponds to a capacity of `80`.
     pub const fn capacity(&self) -> usize {
-        N
+        N.saturating_sub(1)
     }
 
     /// Appends a string slice to the end of this string.
@@ -75,7 +93,7 @@ impl<const N: usize> AdsString<N> {
         }
 
         let current_len = self.len();
-        let available = N - 1 - current_len;
+        let available = self.capacity() - current_len;
 
         if encoded.len() > available {
             return Err(AdsStringError::TooLong {
@@ -91,15 +109,22 @@ impl<const N: usize> AdsString<N> {
     }
 
     /// Appends a single character to the end of this string.
+    ///
+    /// Errors for the same reason as [`push_str`](Self::push_str).
     pub fn push(&mut self, c: char) -> Result<(), AdsStringError> {
         let mut buf = [0u8; 4];
-        let s = c.encode_utf8(&mut buf);
-        self.push_str(s)
+        self.push_str(c.encode_utf8(&mut buf))
     }
 
-    /// Truncates the string to `new_len`.
+    /// Shortens the string to `new_len` bytes.
     ///
-    /// If `new_len` is greater than the current length, this does nothing.
+    /// If `new_len` is greater than or equal to the current length, this is a no-op.
+    ///
+    /// # Note
+    ///
+    /// `new_len` is a **byte offset**, not a character index. Truncating in the middle
+    /// of a multi-byte CP1252 sequence is safe (no heap allocation), but the resulting
+    /// string may end mid-character when decoded.
     pub fn truncate(&mut self, new_len: usize) {
         if new_len < self.len() {
             self.0[new_len] = 0;
@@ -153,6 +178,22 @@ impl<const N: usize> From<&[u8; N]> for AdsString<N> {
     }
 }
 
+impl<const N: usize> From<&[u8]> for AdsString<N> {
+    fn from(bytes: &[u8]) -> Self {
+        let mut buf = [0u8; N];
+
+        if N == 0 {
+            return Self(buf);
+        }
+
+        let len = bytes.len().min(N - 1);
+        buf[..len].copy_from_slice(&bytes[..len]);
+        buf[len] = 0;
+
+        Self(buf)
+    }
+}
+
 impl<const N: usize> TryFrom<&str> for AdsString<N> {
     type Error = AdsStringError;
 
@@ -165,7 +206,7 @@ impl<const N: usize> TryFrom<&str> for AdsString<N> {
 
         if encoded_bytes.len() >= N {
             return Err(AdsStringError::TooLong {
-                expected: N - 1,
+                expected: N.saturating_sub(1),
                 got: encoded_bytes.len(),
             });
         }
@@ -180,6 +221,18 @@ impl<const N: usize> TryFrom<&str> for AdsString<N> {
 impl<const N: usize> AsRef<[u8]> for AdsString<N> {
     fn as_ref(&self) -> &[u8] {
         self.as_bytes_until_nul()
+    }
+}
+
+impl<const N: usize> PartialEq<str> for AdsString<N> {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl<const N: usize> PartialEq<&str> for AdsString<N> {
+    fn eq(&self, other: &&str) -> bool {
+        self.as_str().as_ref() == *other
     }
 }
 
