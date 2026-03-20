@@ -101,7 +101,14 @@ pub mod tokio {
             let device = self.device.clone();
             let target = self.target;
             let handle = self.handle;
-            todo!()
+
+            if let Ok(rt) = tokio_rt::runtime::Handle::try_current() {
+                rt.spawn(async move {
+                    let _ = device.delete_notification(target, handle).await;
+                });
+            }
+            // No runtime context, this is best-effort at best, router cleans up on connection close
+            // anyway. 100% safe to ignore.
         }
     }
 }

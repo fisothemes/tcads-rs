@@ -1,5 +1,6 @@
 use super::{LOGGER_DATA_LEN, LOGGER_INDEX_GROUP, LOGGER_INDEX_OFFSET, LOGGER_PORT, LogEntry};
 use crate::devices::blocking::AdsDevice;
+use crate::notif_guard::blocking::NotificationGuard;
 use std::collections::HashSet;
 use std::net::ToSocketAddrs;
 use std::sync::mpsc::{Receiver, TryRecvError};
@@ -132,7 +133,7 @@ impl Logger {
     ///
     /// Multiple subscriptions can be active simultaneously, and each returns an
     /// independent [`LogEntryReceiver`].
-    pub fn subscribe(&self) -> crate::Result<LogEntryReceiver> {
+    pub fn subscribe(&self) -> crate::Result<(LogEntryReceiver, NotificationHandle)> {
         let (rx, handle) = self.inner.device.add_notification(
             self.inner.target,
             LOGGER_INDEX_GROUP,
@@ -153,7 +154,12 @@ impl Logger {
             }
         };
 
-        Ok(LogEntryReceiver::new(rx, handle, Arc::clone(&self.inner)))
+        let guard = NotificationGuard::new(handle, self.inner.target, self.inner.device.clone());
+
+        Ok((
+            LogEntryReceiver::new(rx, guard, Arc::clone(&self.inner)),
+            handle,
+        ))
     }
 
     /// Explicitly cancels a subscription by handle.
@@ -179,22 +185,22 @@ impl Logger {
 /// Obtain one by calling [`Logger::subscribe`].
 pub struct LogEntryReceiver {
     rx: Receiver<AdsNotificationSampleOwned>,
-    handle: NotificationHandle,
+    guard: NotificationGuard,
     inner: Arc<LoggerInner>,
 }
 
 impl LogEntryReceiver {
     pub fn new(
         rx: Receiver<AdsNotificationSampleOwned>,
-        handle: NotificationHandle,
+        guard: NotificationGuard,
         inner: Arc<LoggerInner>,
     ) -> Self {
-        Self { rx, handle, inner }
+        Self { rx, guard, inner }
     }
 
     /// Returns the notification handle for this subscription.
     pub fn handle(&self) -> NotificationHandle {
-        self.handle
+        self.guard.handle()
     }
 
     /// Blocks until the next log entry arrives.
@@ -245,10 +251,6 @@ impl Drop for LogEntryReceiver {
             .inner
             .handles
             .lock()
-            .map(|mut h| h.remove(&self.handle));
-        let _ = self
-            .inner
-            .device
-            .delete_notification(self.inner.target, self.handle);
+            .map(|mut h| h.remove(&self.guard.handle()));
     }
 }
