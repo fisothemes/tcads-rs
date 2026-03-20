@@ -1,7 +1,7 @@
 use std::io;
 use std::sync::mpsc::{RecvError, RecvTimeoutError, SendError};
 use std::sync::{Arc, PoisonError};
-use tcads_core::ads::AdsReturnCode;
+use tcads_core::ads::{AdsError, AdsReturnCode};
 use tcads_core::protocol::ProtocolError;
 use tokio::sync::mpsc::error::SendError as TokioSendError;
 
@@ -9,6 +9,8 @@ use tokio::sync::mpsc::error::SendError as TokioSendError;
 pub enum Error {
     #[error("I/O error: {0}")]
     Io(#[from] Arc<io::Error>),
+    #[error(transparent)]
+    AdsError(#[from] AdsError),
     #[error(transparent)]
     Protocol(#[from] ProtocolError),
     #[error(transparent)]
