@@ -161,7 +161,7 @@ impl From<&LogEntry> for Vec<u8> {
 
 impl From<LogEntry> for Vec<u8> {
     fn from(value: LogEntry) -> Self {
-        value.into()
+        (&value).into()
     }
 }
 
