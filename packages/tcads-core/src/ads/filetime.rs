@@ -1,5 +1,6 @@
 use super::error::WindowsFileTimeError;
 use chrono::{DateTime, TimeZone, Utc};
+use std::fmt::Debug;
 
 /// A timestamp encoded in the Windows FILETIME format.
 ///
@@ -21,7 +22,7 @@ use chrono::{DateTime, TimeZone, Utc};
 ///
 /// # Wire Format
 /// 8 bytes, little-endian `u64`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WindowsFileTime(u64);
 
 impl WindowsFileTime {
@@ -149,13 +150,15 @@ impl TryFrom<&[u8]> for WindowsFileTime {
     }
 }
 
+impl Debug for WindowsFileTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WindowsFileTime({:?} -> {})", self.0, self.to_datetime())
+    }
+}
+
 impl std::fmt::Display for WindowsFileTime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.to_datetime().format("%Y-%m-%d %H:%M:%S%.6f UTC")
-        )
+        std::fmt::Display::fmt(&self.to_datetime(), f)
     }
 }
 
