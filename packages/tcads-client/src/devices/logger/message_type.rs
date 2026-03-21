@@ -189,12 +189,16 @@ impl Not for MessageType {
 
 impl fmt::Debug for MessageType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "MessageType({:#04X}", self.0)?;
+        write!(f, "MessageType({:#04X}: ", self.0)?;
+        fmt::Display::fmt(&self, f)?;
+        f.write_str(")")
+    }
+}
 
+impl fmt::Display for MessageType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.0 != 0 {
-            f.write_str(": ")?;
             let mut first = true;
-
             macro_rules! check_flag {
                 ($check:expr, $name:literal) => {
                     if $check {
@@ -229,11 +233,13 @@ impl fmt::Debug for MessageType {
                 if !first {
                     f.write_str(" | ")?;
                 }
-                f.write_str("Unknown")?;
+                f.write_str("Unknown")
+            } else {
+                Ok(())
             }
+        } else {
+            f.write_str("Unknown")
         }
-
-        f.write_str(")")
     }
 }
 
