@@ -69,7 +69,7 @@ fn main() -> Result<()> {
 
     let source = *PortConnectResponse::try_from(stream.read_frame()?)?.addr();
 
-    stream.write_frame(&GetLocalNetIdRequest::default().into())?;
+    stream.write_frame(&GetLocalNetIdRequest.into())?;
 
     let target = AmsAddr::new(
         GetLocalNetIdResponse::try_from(stream.read_frame()?)?.net_id(),
