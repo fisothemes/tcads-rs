@@ -50,7 +50,6 @@ fn main() -> Result<()> {
             println!("Received 3 messages. Unsubscribing...");
             // Explicitly unsubscribe (though dropping `rx` also cleans up automatically!)
             logger.unsubscribe(handle)?;
-            break;
         }
     }
 
