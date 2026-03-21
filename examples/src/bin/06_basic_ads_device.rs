@@ -6,7 +6,7 @@
 //! AMS headers, or manual byte packing!
 //!
 //! PREREQUISITE:
-//! Open `twincat/TcAdsExamples/TcAdsExamples.sln` in TwinCAT XAE,
+//! Open `twincat/TcAdsExamples.sln` in TwinCAT XAE,
 //! activate the configuration on your local machine, and put the PLC into RUN mode.
 
 use tcads::client::AmsAddr;
