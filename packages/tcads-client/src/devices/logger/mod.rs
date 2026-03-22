@@ -1,6 +1,7 @@
 pub mod blocking;
 pub mod log_entry;
 pub mod message_type;
+pub mod tokio;
 
 pub use log_entry::LogEntry;
 pub use message_type::MessageType;
