@@ -1,8 +1,8 @@
+use super::log_entry::entry_to_frame;
 use super::{
     LOGGER_DATA_LEN, LOGGER_INDEX_GROUP, LOGGER_INDEX_OFFSET, LOGGER_PORT, LogEntry, MessageType,
 };
 use crate::devices::blocking::AdsDevice;
-use crate::devices::logger::log_entry::entry_to_frame;
 use crate::notif_guard::blocking::NotificationGuard;
 use std::collections::HashSet;
 use std::net::ToSocketAddrs;
