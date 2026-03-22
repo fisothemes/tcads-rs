@@ -2,19 +2,20 @@ use super::log_entry::entry_to_frame;
 use super::{
     LOGGER_DATA_LEN, LOGGER_INDEX_GROUP, LOGGER_INDEX_OFFSET, LOGGER_PORT, LogEntry, MessageType,
 };
-use crate::devices::blocking::AdsDevice;
-use crate::notif_guard::blocking::NotificationGuard;
+use crate::devices::tokio::AdsDevice;
+use crate::notif_guard::tokio::NotificationGuard;
 use std::collections::HashSet;
 use std::net::ToSocketAddrs;
-use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tcads_core::{
     AdsNotificationSampleOwned, AdsTransMode, AmsAddr, AmsNetId, NotificationHandle,
     WindowsFileTime,
 };
+use tokio::sync::mpsc::UnboundedReceiver as Receiver;
+use tokio::sync::mpsc::error::TryRecvError;
 
-/// Shared state of an [`AdsDevice`] client for the TwinCAT system logger.
+/// Shared state of an async [`AdsDevice`] client for the TwinCAT system logger.
 ///
 /// Held behind an [`Arc`] so all [`Logger`] clones share the same connection.
 /// Exposed as `pub` for power users who need direct access to the underlying
@@ -39,19 +40,35 @@ impl Drop for LoggerInner {
         let Ok(mut handles) = self.handles.lock() else {
             return;
         };
-        for handle in handles.drain() {
-            let _ = self.device.delete_notification(self.target, handle);
+
+        if handles.is_empty() {
+            return;
         }
+
+        let device = self.device.clone();
+        let target = self.target;
+        let handles_to_delete: Vec<_> = handles.drain().collect();
+
+        // Safely check for a Tokio runtime context before spawning the clean-up task
+        if let Ok(rt) = tokio::runtime::Handle::try_current() {
+            rt.spawn(async move {
+                for handle in handles_to_delete {
+                    let _ = device.delete_notification(target, handle).await;
+                }
+            });
+        }
+        // No runtime context, this is best-effort at best, router cleans up on connection close
+        // anyway. 100% safe to ignore.
     }
 }
 
-/// An [`AdsDevice`] client for the TwinCAT system logger on ADS port `100`.
+/// An asynchronous [`AdsDevice`] client for the TwinCAT system logger on ADS port `100`.
 ///
 /// # Thread Safety
 ///
-/// The `Logger` device is [`Clone`], so all clones share the same underlying connection.
-/// It is also [`Send`] + [`Sync`], so multiple tasks can receive log entries
-/// concurrently. Clean-up only happens when the last clone is dropped.
+/// `Logger` is [`Clone`], so all clones share the same underlying connection.
+/// It is also [`Send`] + [`Sync`], so multiple tasks can write or receive log
+/// entries concurrently. Clean-up only happens when the last clone is dropped.
 #[derive(Clone)]
 pub struct Logger {
     inner: Arc<LoggerInner>,
@@ -65,20 +82,20 @@ impl Logger {
     /// On Windows, connecting via `127.0.0.1` requires the
     /// `EnableAmsTcpLoopback` registry key to be set. This is enabled by
     /// default in TwinCAT 4024.5 and newer.
-    pub fn connect(timeout: impl Into<Option<Duration>>) -> crate::Result<Self> {
-        Self::connect_to("127.0.0.1:48898", timeout)
+    pub async fn connect(timeout: impl Into<Option<Duration>>) -> crate::Result<Self> {
+        Self::connect_to("127.0.0.1:48898", timeout).await
     }
 
     /// Connects to an AMS router at `addr`.
     ///
     /// Performs a [`PortConnect`](tcads_core::protocol::PortConnectRequest) handshake
     /// to obtain a dynamically assigned source address.
-    pub fn connect_to(
+    pub async fn connect_to(
         addr: impl ToSocketAddrs,
         timeout: impl Into<Option<Duration>>,
     ) -> crate::Result<Self> {
-        let device = AdsDevice::connect_to(addr, timeout)?;
-        let net_id = device.get_local_net_id()?;
+        let device = AdsDevice::connect_to(addr, timeout).await?;
+        let net_id = device.get_local_net_id().await?;
         Ok(Self::new(device, net_id))
     }
 
@@ -90,13 +107,13 @@ impl Logger {
     ///
     /// The [`PortConnect`](tcads_core::protocol::PortConnectRequest) handshake
     /// is **not** performed. See [`AdsDevice::connect_remote`] for details.
-    pub fn connect_remote(
+    pub async fn connect_remote(
         addr: impl ToSocketAddrs,
         source: AmsAddr,
         net_id: AmsNetId,
         timeout: impl Into<Option<Duration>>,
     ) -> crate::Result<Self> {
-        let device = AdsDevice::connect_remote(addr, source, timeout)?;
+        let device = AdsDevice::connect_remote(addr, source, timeout).await?;
         Ok(Self::new(device, net_id))
     }
 
@@ -117,8 +134,8 @@ impl Logger {
     /// Shuts down the underlying connection.
     ///
     /// See [`AdsDevice::shutdown`] for more details.
-    pub fn shutdown(&self) -> crate::Result<()> {
-        self.inner.device.shutdown()
+    pub async fn shutdown(&self) {
+        self.inner.device.shutdown().await
     }
 
     /// Returns the target address of the logger.
@@ -136,7 +153,7 @@ impl Logger {
     /// `task_name` is encoded as Windows-1252 and truncated to
     /// [`MAX_TASK_NAME_LEN`](super::MAX_TASK_NAME_LEN) - 1 characters if it exceeds
     /// that limit.
-    pub fn write_log<A: AsRef<str>>(
+    pub async fn write_log<A: AsRef<str>>(
         &self,
         message_type: MessageType,
         task_name: A,
@@ -145,13 +162,14 @@ impl Logger {
         self.write_entry(LogEntry::new(
             WindowsFileTime::now(),
             message_type,
-            self.get_ref().source()?.port(),
+            self.get_ref().source().await.port(),
             task_name.as_ref().to_owned(),
             message.as_ref().to_owned(),
         ))
+        .await
     }
 
-    /// Writes a log message to the TwinCAT logger.
+    /// Writes a [`LogEntry`] to the TwinCAT logger.
     ///
     /// This replicates [`ADSLOGSTR`](https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31033611.html)
     /// from Structured Text, sending an ADS Device Notification directly to port 100.
@@ -163,35 +181,42 @@ impl Logger {
     /// `entry.sender` is encoded as Windows-1252 and truncated to
     /// [`MAX_TASK_NAME_LEN`](super::MAX_TASK_NAME_LEN) - 1 characters if it exceeds
     /// that limit.
-    pub fn write_entry(&self, entry: LogEntry) -> crate::Result<()> {
-        let frame = entry_to_frame(self.target(), self.get_ref().source()?, entry);
+    pub async fn write_entry(&self, entry: LogEntry) -> crate::Result<()> {
+        let frame = entry_to_frame(self.target(), self.get_ref().source().await, entry);
         unsafe { self.get_ref().write_frame_only(frame) }
     }
 
-    // Subscribes to logger notifications.
+    /// Subscribes asynchronously to TwinCAT logger notifications.
     ///
     /// Returns a [`LogEntryReceiver`] that yields decoded [`LogEntry`] values.
-    /// The subscription is cancelled automatically when the [`LogEntryReceiver`]
-    /// is dropped, or explicitly via [`unsubscribe`](Self::unsubscribe).
+    /// The subscription is cancelled automatically when the [`LogEntryReceiver`] is dropped.
     ///
     /// Multiple subscriptions can be active simultaneously.
-    pub fn subscribe(&self) -> crate::Result<(LogEntryReceiver, NotificationHandle)> {
-        let (rx, handle) = self.inner.device.add_notification(
-            self.inner.target,
-            LOGGER_INDEX_GROUP,
-            LOGGER_INDEX_OFFSET,
-            LOGGER_DATA_LEN,
-            AdsTransMode::ServerCycle,
-            0,
-            0,
-        )?;
+    pub async fn subscribe(&self) -> crate::Result<(LogEntryReceiver, NotificationHandle)> {
+        let (rx, handle) = self
+            .inner
+            .device
+            .add_notification(
+                self.inner.target,
+                LOGGER_INDEX_GROUP,
+                LOGGER_INDEX_OFFSET,
+                LOGGER_DATA_LEN,
+                AdsTransMode::ServerCycle,
+                0,
+                0,
+            )
+            .await?;
+
         match self.inner.handles.lock() {
-            Ok(mut handles) => handles.insert(handle),
+            Ok(mut handles) => {
+                handles.insert(handle);
+            }
             Err(e) => {
                 let _ = self
                     .inner
                     .device
-                    .delete_notification(self.inner.target, handle);
+                    .delete_notification(self.inner.target, handle)
+                    .await;
                 return Err(e.into());
             }
         };
@@ -204,22 +229,25 @@ impl Logger {
         ))
     }
 
-    /// Explicitly cancels a subscription by handle.
+    /// Explicitly cancels a subscription by its handle.
     ///
     /// The [`LogEntryReceiver`] associated with this handle will return
-    /// [`Err(Error::Disconnected)`](Error::Disconnected) on its next call.
+    /// [`Err(Error::Disconnected)`](crate::Error::Disconnected) on its next call.
     ///
     /// Dropping the [`LogEntryReceiver`] has the same effect and is preferred
     /// in most cases.
-    pub fn unsubscribe(&self, handle: NotificationHandle) -> crate::Result<()> {
-        self.inner.handles.lock()?.remove(&handle);
+    pub async fn unsubscribe(&self, handle: NotificationHandle) -> crate::Result<()> {
+        if let Ok(mut handles) = self.inner.handles.lock() {
+            handles.remove(&handle);
+        }
         self.inner
             .device
             .delete_notification(self.inner.target, handle)
+            .await
     }
 }
 
-/// A receiver for decoded [`LogEntry`] values.
+/// An asynchronous receiver for decoded [`LogEntry`] values.
 ///
 /// Wraps the raw ADS notification channel and decodes each sample on demand.
 /// The subscription is cancelled automatically when this is dropped.
@@ -246,45 +274,32 @@ impl LogEntryReceiver {
         self.guard.handle()
     }
 
-    /// Blocks until the next log entry arrives.
+    /// Asynchronously awaits the next log entry.
     ///
-    /// Returns [`Err`] when the subscription is cancelled or the connection
-    /// is lost.
-    pub fn recv(&self) -> crate::Result<LogEntry> {
-        let sample = self.rx.recv()?;
+    /// Returns [`Err(Error::Disconnected)`](crate::Error::Disconnected) when the
+    /// subscription is cancelled or the connection is lost.
+    ///
+    /// # Note
+    ///
+    /// Unlike the blocking [`recv`](super::blocking::LogEntryReceiver::recv), this
+    /// method requires `&mut self` because Tokio's [`Receiver`] does not support
+    /// shared references.
+    pub async fn recv(&mut self) -> crate::Result<LogEntry> {
+        let sample = self.rx.recv().await.ok_or(crate::Error::Disconnected)?;
         LogEntry::try_from(sample.data())
     }
 
-    /// Blocks until the next log entry arrives or `timeout` elapses.
-    ///
-    /// Returns [`Err(Error::Timeout)`](crate::Error::Timeout) if the timeout expires,
-    /// or [`Err(Error::Disconnected)`](crate::Error::Disconnected) if the subscription
-    /// is cancelled or the connection is lost.
-    pub fn recv_timeout(&self, timeout: Duration) -> crate::Result<LogEntry> {
-        let sample = self.rx.recv_timeout(timeout)?;
-        LogEntry::try_from(sample.data())
-    }
-
-    /// Returns the next log entry if one is immediately available, without blocking.
+    /// Returns the next log entry if one is immediately available, without awaiting.
     ///
     /// Returns [`Ok(None)`] if no sample is currently available,
     /// or [`Err(Error::Disconnected)`](crate::Error::Disconnected) if the
     /// subscription is cancelled or the connection is lost.
-    pub fn try_recv(&self) -> crate::Result<Option<LogEntry>> {
+    pub fn try_recv(&mut self) -> crate::Result<Option<LogEntry>> {
         match self.rx.try_recv() {
             Ok(sample) => Ok(Some(LogEntry::try_from(sample.data())?)),
             Err(TryRecvError::Empty) => Ok(None),
             Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
         }
-    }
-
-    /// Returns an iterator that blocks on each call, yielding log entries
-    /// until the subscription is cancelled or the connection is lost.
-    pub fn iter(&self) -> impl Iterator<Item = crate::Result<LogEntry>> + '_ {
-        std::iter::from_fn(move || match self.recv() {
-            Err(crate::Error::Disconnected) => None,
-            result => Some(result),
-        })
     }
 }
 
