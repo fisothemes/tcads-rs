@@ -1,12 +1,18 @@
-use super::{LOGGER_DATA_LEN, LOGGER_INDEX_GROUP, LOGGER_INDEX_OFFSET, LOGGER_PORT, LogEntry};
+use super::{
+    LOGGER_DATA_LEN, LOGGER_INDEX_GROUP, LOGGER_INDEX_OFFSET, LOGGER_PORT, LogEntry, MessageType,
+};
 use crate::devices::blocking::AdsDevice;
+use crate::devices::logger::log_entry::entry_to_frame;
 use crate::notif_guard::blocking::NotificationGuard;
 use std::collections::HashSet;
 use std::net::ToSocketAddrs;
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tcads_core::{AdsNotificationSampleOwned, AdsTransMode, AmsAddr, AmsNetId, NotificationHandle};
+use tcads_core::{
+    AdsNotificationSampleOwned, AdsTransMode, AmsAddr, AmsNetId, NotificationHandle,
+    WindowsFileTime,
+};
 
 /// Shared state of an [`AdsDevice`] client for the TwinCAT system logger.
 ///
@@ -123,6 +129,43 @@ impl Logger {
     /// Returns a reference to the underlying [`AdsDevice`].
     pub fn get_ref(&self) -> &AdsDevice {
         &self.inner.device
+    }
+
+    /// Writes a log message to the TwinCAT logger using the current system time.
+    ///
+    /// `task_name` is encoded as Windows-1252 and truncated to
+    /// [`MAX_TASK_NAME_LEN`](super::MAX_TASK_NAME_LEN) - 1 characters if it exceeds
+    /// that limit.
+    pub fn write_log<A: AsRef<str>>(
+        &self,
+        message_type: MessageType,
+        task_name: A,
+        message: A,
+    ) -> crate::Result<()> {
+        self.write_entry(LogEntry::new(
+            WindowsFileTime::now(),
+            message_type,
+            self.get_ref().source()?.port(),
+            task_name.as_ref().to_owned(),
+            message.as_ref().to_owned(),
+        ))
+    }
+
+    /// Writes a log message to the TwinCAT logger.
+    ///
+    /// This replicates [`ADSLOGSTR`](https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31033611.html)
+    /// from Structured Text, sending an ADS Device Notification directly to port 100.
+    ///
+    /// Prefer [`write_log`](Self::write_log) for most use cases. Use this method
+    /// when you need full control over the [`LogEntry`], such as providing an explicit
+    /// timestamp via [`LogEntry::new`].
+    ///
+    /// `entry.sender` is encoded as Windows-1252 and truncated to
+    /// [`MAX_TASK_NAME_LEN`](super::MAX_TASK_NAME_LEN) - 1 characters if it exceeds
+    /// that limit.
+    pub fn write_entry(&self, entry: LogEntry) -> crate::Result<()> {
+        let frame = entry_to_frame(self.target(), self.get_ref().source()?, entry);
+        unsafe { self.get_ref().write_frame_only(frame) }
     }
 
     // Subscribes to logger notifications.

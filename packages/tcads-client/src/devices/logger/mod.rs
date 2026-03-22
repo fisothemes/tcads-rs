@@ -18,3 +18,6 @@ pub const LOGGER_INDEX_OFFSET: IndexOffset = 0xFFFF;
 
 /// Maximum size of a single logger notification payload.
 pub const LOGGER_DATA_LEN: u32 = 1024;
+
+/// Maximum length of the task name field on the write log entry wire (null terminator included).
+pub const MAX_TASK_NAME_LEN: usize = 20;
