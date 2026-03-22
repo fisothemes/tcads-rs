@@ -17,8 +17,9 @@ use tcads_core::protocol::{
     GetLocalNetIdResponse, PortCloseRequest, PortConnectRequest, PortConnectResponse,
 };
 use tcads_core::{
-    AdsDeviceVersion, AdsReturnCode, AdsState, AdsTransMode, AmsAddr, AmsFrame, AmsNetId,
-    DeviceState, IndexGroup, IndexOffset, InvokeId, NotificationHandle, RouterState,
+    AdsDeviceVersion, AdsHeader, AdsReturnCode, AdsState, AdsTransMode, AmsAddr, AmsCommand,
+    AmsFrame, AmsNetId, DeviceState, IndexGroup, IndexOffset, InvokeId, NotificationHandle,
+    RouterState,
 };
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::RwLock;
@@ -566,6 +567,72 @@ impl AdsDevice {
         Self::check_result(resp.result())?;
         self.inner.ads_notifs.remove(handle).await;
         Ok(())
+    }
+    /// Sends a fire-and-forget frame to the router.
+    ///
+    /// This method exists for unconventional ADS commands that do not follow the
+    /// standard request/response pattern, such as
+    /// [`AdsDeviceNotification`](tcads_core::AdsCommand::AdsDeviceNotification) frames
+    /// written directly to the TwinCAT logger (port 100). For standard commands
+    /// that expect a response, use the high-level methods on [`AdsDevice`].
+    ///
+    /// # Warning
+    ///
+    /// The frame is queued on the writer channel and sent as-is. No `InvokeId`
+    /// is registered with the dispatcher, so **any reply the router sends will be
+    /// silently dropped**.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the [`AmsFrame`] is correctly formed for the intended
+    /// unconventional command. An incorrect frame such as; a malformed ADS header,
+    /// wrong target address, or an invalid payload layout, can cause undefined
+    /// behaviour in the remote TwinCAT runtime. This including crashes, silent data
+    /// corruption, or unexpected state transitions that affect the entire PLC task
+    pub unsafe fn write_frame_only(&self, frame: AmsFrame) -> crate::Result<()> {
+        self.inner.ams_requests.send_only(frame)
+    }
+
+    /// Sends a frame and returns a [`Receiver`] for the matching response.
+    ///
+    /// This method exists for unconventional ADS commands that are not covered by
+    /// the high-level API on [`AdsDevice`]. For standard commands, prefer the
+    /// typed methods (e.g. [`read`](Self::read), [`write`](Self::write)) which
+    /// handle `InvokeId` assignment, frame construction, and response parsing.
+    /// For unconventional commands that never receive a response, use
+    /// [`write_frame_only`](Self::write_frame_only) instead.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Err(Error::InvalidPayload)`](crate::Error::InvalidPayload) if the
+    /// frame carries an [`AmsCommand`] variant that has no dispatch key (anything
+    /// other than [`AdsCommand`](AmsCommand::AdsCommand), [`GetLocalNetId`](AmsCommand::GetLocalNetId),
+    /// or [`PortConnect`](AmsCommand::PortConnect)).
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure the [`AmsFrame`] is correctly formed for the intended
+    /// unconventional command. An incorrect frame such as; a malformed ADS header,
+    /// wrong target address, or an invalid payload layout, can cause undefined
+    /// behaviour in the remote TwinCAT runtime. This including crashes, silent data
+    /// corruption, or unexpected state transitions that affect the entire PLC task.
+    ///
+    /// The caller is also responsible for ensuring the `InvokeId` embedded in the
+    /// [`AdsHeader`] is unique among all in-flight requests on this connection.
+    /// A duplicate `InvokeId` will cause the wrong caller to receive the response.
+    pub async unsafe fn write_frame(&self, frame: AmsFrame) -> crate::Result<Receiver<AmsFrame>> {
+        let key = match frame.header().command() {
+            AmsCommand::AdsCommand => {
+                let (header, _) =
+                    AdsHeader::parse_prefix(frame.payload()).map_err(tcads_core::AdsError::from)?;
+                AmsRequestDispatchKey::AdsCommand(header.invoke_id())
+            }
+            AmsCommand::GetLocalNetId => AmsRequestDispatchKey::GetLocalNetId,
+            AmsCommand::PortConnect => AmsRequestDispatchKey::PortConnect,
+            _ => return Err(crate::Error::InvalidPayload),
+        };
+
+        self.inner.ams_requests.dispatch(key, frame).await
     }
 
     async fn send_and_wait(&self, frame: AmsFrame, invoke_id: InvokeId) -> crate::Result<AmsFrame> {
