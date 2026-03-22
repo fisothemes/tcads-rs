@@ -174,8 +174,7 @@ impl Logger {
     /// The subscription is cancelled automatically when the [`LogEntryReceiver`]
     /// is dropped, or explicitly via [`unsubscribe`](Self::unsubscribe).
     ///
-    /// Multiple subscriptions can be active simultaneously, and each returns an
-    /// independent [`LogEntryReceiver`].
+    /// Multiple subscriptions can be active simultaneously.
     pub fn subscribe(&self) -> crate::Result<(LogEntryReceiver, NotificationHandle)> {
         let (rx, handle) = self.inner.device.add_notification(
             self.inner.target,
