@@ -362,11 +362,12 @@ dependencies = [
 name = "tcads-client"
 version = "0.1.0"
 dependencies = [
+ "chrono",
+ "encoding_rs",
  "serde",
  "tcads-core",
  "thiserror",
  "tokio",
- "tokio-test",
 ]
 
 [[package]]

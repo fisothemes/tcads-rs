@@ -38,7 +38,7 @@ impl AmsRequestDispatcher {
         &self,
         key: AmsRequestDispatchKey,
         frame: AmsFrame,
-    ) -> Result<Receiver<AmsFrame>, crate::Error> {
+    ) -> crate::Result<Receiver<AmsFrame>> {
         let (tx, rx) = mpsc::channel();
         self.register(key, tx)?;
         self.write_tx.send(frame)?;
