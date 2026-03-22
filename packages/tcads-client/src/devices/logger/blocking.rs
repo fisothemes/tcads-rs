@@ -233,6 +233,7 @@ pub struct LogEntryReceiver {
 }
 
 impl LogEntryReceiver {
+    /// Creates a new instance of the [`LogEntryReceiver`].
     pub fn new(
         rx: Receiver<AdsNotificationSampleOwned>,
         guard: NotificationGuard,
