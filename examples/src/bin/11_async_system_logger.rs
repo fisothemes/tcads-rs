@@ -9,7 +9,7 @@
 //! it shares a connection and runs concurrent tasks.
 
 use std::time::Duration;
-use tcads::client::devices::tokio::{Logger, MessageType};
+use tcads::client::devices::tokio::{LogMessageType, Logger};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -60,7 +60,7 @@ async fn main() -> Result<()> {
 
     logger
         .write_log(
-            MessageType::new(MessageType::HINT | MessageType::LOG),
+            (LogMessageType::HINT | LogMessageType::LOG).into(),
             "RustClient",
             "Hint from tcads-rs.",
         )
@@ -68,7 +68,7 @@ async fn main() -> Result<()> {
 
     logger
         .write_log(
-            MessageType::new(MessageType::WARNING | MessageType::LOG),
+            (LogMessageType::WARNING | LogMessageType::LOG).into(),
             "RustClient",
             "Warning from tcads-rs.",
         )
@@ -77,7 +77,7 @@ async fn main() -> Result<()> {
     // The listener stops when it sees this message.
     logger
         .write_log(
-            MessageType::new(MessageType::ERROR | MessageType::LOG),
+            (LogMessageType::ERROR | LogMessageType::LOG).into(),
             "RustClient",
             "Goodbye from tcads-rs!",
         )

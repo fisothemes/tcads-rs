@@ -1,6 +1,7 @@
 pub mod ads_add_device_notification;
 pub mod ads_delete_device_notification;
 pub mod ads_device_notification;
+pub mod ads_logger_write;
 pub mod ads_read;
 pub mod ads_read_device_info;
 pub mod ads_read_state;
@@ -25,6 +26,7 @@ pub use ads_device_notification::{
     AdsDeviceNotification, AdsDeviceNotificationOwned, AdsNotificationSample,
     AdsNotificationSampleOwned, AdsStampHeader, AdsStampHeaderOwned,
 };
+pub use ads_logger_write::{AdsLoggerWriteRequest, AdsLoggerWriteRequestOwned};
 pub use ads_read::{AdsReadRequest, AdsReadResponse, AdsReadResponseOwned};
 pub use ads_read_device_info::{AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse};
 pub use ads_read_state::{AdsReadStateRequest, AdsReadStateResponse};

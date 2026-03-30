@@ -1,7 +1,4 @@
-use super::log_entry::entry_to_frame;
-use super::{
-    LOGGER_DATA_LEN, LOGGER_INDEX_GROUP, LOGGER_INDEX_OFFSET, LOGGER_PORT, LogEntry, MessageType,
-};
+use super::{LOGGER_INDEX_GROUP, LOGGER_INDEX_OFFSET, LOGGER_PORT, LogEntry, LogMessageType};
 use crate::devices::blocking::AdsDevice;
 use crate::notif_guard::blocking::NotificationGuard;
 use std::collections::HashSet;
@@ -9,9 +6,11 @@ use std::net::ToSocketAddrs;
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tcads_core::ads::StateFlag;
+use tcads_core::protocol::AdsLoggerWriteRequestOwned;
 use tcads_core::{
-    AdsNotificationSampleOwned, AdsTransMode, AmsAddr, AmsNetId, NotificationHandle,
-    WindowsFileTime,
+    AdsCommand, AdsNotificationSampleOwned, AdsTransMode, AmsAddr, AmsCommand, AmsFrame, AmsNetId,
+    NotificationHandle, WindowsFileTime,
 };
 
 /// Shared state of an [`AdsDevice`] client for the TwinCAT system logger.
@@ -138,7 +137,7 @@ impl Logger {
     /// that limit.
     pub fn write_log<A: AsRef<str>>(
         &self,
-        message_type: MessageType,
+        message_type: LogMessageType,
         task_name: A,
         message: A,
     ) -> crate::Result<()> {
@@ -164,7 +163,16 @@ impl Logger {
     /// [`MAX_TASK_NAME_LEN`](super::MAX_TASK_NAME_LEN) - 1 characters if it exceeds
     /// that limit.
     pub fn write_entry(&self, entry: LogEntry) -> crate::Result<()> {
-        let frame = entry_to_frame(self.target(), self.get_ref().source()?, entry);
+        let frame = AdsLoggerWriteRequestOwned::new(
+            self.target(),
+            self.get_ref().source()?,
+            entry.timestamp(),
+            entry.message_type(),
+            entry.sender(),
+            entry.message(),
+            "",
+        )
+        .into();
         unsafe { self.get_ref().write_frame_only(frame) }
     }
 
@@ -180,7 +188,7 @@ impl Logger {
             self.inner.target,
             LOGGER_INDEX_GROUP,
             LOGGER_INDEX_OFFSET,
-            LOGGER_DATA_LEN,
+            LogEntry::MAX_PAYLOAD_LEN,
             AdsTransMode::ServerCycle,
             0,
             0,
@@ -252,7 +260,7 @@ impl LogEntryReceiver {
     /// is lost.
     pub fn recv(&self) -> crate::Result<LogEntry> {
         let sample = self.rx.recv()?;
-        LogEntry::try_from(sample.data())
+        Ok(LogEntry::try_from(sample.data())?)
     }
 
     /// Blocks until the next log entry arrives or `timeout` elapses.
@@ -262,7 +270,7 @@ impl LogEntryReceiver {
     /// is cancelled or the connection is lost.
     pub fn recv_timeout(&self, timeout: Duration) -> crate::Result<LogEntry> {
         let sample = self.rx.recv_timeout(timeout)?;
-        LogEntry::try_from(sample.data())
+        Ok(LogEntry::try_from(sample.data())?)
     }
 
     /// Returns the next log entry if one is immediately available, without blocking.

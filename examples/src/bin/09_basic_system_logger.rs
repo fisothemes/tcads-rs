@@ -10,7 +10,7 @@
 //! start/stop the PLC to see system state logs.
 
 use std::time::Duration;
-use tcads::client::devices::blocking::{Logger, MessageType};
+use tcads::client::devices::blocking::{LogMessageType, Logger};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -29,7 +29,7 @@ fn main() -> Result<()> {
     // We can combine MessageTypes using standard bitwise OR (|)
     println!("Writing a test message to the logger...");
     logger.write_log(
-        (MessageType::WARNING | MessageType::LOG).into(),
+        (LogMessageType::WARNING | LogMessageType::LOG).into(),
         "RustClient",
         "Hello from tcads-rs! This is a custom log message.",
     )?;

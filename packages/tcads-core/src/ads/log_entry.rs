@@ -1,11 +1,5 @@
-use super::{LOGGER_DATA_LEN, MAX_TASK_NAME_LEN, MessageType};
-use tcads_core::ads::{AdsString, StateFlag};
-use tcads_core::{
-    AdsCommand, AdsError, AdsHeader, AdsReturnCode, AmsAddr, AmsCommand, AmsFrame, AmsPort,
-    WindowsFileTime,
-};
-
-const MAX_MSG_LEN: usize = LOGGER_DATA_LEN as usize - LogEntry::MIN_LENGTH;
+use super::{AdsError, AdsString, LogEntryError, LogMessageType, WindowsFileTime};
+use crate::ams::AmsPort;
 
 /// TwinCAT logger entry.
 ///
@@ -23,7 +17,7 @@ const MAX_MSG_LEN: usize = LOGGER_DATA_LEN as usize - LogEntry::MIN_LENGTH;
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
 pub struct LogEntry {
     timestamp: WindowsFileTime,
-    message_type: MessageType,
+    message_type: LogMessageType,
     sender_port: AmsPort,
     sender: String,
     message: String,
@@ -36,10 +30,19 @@ impl LogEntry {
     /// + 16 (sender) + 4 (message length) = 3
     pub const MIN_LENGTH: usize = 36;
 
+    /// Maximum length of the task name field on the write log entry wire (null terminator included).
+    pub const MAX_TASK_NAME_LEN: usize = 20;
+
+    /// Maximum size of a single logger notification payload.
+    pub const MAX_PAYLOAD_LEN: u32 = 1024;
+
+    /// Maximum length string message in bytes.
+    const MAX_MSG_LEN: usize = Self::MAX_PAYLOAD_LEN as usize - LogEntry::MIN_LENGTH;
+
     /// Create a new log entry.
     pub fn new(
         timestamp: WindowsFileTime,
-        message_type: MessageType,
+        message_type: LogMessageType,
         sender_port: AmsPort,
         sender: String,
         message: String,
@@ -54,7 +57,7 @@ impl LogEntry {
     }
 
     /// Tries to parse a [`LogEntry`] from a slice of bytes (Little Endian).
-    pub fn try_from_bytes(bytes: &[u8]) -> Result<Self, crate::Error> {
+    pub fn try_from_bytes(bytes: &[u8]) -> Result<Self, AdsError> {
         Self::try_from(bytes)
     }
 
@@ -69,7 +72,7 @@ impl LogEntry {
     }
 
     /// Message type flags.
-    pub fn message_type(&self) -> MessageType {
+    pub fn message_type(&self) -> LogMessageType {
         self.message_type
     }
 
@@ -89,103 +92,32 @@ impl LogEntry {
     }
 }
 
-/// Builds an [`AmsFrame`] that writes a log message to the TwinCAT logger (port 100).
-///
-/// This replicates the wire format of [`ADSLOGSTR`](https://infosys.beckhoff.com/content/1033/tcplclib_tc2_system/31033611.html?id=9189897725322916238)
-/// confirmed from capture analysis.
-///
-/// # Wire layout (ADS data, after the 32-byte ADS header)
-///
-/// The frame sent to the logger is essentially a non-standard [`AdsDeviceNotification`](tcads_core::protocol::AdsDeviceNotification)
-/// whose Stamps field is set to `0` and has ADS data of size `Length` following it.
-///
-/// Size this format is non-standard, the function is `pub(super)` to avoid issues in the future.
-///
-/// | Offset | Size | Field Name       | Description                                               |
-/// |--------|------|------------------|-----------------------------------------------------------|
-/// | 0      | 4    | `Length`         | Size in bytes of the ADS payload (excludes its own field) |
-/// | 4      | 4    | `Stamps`         | Number of notification stamps (always `0`)                |
-/// | 8      | 8    | `Filetime`       | [`WindowsFileTime`]                                       |
-/// | 16     | 8    | Reserved         | always `0`                                                |
-/// | 24     | 4    | Msg + Arg Length | String length of format string + format specifier string  |
-/// | 28     | 4    | Msg Type         | [`MessageType`] raw value                                 |
-/// | 32     | 20   | Task Name        | Sender name as a Windows-1252 null terminated string      |
-/// | 52     | n    | Message          | A null terminated Windows-1252 string                     |
-/// | n + 1  | n    | Arg              | Argument for the format specifier (Windows-1252)          |
-///
-/// ## Note
-///
-/// The `Msg + Arg Length` field only needs to be greater than the `Message` length for TwinCAT
-/// to perform substitution; the actual message length is bounded by the ADS header `length` field.
-pub(super) fn entry_to_frame(target: AmsAddr, source: AmsAddr, entry: LogEntry) -> AmsFrame {
-    let mut data = Vec::with_capacity(52);
-
-    let stamps = [0u8; 4];
-    let filetime = entry.timestamp.to_bytes();
-    let reserved = [0u8; 8];
-    let message_type = entry.message_type.to_bytes();
-    let task_name =
-        AdsString::<MAX_TASK_NAME_LEN>::try_from(entry.sender.as_str()).unwrap_or_else(|_| {
-            // Encode best-effort then truncate to fit the buffer.
-            let (encoded, _, _) = encoding_rs::WINDOWS_1252.encode(entry.sender.as_str());
-            AdsString::from(encoded.as_ref())
-        });
-
-    let (message, _, _) = encoding_rs::WINDOWS_1252.encode(&entry.message);
-    // Ignoring the `Arg` length because it's unnecessary in Rust.
-    // Using `+ 1` for the null terminator.
-    let message_arg_len = (message.len() as u32 + 1).to_le_bytes();
-
-    data.extend_from_slice(&stamps);
-    data.extend_from_slice(&filetime);
-    data.extend_from_slice(&reserved);
-    data.extend_from_slice(&message_arg_len);
-    data.extend_from_slice(&message_type);
-    data.extend_from_slice(task_name.as_bytes());
-    data.extend_from_slice(message.as_ref());
-    data.push(0);
-
-    let header = AdsHeader::new(
-        target,
-        source,
-        AdsCommand::AdsDeviceNotification,
-        StateFlag::ADS_COMMAND.into(),
-        4 + data.len() as u32,
-        AdsReturnCode::Ok,
-        0,
-    );
-
-    let mut payload = Vec::with_capacity(AdsHeader::LENGTH + 4 + data.len());
-
-    payload.extend_from_slice(&header.to_bytes());
-    payload.extend_from_slice(&(data.len() as u32).to_le_bytes());
-    payload.extend_from_slice(&data);
-
-    AmsFrame::new(AmsCommand::AdsCommand, payload)
-}
-
 impl TryFrom<&[u8]> for LogEntry {
-    type Error = crate::Error;
+    type Error = AdsError;
 
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
         if data.len() < Self::MIN_LENGTH {
-            return Err(crate::Error::InvalidPayload);
+            return Err(LogEntryError::PayloadTooShort {
+                expected: Self::MIN_LENGTH,
+                got: data.len(),
+            }
+            .into());
         }
 
         let timestamp = WindowsFileTime::try_from_slice(&data[0..8]).map_err(AdsError::from)?;
-        let message_type = MessageType::try_from(&data[8..12])?;
+        let message_type = LogMessageType::try_from(&data[8..12])?;
         let sender_port = AmsPort::from_le_bytes([data[12], data[13]]);
         let sender = AdsString::<16>::from(&data[16..32]).to_string();
 
-        let msg_len = u32::from_le_bytes(
-            data[32..36]
-                .try_into()
-                .map_err(|_| crate::Error::InvalidPayload)?,
-        ) as usize;
+        let msg_len = u32::from_le_bytes(data[32..36].try_into().unwrap()) as usize;
 
         let msg_end = 36 + msg_len;
         if data.len() < msg_end {
-            return Err(crate::Error::InvalidPayload);
+            return Err(LogEntryError::UnexpectedLength {
+                expected: msg_end,
+                got: data.len(),
+            }
+            .into());
         }
 
         let msg_data = &data[36..msg_end];
@@ -194,7 +126,7 @@ impl TryFrom<&[u8]> for LogEntry {
                 .trim_end_matches('\0')
                 .to_owned()
         } else {
-            AdsString::<MAX_MSG_LEN>::from(msg_data).to_string()
+            AdsString::<{ Self::MAX_MSG_LEN }>::from(msg_data).to_string()
         };
 
         Ok(Self::new(
@@ -308,7 +240,8 @@ mod tests {
     fn roundtrips_utf8_message() {
         let mut data = test_bytes();
         // Set UTF8 flag (0x1000) in addition to existing flags
-        let flags = (MessageType::HINT | MessageType::LOG | MessageType::UTF8).to_le_bytes();
+        let flags =
+            (LogMessageType::HINT | LogMessageType::LOG | LogMessageType::UTF8).to_le_bytes();
         data[8..12].copy_from_slice(&flags);
         // Replace message bytes with a UTF-8 string containing a non-ASCII char
         let utf8_msg = "héllo".as_bytes();

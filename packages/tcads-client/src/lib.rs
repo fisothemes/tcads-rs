@@ -6,7 +6,7 @@ pub mod tasks;
 pub use tcads_core::{
     ads::{
         AdsReturnCode, AdsState, AdsTransMode, DeviceState, IndexGroup, IndexOffset, InvokeId,
-        NotificationHandle, WindowsFileTime,
+        LogEntry, LogMessageType, NotificationHandle, WindowsFileTime,
     },
     ams::{AmsAddr, AmsNetId, AmsPort, RouterState},
     protocol::{AdsNotificationSampleOwned, ProtocolError},

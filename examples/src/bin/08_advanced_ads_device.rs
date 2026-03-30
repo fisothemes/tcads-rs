@@ -36,7 +36,6 @@ fn main() -> Result<()> {
 
     // 2. Subscribe to Notifications on `MAIN.nCount`
     println!("Subscribing to MAIN.nCount changes...");
-    // FIX: Renamed the return variable to `notif_handle`
     let (rx, notif_handle) = add_notification::<u32>(&device, plc_target, count_handle)?;
 
     // ADS `ServerOnChange` always fires one initial notification upon registration

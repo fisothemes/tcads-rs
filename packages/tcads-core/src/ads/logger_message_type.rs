@@ -1,3 +1,4 @@
+use super::LogMessageTypeError;
 use core::ops::{BitAnd, BitOr, BitOrAssign, Not};
 use std::fmt;
 
@@ -16,10 +17,10 @@ use std::fmt;
 /// # Examples
 ///
 /// ```
-/// use tcads_client::devices::logger::MessageType;
+/// use tcads_core::ads::LogMessageType;
 ///
 /// // Create a mask for a warning that should also be logged to a file
-/// let mask = MessageType::new(MessageType::WARNING | MessageType::LOG);
+/// let mask = LogMessageType::new(LogMessageType::WARNING | LogMessageType::LOG);
 ///
 /// assert!(mask.is_warning());
 /// assert!(mask.is_log());
@@ -31,9 +32,9 @@ use std::fmt;
 #[derive(
     serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash,
 )]
-pub struct MessageType(u32);
+pub struct LogMessageType(u32);
 
-impl MessageType {
+impl LogMessageType {
     /// The length of the Message Type in bytes.
     pub const LENGTH: usize = 4;
     /// Informational hint messages.
@@ -53,141 +54,144 @@ impl MessageType {
     /// UTF-8 encoded string message.
     pub const UTF8: u32 = 0x1000;
 
-    /// Creates a new [`MessageType`] set of flags from a raw u32.
+    /// Creates a new [`LogMessageType`] set of flags from a raw u32.
     pub const fn new(raw: u32) -> Self {
         Self(raw)
     }
 
-    /// Creates a [`MessageType`] from a 4-byte array (Little Endian).
+    /// Creates a [`LogMessageType`] from a 4-byte array (Little Endian).
     pub const fn from_bytes(bytes: &[u8; Self::LENGTH]) -> Self {
         Self(u32::from_le_bytes(*bytes))
     }
 
-    /// Tries to parse a [`MessageType`] from a 4-byte array (Little Endian).
-    pub fn try_from_bytes(bytes: &[u8]) -> Result<Self, crate::Error> {
+    /// Tries to parse a [`LogMessageType`] from a 4-byte array (Little Endian).
+    pub fn try_from_bytes(bytes: &[u8]) -> Result<Self, LogMessageTypeError> {
         Self::try_from(bytes)
     }
 
-    /// Converts [`MessageType`] to a 4-byte array (Little Endian).
+    /// Converts [`LogMessageType`] to a 4-byte array (Little Endian).
     pub fn to_bytes(&self) -> [u8; Self::LENGTH] {
         self.0.to_le_bytes()
     }
 
-    /// Returns the raw value of the [`MessageType`].
+    /// Returns the raw value of the [`LogMessageType`].
     pub const fn as_raw(self) -> u32 {
         self.0
     }
 
-    /// Returns `true` if the [`MessageType::HINT`] flag has been set.
+    /// Returns `true` if the [`LogMessageType::HINT`] flag has been set.
     pub fn is_hint(self) -> bool {
         self.0 & Self::HINT != 0
     }
-    /// Returns `true` if the [`MessageType::WARNING`] flag has been set.
+    /// Returns `true` if the [`LogMessageType::WARNING`] flag has been set.
     pub fn is_warning(self) -> bool {
         self.0 & Self::WARNING != 0
     }
-    /// Returns `true` if the [`MessageType::ERROR`] flag has been set.
+    /// Returns `true` if the [`LogMessageType::ERROR`] flag has been set.
     pub fn is_error(self) -> bool {
         self.0 & Self::ERROR != 0
     }
-    /// Returns `true` if the [`MessageType::LOG`] flag has been set.
+    /// Returns `true` if the [`LogMessageType::LOG`] flag has been set.
     pub fn is_log(self) -> bool {
         self.0 & Self::LOG != 0
     }
-    /// Returns `true` if the [`MessageType::MSGBOX`] flag has been set.
+    /// Returns `true` if the [`LogMessageType::MSGBOX`] flag has been set.
     pub fn is_msgbox(self) -> bool {
         self.0 & Self::MSGBOX != 0
     }
-    /// Returns `true` if the [`MessageType::RESOURCE`] flag has been set.
+    /// Returns `true` if the [`LogMessageType::RESOURCE`] flag has been set.
     pub fn is_resource(self) -> bool {
         self.0 & Self::RESOURCE != 0
     }
-    /// Returns `true` if the [`MessageType::STRING`] flag has been set.
+    /// Returns `true` if the [`LogMessageType::STRING`] flag has been set.
     pub fn is_string(self) -> bool {
         self.0 & Self::STRING != 0
     }
-    /// Returns `true` if the [`MessageType::UTF8`] flag has been set.
+    /// Returns `true` if the [`LogMessageType::UTF8`] flag has been set.
     pub fn is_utf8(self) -> bool {
         self.0 & Self::UTF8 != 0
     }
 }
 
-impl From<u32> for MessageType {
+impl From<u32> for LogMessageType {
     fn from(val: u32) -> Self {
         Self(val)
     }
 }
 
-impl From<MessageType> for u32 {
-    fn from(msg_type: MessageType) -> Self {
+impl From<LogMessageType> for u32 {
+    fn from(msg_type: LogMessageType) -> Self {
         msg_type.0
     }
 }
 
-impl From<[u8; Self::LENGTH]> for MessageType {
+impl From<[u8; Self::LENGTH]> for LogMessageType {
     fn from(value: [u8; Self::LENGTH]) -> Self {
         Self::from_bytes(&value)
     }
 }
 
-impl From<&[u8; Self::LENGTH]> for MessageType {
+impl From<&[u8; Self::LENGTH]> for LogMessageType {
     fn from(value: &[u8; Self::LENGTH]) -> Self {
         Self::from_bytes(value)
     }
 }
 
-impl From<MessageType> for [u8; MessageType::LENGTH] {
-    fn from(value: MessageType) -> Self {
+impl From<LogMessageType> for [u8; LogMessageType::LENGTH] {
+    fn from(value: LogMessageType) -> Self {
         value.to_bytes()
     }
 }
 
-impl From<&MessageType> for [u8; MessageType::LENGTH] {
-    fn from(value: &MessageType) -> Self {
+impl From<&LogMessageType> for [u8; LogMessageType::LENGTH] {
+    fn from(value: &LogMessageType) -> Self {
         value.to_bytes()
     }
 }
 
-impl TryFrom<&[u8]> for MessageType {
-    type Error = crate::Error;
+impl TryFrom<&[u8]> for LogMessageType {
+    type Error = LogMessageTypeError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() != Self::LENGTH {
-            return Err(crate::Error::InvalidPayload);
+            return Err(LogMessageTypeError::UnexpectedLength {
+                expected: Self::LENGTH,
+                got: value.len(),
+            });
         }
         let raw = u32::from_le_bytes([value[0], value[1], value[2], value[3]]);
         Ok(Self(raw))
     }
 }
 
-impl BitOr for MessageType {
+impl BitOr for LogMessageType {
     type Output = Self;
     fn bitor(self, rhs: Self) -> Self {
         Self(self.0 | rhs.0)
     }
 }
 
-impl BitOrAssign for MessageType {
+impl BitOrAssign for LogMessageType {
     fn bitor_assign(&mut self, rhs: Self) {
         self.0 |= rhs.0;
     }
 }
 
-impl BitAnd for MessageType {
+impl BitAnd for LogMessageType {
     type Output = Self;
     fn bitand(self, rhs: Self) -> Self {
         Self(self.0 & rhs.0)
     }
 }
 
-impl Not for MessageType {
+impl Not for LogMessageType {
     type Output = Self;
     fn not(self) -> Self::Output {
         Self(!self.0)
     }
 }
 
-impl fmt::Debug for MessageType {
+impl fmt::Debug for LogMessageType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "MessageType({:#04X}: ", self.0)?;
         fmt::Display::fmt(&self, f)?;
@@ -195,7 +199,7 @@ impl fmt::Debug for MessageType {
     }
 }
 
-impl fmt::Display for MessageType {
+impl fmt::Display for LogMessageType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.0 != 0 {
             let mut first = true;
@@ -220,14 +224,14 @@ impl fmt::Display for MessageType {
             check_flag!(self.is_string(), "STRING");
             check_flag!(self.is_utf8(), "UTF8");
 
-            let known = MessageType::HINT
-                | MessageType::WARNING
-                | MessageType::ERROR
-                | MessageType::LOG
-                | MessageType::MSGBOX
-                | MessageType::RESOURCE
-                | MessageType::STRING
-                | MessageType::UTF8;
+            let known = LogMessageType::HINT
+                | LogMessageType::WARNING
+                | LogMessageType::ERROR
+                | LogMessageType::LOG
+                | LogMessageType::MSGBOX
+                | LogMessageType::RESOURCE
+                | LogMessageType::STRING
+                | LogMessageType::UTF8;
 
             if (self.0 & !known) != 0 {
                 if !first {
@@ -249,33 +253,33 @@ mod tests {
 
     #[test]
     fn test_new_and_as_raw() {
-        let msg_type = MessageType::new(0x42);
+        let msg_type = LogMessageType::new(0x42);
         assert_eq!(msg_type.as_raw(), 0x42);
     }
 
     #[test]
     fn test_from_bytes() {
         let bytes = [0x21, 0x43, 0x00, 0x00];
-        let msg_type = MessageType::from_bytes(&bytes);
+        let msg_type = LogMessageType::from_bytes(&bytes);
         assert_eq!(msg_type.as_raw(), 0x4321);
     }
 
     #[test]
     fn test_to_bytes() {
-        let msg_type = MessageType::new(0x1234);
+        let msg_type = LogMessageType::new(0x1234);
         let bytes = msg_type.to_bytes();
         assert_eq!(bytes, [0x34, 0x12, 0x00, 0x00]);
     }
 
     #[test]
     fn test_from_u32() {
-        let msg_type = MessageType::from(0x80);
+        let msg_type = LogMessageType::from(0x80);
         assert_eq!(msg_type.as_raw(), 0x80);
     }
 
     #[test]
     fn test_into_u32() {
-        let msg_type = MessageType::new(0x40);
+        let msg_type = LogMessageType::new(0x40);
         let value: u32 = msg_type.into();
         assert_eq!(value, 0x40);
     }
@@ -283,55 +287,56 @@ mod tests {
     #[test]
     fn test_from_byte_array() {
         let bytes = [0xFF, 0x00, 0x10, 0x00];
-        let msg_type = MessageType::from(bytes);
+        let msg_type = LogMessageType::from(bytes);
         assert_eq!(msg_type.as_raw(), 0x1000FF);
     }
 
     #[test]
     fn test_into_byte_array() {
-        let msg_type = MessageType::new(0x1040);
-        let bytes: [u8; MessageType::LENGTH] = msg_type.into();
+        let msg_type = LogMessageType::new(0x1040);
+        let bytes: [u8; LogMessageType::LENGTH] = msg_type.into();
         assert_eq!(bytes, [0x40, 0x10, 0x00, 0x00]);
     }
 
     #[test]
     fn test_flag_checks() {
-        let hint = MessageType::new(MessageType::HINT);
+        let hint = LogMessageType::new(LogMessageType::HINT);
         assert!(hint.is_hint());
         assert!(!hint.is_warning());
 
-        let warning = MessageType::new(MessageType::WARNING);
+        let warning = LogMessageType::new(LogMessageType::WARNING);
         assert!(warning.is_warning());
         assert!(!warning.is_error());
 
-        let error = MessageType::new(MessageType::ERROR);
+        let error = LogMessageType::new(LogMessageType::ERROR);
         assert!(error.is_error());
         assert!(!error.is_log());
 
-        let log = MessageType::new(MessageType::LOG);
+        let log = LogMessageType::new(LogMessageType::LOG);
         assert!(log.is_log());
         assert!(!log.is_msgbox());
 
-        let msgbox = MessageType::new(MessageType::MSGBOX);
+        let msgbox = LogMessageType::new(LogMessageType::MSGBOX);
         assert!(msgbox.is_msgbox());
         assert!(!msgbox.is_resource());
 
-        let resource = MessageType::new(MessageType::RESOURCE);
+        let resource = LogMessageType::new(LogMessageType::RESOURCE);
         assert!(resource.is_resource());
         assert!(!resource.is_string());
 
-        let string = MessageType::new(MessageType::STRING);
+        let string = LogMessageType::new(LogMessageType::STRING);
         assert!(string.is_string());
         assert!(!string.is_utf8());
 
-        let utf8 = MessageType::new(MessageType::UTF8);
+        let utf8 = LogMessageType::new(LogMessageType::UTF8);
         assert!(utf8.is_utf8());
         assert!(!utf8.is_hint());
     }
 
     #[test]
     fn test_bitor() {
-        let msg_type = MessageType::new(MessageType::HINT) | MessageType::new(MessageType::WARNING);
+        let msg_type = LogMessageType::new(LogMessageType::HINT)
+            | LogMessageType::new(LogMessageType::WARNING);
         assert!(msg_type.is_hint());
         assert!(msg_type.is_warning());
         assert!(!msg_type.is_error());
@@ -339,8 +344,8 @@ mod tests {
 
     #[test]
     fn test_bitor_assign() {
-        let mut msg_type = MessageType::new(MessageType::ERROR);
-        msg_type |= MessageType::new(MessageType::LOG);
+        let mut msg_type = LogMessageType::new(LogMessageType::ERROR);
+        msg_type |= LogMessageType::new(LogMessageType::LOG);
         assert!(msg_type.is_error());
         assert!(msg_type.is_log());
         assert!(!msg_type.is_hint());
@@ -348,21 +353,21 @@ mod tests {
 
     #[test]
     fn test_bitand() {
-        let msg_type = MessageType::new(MessageType::HINT | MessageType::WARNING);
-        let result = msg_type & MessageType::new(MessageType::HINT);
-        assert_eq!(result.as_raw(), MessageType::HINT);
+        let msg_type = LogMessageType::new(LogMessageType::HINT | LogMessageType::WARNING);
+        let result = msg_type & LogMessageType::new(LogMessageType::HINT);
+        assert_eq!(result.as_raw(), LogMessageType::HINT);
     }
 
     #[test]
     fn test_not() {
-        let msg_type = MessageType::new(MessageType::HINT);
+        let msg_type = LogMessageType::new(LogMessageType::HINT);
         let inverted = !msg_type;
-        assert_eq!(inverted.as_raw(), !MessageType::HINT);
+        assert_eq!(inverted.as_raw(), !LogMessageType::HINT);
     }
 
     #[test]
     fn test_debug_single_flag() {
-        let msg_type = MessageType::new(MessageType::HINT);
+        let msg_type = LogMessageType::new(LogMessageType::HINT);
         let debug_str = format!("{:?}", msg_type);
         assert!(debug_str.contains("HINT"));
         assert!(debug_str.contains("0x01") || debug_str.contains("0x0001"));
@@ -370,7 +375,8 @@ mod tests {
 
     #[test]
     fn test_debug_multiple_flags() {
-        let msg_type = MessageType::new(MessageType::ERROR | MessageType::LOG | MessageType::UTF8);
+        let msg_type =
+            LogMessageType::new(LogMessageType::ERROR | LogMessageType::LOG | LogMessageType::UTF8);
         let debug_str = format!("{:?}", msg_type);
         assert!(debug_str.contains("ERROR"));
         assert!(debug_str.contains("LOG"));
@@ -380,14 +386,14 @@ mod tests {
 
     #[test]
     fn test_debug_unknown_flags() {
-        let msg_type = MessageType::new(0x8000);
+        let msg_type = LogMessageType::new(0x8000);
         let debug_str = format!("{:?}", msg_type);
         assert!(debug_str.contains("Unknown"));
     }
 
     #[test]
     fn test_debug_zero_value() {
-        let msg_type = MessageType::new(0);
+        let msg_type = LogMessageType::new(0);
         let debug_str = format!("{:?}", msg_type);
         assert!(debug_str.contains("MessageType"));
         assert!(debug_str.contains("0x00") || debug_str.contains("0x0000"));

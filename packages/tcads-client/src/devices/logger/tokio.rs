@@ -1,13 +1,11 @@
-use super::log_entry::entry_to_frame;
-use super::{
-    LOGGER_DATA_LEN, LOGGER_INDEX_GROUP, LOGGER_INDEX_OFFSET, LOGGER_PORT, LogEntry, MessageType,
-};
+use super::{LOGGER_INDEX_GROUP, LOGGER_INDEX_OFFSET, LOGGER_PORT, LogEntry, LogMessageType};
 use crate::devices::tokio::AdsDevice;
 use crate::notif_guard::tokio::NotificationGuard;
 use std::collections::HashSet;
 use std::net::ToSocketAddrs;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tcads_core::protocol::AdsLoggerWriteRequestOwned;
 use tcads_core::{
     AdsNotificationSampleOwned, AdsTransMode, AmsAddr, AmsNetId, NotificationHandle,
     WindowsFileTime,
@@ -155,7 +153,7 @@ impl Logger {
     /// that limit.
     pub async fn write_log<A: AsRef<str>>(
         &self,
-        message_type: MessageType,
+        message_type: LogMessageType,
         task_name: A,
         message: A,
     ) -> crate::Result<()> {
@@ -182,7 +180,16 @@ impl Logger {
     /// [`MAX_TASK_NAME_LEN`](super::MAX_TASK_NAME_LEN) - 1 characters if it exceeds
     /// that limit.
     pub async fn write_entry(&self, entry: LogEntry) -> crate::Result<()> {
-        let frame = entry_to_frame(self.target(), self.get_ref().source().await, entry);
+        let frame = AdsLoggerWriteRequestOwned::new(
+            self.target(),
+            self.get_ref().source().await,
+            entry.timestamp(),
+            entry.message_type(),
+            entry.sender(),
+            entry.message(),
+            "",
+        )
+        .into();
         unsafe { self.get_ref().write_frame_only(frame) }
     }
 
@@ -200,7 +207,7 @@ impl Logger {
                 self.inner.target,
                 LOGGER_INDEX_GROUP,
                 LOGGER_INDEX_OFFSET,
-                LOGGER_DATA_LEN,
+                LogEntry::MAX_PAYLOAD_LEN,
                 AdsTransMode::ServerCycle,
                 0,
                 0,
@@ -286,7 +293,7 @@ impl LogEntryReceiver {
     /// shared references.
     pub async fn recv(&mut self) -> crate::Result<LogEntry> {
         let sample = self.rx.recv().await.ok_or(crate::Error::Disconnected)?;
-        LogEntry::try_from(sample.data())
+        Ok(LogEntry::try_from(sample.data())?)
     }
 
     /// Returns the next log entry if one is immediately available, without awaiting.

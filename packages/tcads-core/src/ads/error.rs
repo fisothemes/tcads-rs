@@ -34,6 +34,11 @@ pub enum AdsError {
     /// Invalid Windows file time format or content.
     #[error("Invalid Windows file time: {0}")]
     InvalidWindowsFileTime(#[from] WindowsFileTimeError),
+    /// Invalid ADS log message type format or content.
+    #[error("Invalid ADS log message type: {0}")]
+    InvalidLogMessageType(#[from] LogMessageTypeError),
+    #[error("Invalid ADS log entry: {0}")]
+    InvalidLogEntry(#[from] LogEntryError),
     /// Invalid ADS data length format or content (not header or return code).
     #[error("Unexpected data length: expected {expected} bytes, got {got} bytes")]
     UnexpectedDataLength { expected: usize, got: usize },
@@ -110,5 +115,21 @@ pub enum AdsNotificationHandleError {
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum WindowsFileTimeError {
     #[error("unexpected length: expected {expected}, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
+}
+
+/// Error returned when parsing a [LogMessageType](super::LogMessageType) fails.
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum LogMessageTypeError {
+    #[error("unexpected length: expected {expected}, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
+}
+
+/// Error returned when parsing a [LogEntry](super::LogEntry) fails.
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum LogEntryError {
+    #[error("Payload too short: expected at least {expected} bytes, got {got}")]
+    PayloadTooShort { expected: usize, got: usize },
+    #[error("Unexpected length: expected {expected} bytes, got {got}")]
     UnexpectedLength { expected: usize, got: usize },
 }
