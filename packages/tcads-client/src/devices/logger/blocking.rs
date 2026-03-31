@@ -6,11 +6,10 @@ use std::net::ToSocketAddrs;
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tcads_core::ads::StateFlag;
 use tcads_core::protocol::AdsLoggerWriteRequestOwned;
 use tcads_core::{
-    AdsCommand, AdsNotificationSampleOwned, AdsTransMode, AmsAddr, AmsCommand, AmsFrame, AmsNetId,
-    NotificationHandle, WindowsFileTime,
+    AdsNotificationSampleOwned, AdsTransMode, AmsAddr, AmsNetId, NotificationHandle,
+    WindowsFileTime,
 };
 
 /// Shared state of an [`AdsDevice`] client for the TwinCAT system logger.
