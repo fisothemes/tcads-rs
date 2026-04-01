@@ -23,29 +23,28 @@ pub struct DataTypeDevice {
 }
 
 impl DataTypeDevice {
-    /// Connects to the local AMS router at `127.0.0.1:48898`.
+    /// Connects to the local target ADS device at a given `port` using the local
+    /// AMS router at `127.0.0.1:48898`.
     ///
-    /// The `port` is the [`AmsPort`] of the run-time/free-task ADS Device you wish to interact with.
+    /// The `port` is the [`AmsPort`] of the run-time/free-task ADS Device you wish to interact
+    /// with based on the target's AMS address.
     ///
     /// See [`AdsDevice::connect`] for more details.
     pub fn connect(port: AmsPort, timeout: impl Into<Option<Duration>>) -> crate::Result<Self> {
-        Self::connect_to("127.0.0.1:48898", port, timeout)
+        let device = AdsDevice::connect_to("127.0.0.1:48898", timeout)?;
+        let target = AmsAddr::new(device.get_local_net_id()?, port);
+        Ok(Self::new(device, target))
     }
 
-    /// Connects to an AMS router at `addr`.
+    /// Connects to the `target` ADS device using the local AMS router at `127.0.0.1:48898`.
     ///
-    /// Performs a [`PortConnect`](tcads_core::protocol::PortConnectRequest) handshake
-    /// to obtain a dynamically assigned source address.
-    ///
-    /// The `port` is the [`AmsPort`] of the run-time/free-task ADS Device you wish to interact with.
+    /// The `target` is the [`AmsAddr`] of the run-time/free-task ADS Device you wish to interact with.
     pub fn connect_to(
-        addr: impl ToSocketAddrs,
-        port: AmsPort,
+        target: AmsAddr,
         timeout: impl Into<Option<Duration>>,
     ) -> crate::Result<Self> {
-        let device = AdsDevice::connect_to(addr, timeout)?;
-        let net_id = device.get_local_net_id()?;
-        Ok(Self::new(device, (net_id, port).into()))
+        let device = AdsDevice::connect_to("127.0.0.1:48898", timeout)?;
+        Ok(Self::new(device, target))
     }
 
     /// Connects directly to a remote AMS router without a local router.
@@ -93,12 +92,26 @@ impl DataTypeDevice {
 
     /// Returns data type info (current raw bytes until I work out the format)
     pub fn get_data_type_info(&self, name: &str) -> crate::Result<Vec<u8>> {
+        let length_bytes = self.inner.device.read_write(
+            self.inner.target,
+            ADSIGRP_SYM_DT_INFOBYNAME,
+            0,
+            4,
+            name,
+        )?;
+
+        let entry_length = u32::from_le_bytes(
+            length_bytes
+                .try_into()
+                .map_err(|_| crate::Error::InvalidPayload)?,
+        );
+
         self.inner.device.read_write(
             self.inner.target,
             ADSIGRP_SYM_DT_INFOBYNAME,
             0,
-            1024,
-            name.as_bytes(),
+            entry_length,
+            name,
         )
     }
 }
