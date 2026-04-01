@@ -1,8 +1,10 @@
 pub mod ads_device;
+pub mod data_type;
 pub mod logger;
 
 pub mod blocking {
     pub use super::ads_device::blocking::AdsDevice;
+    pub use super::data_type::{ADSIGRP_SYM_DT_INFOBYNAME, blocking::DataTypeDevice};
     pub use super::logger::{
         LogEntry, LogMessageType,
         blocking::{LogEntryReceiver, Logger},
