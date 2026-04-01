@@ -1,83 +1,28 @@
 //! Scratch pad for testing.
 
-use tcads::core::WindowsFileTime;
-use tcads::core::ads::{AdsCommand, AdsHeader, AdsReturnCode, StateFlag};
-use tcads::core::ams::{AmsAddr, AmsCommand};
-use tcads::core::io::AmsFrame;
-use tcads::core::io::blocking::AmsStream;
-use tcads::core::protocol::{
-    AdsReadWriteRequestOwned, AdsReadWriteResponse, GetLocalNetIdRequest, GetLocalNetIdResponse,
-    PortConnectRequest, PortConnectResponse,
-};
+use std::time::Duration;
+use tcads::client::devices::blocking::DataTypeDevice;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-fn _subscribe_to_logger(stream: &mut AmsStream, target: AmsAddr, source: AmsAddr) -> Result<()> {
-    let frame = AdsReadWriteRequestOwned::new(target, source, 1, 0xF090, 0, 4, source.to_bytes())
-        .into_frame();
+fn main() -> Result<()> {
+    let device = DataTypeDevice::connect(851, Duration::from_secs(5))?;
 
-    stream.write_frame(&frame)?;
-    let frame = stream.read_frame()?;
-    let resp = AdsReadWriteResponse::try_from(&frame)?;
-    println!("s: {resp:?}");
+    let info = device.get_data_type_info("UDINT")?;
 
-    Ok(())
-}
+    println!("{:?}", info);
 
-fn send(stream: &mut AmsStream, target: AmsAddr, source: AmsAddr) -> Result<()> {
-    let bytes: [u8; _] = [
-        59, 0, 0, 0, // Notif Size
-        0, 0, 0, 0, // Count of Stamps
-        16, 87, 133, 69, 142, 182, 220, 1, // Windows file time
-        0, 0, 0, 0, 0, 0, 0, 0, // Reserved
-        7, 0, 0, 0, // Length of format + arg?
-        2, 0, 0, 0, // Mask
-        80, 108, 99, 84, 97, 115, 107, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // Task Name
-        65, 65, 40, 37, 115, 41,
-        0, // Format String
-           //57, 57, 57, 57, 57, 57, 69, 69, // Argument
+    // This is here for testing purposes.
+    let _val: [u8; _] = [
+        120, 0, 0, 0, // Length
+        1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // ??
+        4, 0, 0, 0, 0, 0, 0, 0, // Type Length
+        19, 0, 0, 0, // Type ID (19 = ADST_UINT32)
+        129, 16, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 85, 68, 73, 78, 84, 0, 0, 0, 149, 25, 7, 24,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 2, 0, 15, 1, 68, 105, 115, 112, 108, 97, 121, 77, 105,
+        110, 86, 97, 108, 117, 101, 0, 48, 0, 15, 10, 68, 105, 115, 112, 108, 97, 121, 77, 97, 120,
+        86, 97, 108, 117, 101, 0, 35, 120, 102, 102, 102, 102, 102, 102, 102, 102, 0, 0, 0, 0,
     ];
 
-    let header = AdsHeader::new(
-        target,
-        source,
-        AdsCommand::AdsDeviceNotification,
-        StateFlag::ADS_COMMAND.into(),
-        bytes.len() as u32,
-        AdsReturnCode::Ok,
-        0x0,
-    );
-
-    let mut payload = Vec::from(header.to_bytes());
-    payload.extend_from_slice(&bytes[0..8]); // header
-    payload.extend_from_slice(&WindowsFileTime::now().to_bytes()); // file time
-    payload.extend_from_slice(&bytes[16..]);
-
-    let frame = AmsFrame::new(AmsCommand::AdsCommand, payload);
-
-    println!("b:{:?}", &frame.to_vec());
-
-    stream.write_frame(&frame)?;
-
-    Ok(())
-}
-
-fn main() -> Result<()> {
-    let mut stream = AmsStream::connect("127.0.0.1:48898")?;
-
-    stream.write_frame(&PortConnectRequest::default().into())?;
-
-    let source = *PortConnectResponse::try_from(stream.read_frame()?)?.addr();
-
-    stream.write_frame(&GetLocalNetIdRequest.into())?;
-
-    let target = AmsAddr::new(
-        GetLocalNetIdResponse::try_from(stream.read_frame()?)?.net_id(),
-        100,
-    );
-
-    //subscribe_to_logger(&mut stream, target, source)?;
-
-    send(&mut stream, target, source)?;
     Ok(())
 }
