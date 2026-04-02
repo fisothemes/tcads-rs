@@ -3,7 +3,7 @@ use crate::devices::blocking::AdsDevice;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
 use std::time::Duration;
-use tcads_core::{AmsAddr, AmsPort};
+use tcads_core::{AdsError, AdsSymbolUploadInfo, AmsAddr, AmsPort};
 
 pub struct DataTypeDeviceInner {
     pub device: AdsDevice,
@@ -113,5 +113,16 @@ impl DataTypeDevice {
             entry_length,
             name,
         )
+    }
+
+    pub fn get_upload_info(&self) -> crate::Result<AdsSymbolUploadInfo> {
+        let bytes = self.inner.device.read(
+            self.inner.target,
+            SYMBOL_UPLOAD_INFO_INDEX_GROUP,
+            0,
+            AdsSymbolUploadInfo::LENGTH as u32,
+        )?;
+
+        Ok(AdsSymbolUploadInfo::try_from_slice(&bytes).map_err(AdsError::from)?)
     }
 }

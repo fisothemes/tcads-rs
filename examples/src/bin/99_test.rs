@@ -8,9 +8,13 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 fn main() -> Result<()> {
     let device = DataTypeDevice::connect(851, Duration::from_secs(5))?;
 
-    let info = device.get_data_type_info("UDINT")?;
+    let dt_info = device.get_data_type_info("UDINT")?;
 
-    println!("{:?}", info);
+    println!("length: {} | data: {:?}", dt_info.len(), dt_info);
+
+    let upload_info = device.get_upload_info()?;
+
+    println!("{:?}", upload_info);
 
     // This is here for testing purposes.
     let _val: [u8; _] = [
