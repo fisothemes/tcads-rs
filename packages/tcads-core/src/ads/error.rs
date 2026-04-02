@@ -39,6 +39,9 @@ pub enum AdsError {
     InvalidLogMessageType(#[from] LogMessageTypeError),
     #[error("Invalid ADS log entry: {0}")]
     InvalidLogEntry(#[from] LogEntryError),
+    /// Invalid ADS symbol upload info format or content.
+    #[error("Invalid ADS symbol upload info: {0}")]
+    InvalidAdsSymbolUploadInfo(#[from] AdsSymbolUploadInfoError),
     /// Invalid ADS data length format or content (not header or return code).
     #[error("Unexpected data length: expected {expected} bytes, got {got} bytes")]
     UnexpectedDataLength { expected: usize, got: usize },
@@ -130,6 +133,13 @@ pub enum LogMessageTypeError {
 pub enum LogEntryError {
     #[error("Payload too short: expected at least {expected} bytes, got {got}")]
     PayloadTooShort { expected: usize, got: usize },
+    #[error("Unexpected length: expected {expected} bytes, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
+}
+
+/// Error returned when parsing [`AdsSymbolUploadInfo`](super::symbol::AdsSymbolUploadInfo) fails.
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum AdsSymbolUploadInfoError {
     #[error("Unexpected length: expected {expected} bytes, got {got}")]
     UnexpectedLength { expected: usize, got: usize },
 }

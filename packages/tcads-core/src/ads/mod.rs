@@ -10,6 +10,7 @@ pub mod notification_handle;
 pub mod return_codes;
 pub mod state_flag;
 pub mod string;
+pub mod symbol;
 pub mod trans_mode;
 
 pub use command::AdsCommand;
@@ -28,6 +29,7 @@ pub use notification_handle::NotificationHandle;
 pub use return_codes::AdsReturnCode;
 pub use state_flag::StateFlag;
 pub use string::AdsString;
+pub use symbol::AdsSymbolUploadInfo;
 pub use trans_mode::AdsTransMode;
 
 pub type IndexGroup = u32;
