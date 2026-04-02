@@ -1,4 +1,4 @@
-use super::ADSIGRP_SYM_DT_INFOBYNAME;
+use super::{DATATYPE_INFO_BY_NAME_INDEX_GROUP, SYMBOL_UPLOAD_INFO_INDEX_GROUP};
 use crate::devices::blocking::AdsDevice;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
@@ -94,7 +94,7 @@ impl DataTypeDevice {
     pub fn get_data_type_info(&self, name: &str) -> crate::Result<Vec<u8>> {
         let length_bytes = self.inner.device.read_write(
             self.inner.target,
-            ADSIGRP_SYM_DT_INFOBYNAME,
+            DATATYPE_INFO_BY_NAME_INDEX_GROUP,
             0,
             4,
             name,
@@ -108,7 +108,7 @@ impl DataTypeDevice {
 
         self.inner.device.read_write(
             self.inner.target,
-            ADSIGRP_SYM_DT_INFOBYNAME,
+            DATATYPE_INFO_BY_NAME_INDEX_GROUP,
             0,
             entry_length,
             name,
