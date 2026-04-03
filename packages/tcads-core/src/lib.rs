@@ -136,7 +136,7 @@ pub mod io;
 pub mod protocol;
 
 pub use ads::{
-    AdsCommand, AdsDeviceVersion, AdsError, AdsHeader, AdsReturnCode, AdsState,
+    AdsCommand, AdsDataTypeId, AdsDeviceVersion, AdsError, AdsHeader, AdsReturnCode, AdsState,
     AdsSymbolUploadInfo, AdsTransMode, DeviceState, IndexGroup, IndexOffset, InvokeId, LogEntry,
     LogMessageType, NotificationHandle, WindowsFileTime,
 };
