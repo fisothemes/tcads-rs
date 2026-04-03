@@ -42,6 +42,9 @@ pub enum AdsError {
     /// Invalid ADS symbol upload info format or content.
     #[error("Invalid ADS symbol upload info: {0}")]
     InvalidAdsSymbolUploadInfo(#[from] AdsSymbolUploadInfoError),
+    /// Invalid ADS type info format or content.
+    #[error("Invalid ADS type info: {0}")]
+    InvalidAdsTypeInfo(#[from] AdsTypeInfoError),
     /// Invalid ADS data length format or content (not header or return code).
     #[error("Unexpected data length: expected {expected} bytes, got {got} bytes")]
     UnexpectedDataLength { expected: usize, got: usize },
@@ -137,9 +140,22 @@ pub enum LogEntryError {
     UnexpectedLength { expected: usize, got: usize },
 }
 
-/// Error returned when parsing [`AdsSymbolUploadInfo`](super::symbol::AdsSymbolUploadInfo) fails.
+/// Error returned when parsing [`AdsSymbolUploadInfo`](super::AdsSymbolUploadInfo) fails.
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum AdsSymbolUploadInfoError {
     #[error("Unexpected length: expected {expected} bytes, got {got}")]
     UnexpectedLength { expected: usize, got: usize },
+}
+
+/// Error returned when parsing an [`AdsDataTypeInfo`](super::AdsDataTypeInfo) entry fails.
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum AdsTypeInfoError {
+    #[error("Payload too short: expected at least {expected} bytes, got {got}")]
+    TooShort { expected: usize, got: usize },
+
+    #[error("Entry length mismatch: entry claims {expected} bytes but only {got} available")]
+    EntryLengthMismatch { expected: usize, got: usize },
+
+    #[error("Invalid UTF-8 in field '{field}'")]
+    InvalidUtf8 { field: &'static str },
 }
