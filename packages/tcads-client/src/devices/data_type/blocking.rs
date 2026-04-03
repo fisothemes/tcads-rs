@@ -5,7 +5,7 @@ use crate::devices::blocking::AdsDevice;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
 use std::time::Duration;
-use tcads_core::{AdsError, AdsSymbolUploadInfo, AmsAddr, AmsPort};
+use tcads_core::{AdsDataTypeInfo, AdsError, AdsSymbolUploadInfo, AmsAddr, AmsPort};
 
 pub struct DataTypeDeviceInner {
     pub device: AdsDevice,
@@ -93,7 +93,7 @@ impl DataTypeDevice {
     }
 
     /// Returns data type info (current raw bytes until I work out the format)
-    pub fn get_data_type_info(&self, name: &str) -> crate::Result<Vec<u8>> {
+    pub fn get_data_type_info(&self, name: &str) -> crate::Result<AdsDataTypeInfo> {
         let length_bytes = self.inner.device.read_write(
             self.inner.target,
             DATATYPE_INFO_BY_NAME_INDEX_GROUP,
@@ -108,13 +108,15 @@ impl DataTypeDevice {
                 .map_err(|_| crate::Error::InvalidPayload)?,
         );
 
-        self.inner.device.read_write(
+        let bytes = self.inner.device.read_write(
             self.inner.target,
             DATATYPE_INFO_BY_NAME_INDEX_GROUP,
             0,
             entry_length,
             name,
-        )
+        )?;
+
+        Ok(AdsDataTypeInfo::try_from_slice(&bytes).map_err(AdsError::from)?)
     }
 
     pub fn get_all_data_type_info(&self) -> crate::Result<Vec<u8>> {
