@@ -1,4 +1,6 @@
-use super::{DATATYPE_INFO_BY_NAME_INDEX_GROUP, SYMBOL_UPLOAD_INFO_INDEX_GROUP};
+use super::{
+    DATATYPE_INFO_BY_NAME_INDEX_GROUP, DATATYPE_UPLOAD_INDEX_GROUP, SYMBOL_UPLOAD_INFO_INDEX_GROUP,
+};
 use crate::devices::blocking::AdsDevice;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
@@ -112,6 +114,16 @@ impl DataTypeDevice {
             0,
             entry_length,
             name,
+        )
+    }
+
+    pub fn get_all_data_type_info(&self) -> crate::Result<Vec<u8>> {
+        let info = self.get_upload_info()?;
+        self.inner.device.read(
+            self.inner.target,
+            DATATYPE_UPLOAD_INDEX_GROUP,
+            0,
+            info.data_type_byte_size(),
         )
     }
 
