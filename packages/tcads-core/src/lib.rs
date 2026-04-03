@@ -136,9 +136,10 @@ pub mod io;
 pub mod protocol;
 
 pub use ads::{
-    AdsCommand, AdsDataTypeFlags, AdsDataTypeId, AdsDataTypeInfo, AdsDeviceVersion, AdsError,
-    AdsHeader, AdsReturnCode, AdsState, AdsSymbolUploadInfo, AdsTransMode, DeviceState, IndexGroup,
-    IndexOffset, InvokeId, LogEntry, LogMessageType, NotificationHandle, WindowsFileTime,
+    AdsAttribute, AdsCommand, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId,
+    AdsDataTypeInfo, AdsDeviceVersion, AdsError, AdsHeader, AdsReturnCode, AdsState,
+    AdsSymbolUploadInfo, AdsTransMode, DeviceState, IndexGroup, IndexOffset, InvokeId, LogEntry,
+    LogMessageType, NotificationHandle, WindowsFileTime,
 };
 pub use ams::{AmsAddr, AmsCommand, AmsNetId, AmsPort, AmsTcpHeader, RouterState, RuntimeType};
 pub use io::AmsFrame;

@@ -7,7 +7,7 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 fn main() -> Result<()> {
     let device = DataTypeDevice::connect(851, Duration::from_secs(5))?;
-    let dt_info = device.get_data_type_info("ARRAY [1..1] OF PLC.PlcTaskSystemInfo")?;
+    let dt_info = device.get_data_type_info("UDINT")?;
 
     println!("{:#?}", dt_info);
 

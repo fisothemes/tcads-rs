@@ -150,12 +150,12 @@ pub enum AdsSymbolUploadInfoError {
 /// Error returned when parsing an [`AdsDataTypeInfo`](super::AdsDataTypeInfo) entry fails.
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum AdsTypeInfoError {
+    #[error("Unexpected length: expected {expected} bytes, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
     #[error("Payload too short: expected at least {expected} bytes, got {got}")]
     TooShort { expected: usize, got: usize },
-
     #[error("Entry length mismatch: entry claims {expected} bytes but only {got} available")]
     EntryLengthMismatch { expected: usize, got: usize },
-
     #[error("Invalid UTF-8 in field '{field}'")]
     InvalidUtf8 { field: &'static str },
 }

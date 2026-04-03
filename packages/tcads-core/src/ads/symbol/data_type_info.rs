@@ -1,5 +1,5 @@
 use super::error::AdsTypeInfoError;
-use super::{AdsDataTypeFlags, AdsDataTypeId};
+use super::{AdsAttribute, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId};
 
 /// TwinCAT ADS data type info.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -15,8 +15,10 @@ pub struct AdsDataTypeInfo {
     name: String,
     type_name: String,
     comment: String,
-    _other_fixed: Vec<u8>,
-    _other_dynamic: Vec<u8>,
+    array_infos: Vec<AdsDataTypeArrayInfo>,
+    sub_items: Vec<AdsDataTypeInfo>,
+    guid: Option<[u8; 16]>,
+    attributes: Vec<AdsAttribute>,
 }
 
 impl AdsDataTypeInfo {
@@ -69,6 +71,22 @@ impl AdsDataTypeInfo {
     pub fn comment(&self) -> &str {
         &self.comment
     }
+    /// Array dimension bounds. Non-empty only for array types.
+    pub fn array_infos(&self) -> &[AdsDataTypeArrayInfo] {
+        &self.array_infos
+    }
+    /// Struct fields, fully inlined. Non-empty only for struct types.
+    pub fn sub_items(&self) -> &[AdsDataTypeInfo] {
+        &self.sub_items
+    }
+    /// 16-byte type GUID. Present when [`AdsDataTypeFlags::TYPE_GUID`] is set.
+    pub fn guid(&self) -> Option<&[u8; 16]> {
+        self.guid.as_ref()
+    }
+    /// Pragma key-value attributes. Non-empty when [`AdsDataTypeFlags::ATTRIBUTES`] is set.
+    pub fn attributes(&self) -> &[AdsAttribute] {
+        &self.attributes
+    }
 
     /// Parses an [`AdsTypeInfo`] from a byte slice.
     pub fn try_from_slice(data: &[u8]) -> Result<Self, AdsTypeInfoError> {
@@ -109,6 +127,8 @@ impl TryFrom<&[u8]> for AdsDataTypeInfo {
         let name_length = u16::from_le_bytes(entry[32..34].try_into().unwrap()) as usize;
         let type_length = u16::from_le_bytes(entry[34..36].try_into().unwrap()) as usize;
         let comment_length = u16::from_le_bytes(entry[36..38].try_into().unwrap()) as usize;
+        let array_dim_count = u16::from_le_bytes(entry[38..40].try_into().unwrap()) as usize;
+        let sub_item_count = u16::from_le_bytes(entry[40..42].try_into().unwrap()) as usize;
 
         let mut pos = Self::MIN_LENGTH;
 
@@ -133,8 +153,51 @@ impl TryFrom<&[u8]> for AdsDataTypeInfo {
 
         pos = comment_end;
 
-        let other_fixed = &entry[38..Self::MIN_LENGTH];
-        let other_dynamic = &entry[pos..];
+        let mut array_infos = Vec::with_capacity(array_dim_count);
+        for _ in 0..array_dim_count {
+            array_infos.push(AdsDataTypeArrayInfo::try_from_slice(
+                &entry[pos..pos + AdsDataTypeArrayInfo::LENGTH],
+            )?);
+            pos += AdsDataTypeArrayInfo::LENGTH;
+        }
+
+        let mut sub_items = Vec::with_capacity(sub_item_count);
+        for _ in 0..sub_item_count {
+            let sub_item = AdsDataTypeInfo::try_from(&entry[pos..])?;
+            pos += sub_item.entry_length() as usize;
+            sub_items.push(sub_item);
+        }
+
+        let mut guid = None;
+        if flags.has_type_guid() && pos + 16 <= entry_length as usize {
+            let mut guid_bytes = [0u8; 16];
+            guid_bytes.copy_from_slice(&entry[pos..pos + 16]);
+            guid = Some(guid_bytes);
+            pos += guid_bytes.len();
+        }
+
+        if flags.has_copy_mask() {
+            // Legacy section, skip it
+            pos = (pos + size as usize).min(entry_length as usize);
+        }
+
+        if flags.has_method_infos() {
+            // Skip method info section
+            todo!("Method info section not yet implemented");
+        }
+
+        let mut attributes = Vec::new();
+        if flags.has_attributes() && pos + 2 <= entry_length as usize {
+            let attr_count = u16::from_le_bytes(entry[pos..pos + 2].try_into().unwrap()) as usize;
+            pos += 2;
+
+            attributes.reserve(attr_count);
+            for _ in 0..attr_count {
+                let attr = AdsAttribute::try_from_slice(&entry[pos..])?;
+                pos += attr.wire_size(); // Advance by dynamically parsed size
+                attributes.push(attr);
+            }
+        }
 
         Ok(Self {
             entry_length,
@@ -148,8 +211,10 @@ impl TryFrom<&[u8]> for AdsDataTypeInfo {
             name: name.to_string(),
             type_name: type_name.to_string(),
             comment: comment.to_string(),
-            _other_fixed: other_fixed.to_vec(),
-            _other_dynamic: other_dynamic.to_vec(),
+            array_infos,
+            sub_items,
+            guid,
+            attributes,
         })
     }
 }

@@ -29,7 +29,10 @@ pub use notification_handle::NotificationHandle;
 pub use return_codes::AdsReturnCode;
 pub use state_flag::StateFlag;
 pub use string::AdsString;
-pub use symbol::{AdsDataTypeFlags, AdsDataTypeId, AdsDataTypeInfo, AdsSymbolUploadInfo};
+pub use symbol::{
+    AdsAttribute, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId, AdsDataTypeInfo,
+    AdsSymbolUploadInfo,
+};
 pub use trans_mode::AdsTransMode;
 
 pub type IndexGroup = u32;
