@@ -180,7 +180,6 @@ impl TryFrom<&[u8]> for AdsDataTypeInfo {
         }
 
         if flags.has_method_infos() {
-            // Skip method info section
             todo!("Method info section not yet implemented");
         }
 
@@ -195,6 +194,26 @@ impl TryFrom<&[u8]> for AdsDataTypeInfo {
                 pos += attr.wire_size(); // Advance by dynamically parsed size
                 attributes.push(attr);
             }
+        }
+
+        if flags.has_enum_infos() {
+            todo!("Enum info section not yet implemented");
+        }
+
+        if flags.has_refactor_info() {
+            todo!("Refactor info section not yet implemented");
+        }
+
+        if flags.has_extended_flags() {
+            todo!("Extended flags section not yet implemented");
+        }
+
+        if flags.is_variant() {
+            todo!("Variant section not yet implemented");
+        }
+
+        if flags.has_extended_enum_infos() {
+            todo!("Extended enum info section not yet implemented");
         }
 
         Ok(Self {
