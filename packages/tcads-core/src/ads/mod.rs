@@ -31,7 +31,7 @@ pub use state_flag::StateFlag;
 pub use string::AdsString;
 pub use symbol::{
     AdsAttribute, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId, AdsDataTypeInfo,
-    AdsSymbolUploadInfo,
+    AdsSymbolUploadInfo, Guid,
 };
 pub use trans_mode::AdsTransMode;
 

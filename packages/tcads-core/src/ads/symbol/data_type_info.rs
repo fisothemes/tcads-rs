@@ -1,5 +1,5 @@
 use super::error::AdsTypeInfoError;
-use super::{AdsAttribute, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId};
+use super::{AdsAttribute, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId, Guid};
 
 /// TwinCAT ADS data type info.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -17,7 +17,7 @@ pub struct AdsDataTypeInfo {
     comment: String,
     array_infos: Vec<AdsDataTypeArrayInfo>,
     sub_items: Vec<AdsDataTypeInfo>,
-    guid: Option<[u8; 16]>,
+    guid: Option<Guid>,
     attributes: Vec<AdsAttribute>,
 }
 
@@ -80,7 +80,7 @@ impl AdsDataTypeInfo {
         &self.sub_items
     }
     /// 16-byte type GUID. Present when [`AdsDataTypeFlags::TYPE_GUID`] is set.
-    pub fn guid(&self) -> Option<&[u8; 16]> {
+    pub fn guid(&self) -> Option<&Guid> {
         self.guid.as_ref()
     }
     /// Pragma key-value attributes. Non-empty when [`AdsDataTypeFlags::ATTRIBUTES`] is set.
@@ -170,10 +170,8 @@ impl TryFrom<&[u8]> for AdsDataTypeInfo {
 
         let mut guid = None;
         if flags.has_type_guid() && pos + 16 <= entry_length as usize {
-            let mut guid_bytes = [0u8; 16];
-            guid_bytes.copy_from_slice(&entry[pos..pos + 16]);
-            guid = Some(guid_bytes);
-            pos += guid_bytes.len();
+            guid = Some(Guid::try_from_slice(&entry[pos..pos + 16])?);
+            pos += Guid::LENGTH;
         }
 
         if flags.has_copy_mask() {

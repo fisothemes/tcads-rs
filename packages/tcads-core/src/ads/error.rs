@@ -45,6 +45,9 @@ pub enum AdsError {
     /// Invalid ADS type info format or content.
     #[error("Invalid ADS type info: {0}")]
     InvalidAdsTypeInfo(#[from] AdsTypeInfoError),
+    /// Invalid ADS data type format or content.
+    #[error("Invalid GUID: {0}")]
+    InvalidGuid(#[from] GuidParseError),
     /// Invalid ADS data length format or content (not header or return code).
     #[error("Unexpected data length: expected {expected} bytes, got {got} bytes")]
     UnexpectedDataLength { expected: usize, got: usize },
@@ -158,4 +161,15 @@ pub enum AdsTypeInfoError {
     EntryLengthMismatch { expected: usize, got: usize },
     #[error("Invalid UTF-8 in field '{field}'")]
     InvalidUtf8 { field: &'static str },
+    #[error("Invalid GUID: {0}")]
+    InvalidGuid(#[from] GuidParseError),
+}
+
+/// Error returned when parsing a [`Guid`](super::Guid) fails.
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum GuidParseError {
+    #[error("Invalid GUID length: expected 32 hex characters (16 bytes), got {0}")]
+    InvalidLength(usize),
+    #[error("Invalid hexadecimal characters in GUID")]
+    InvalidHex,
 }
