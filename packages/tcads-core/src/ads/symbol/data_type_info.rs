@@ -4,20 +4,26 @@ use super::{AdsAttribute, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId,
 /// TwinCAT ADS data type info.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct AdsDataTypeInfo {
-    entry_length: u32,
     version: u32,
     hash_value: u32,
     type_hash_value: u32,
     size: u32,
     offset: u32,
     type_id: AdsDataTypeId,
+    #[serde(skip_serializing)]
     flags: AdsDataTypeFlags,
     name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     type_name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     comment: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     array_infos: Vec<AdsDataTypeArrayInfo>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     sub_items: Vec<AdsDataTypeInfo>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     guid: Option<Guid>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     attributes: Vec<AdsAttribute>,
 }
 
@@ -25,10 +31,6 @@ impl AdsDataTypeInfo {
     /// Byte size of the fixed header.
     pub const MIN_LENGTH: usize = 42;
 
-    // Total byte size of this entry on the wire, including the `entry_length` field itself.
-    pub fn entry_length(&self) -> u32 {
-        self.entry_length
-    }
     /// Structure version.
     pub fn version(&self) -> u32 {
         self.version
@@ -89,33 +91,25 @@ impl AdsDataTypeInfo {
     }
 
     /// Parses an [`AdsTypeInfo`] from a byte slice.
-    pub fn try_from_slice(data: &[u8]) -> Result<Self, AdsTypeInfoError> {
-        Self::try_from(data)
-    }
-}
-
-impl TryFrom<&[u8]> for AdsDataTypeInfo {
-    type Error = AdsTypeInfoError;
-
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        if value.len() < Self::MIN_LENGTH {
+    pub fn try_from_slice(data: &[u8]) -> Result<(Self, usize), AdsTypeInfoError> {
+        if data.len() < Self::MIN_LENGTH {
             return Err(AdsTypeInfoError::TooShort {
                 expected: Self::MIN_LENGTH,
-                got: value.len(),
+                got: data.len(),
             });
         }
 
-        let entry_length = u32::from_le_bytes([value[0], value[1], value[2], value[3]]);
+        let entry_length = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
 
-        if value.len() < entry_length as usize {
+        if data.len() < entry_length as usize {
             return Err(AdsTypeInfoError::EntryLengthMismatch {
                 expected: entry_length as usize,
-                got: value.len(),
+                got: data.len(),
             });
         }
 
         // Work within the declared boundary
-        let entry = &value[..entry_length as usize];
+        let entry = &data[..entry_length as usize];
 
         let version = u32::from_le_bytes(entry[4..8].try_into().unwrap());
         let hash_value = u32::from_le_bytes(entry[8..12].try_into().unwrap());
@@ -163,8 +157,8 @@ impl TryFrom<&[u8]> for AdsDataTypeInfo {
 
         let mut sub_items = Vec::with_capacity(sub_item_count);
         for _ in 0..sub_item_count {
-            let sub_item = AdsDataTypeInfo::try_from(&entry[pos..])?;
-            pos += sub_item.entry_length() as usize;
+            let (sub_item, sub_item_entry_length) = AdsDataTypeInfo::try_from_slice(&entry[pos..])?;
+            pos += sub_item_entry_length;
             sub_items.push(sub_item);
         }
 
@@ -216,22 +210,33 @@ impl TryFrom<&[u8]> for AdsDataTypeInfo {
             todo!("Extended enum info section not yet implemented");
         }
 
-        Ok(Self {
-            entry_length,
-            version,
-            hash_value,
-            type_hash_value,
-            size,
-            offset,
-            type_id,
-            flags,
-            name: name.to_string(),
-            type_name: type_name.to_string(),
-            comment: comment.to_string(),
-            array_infos,
-            sub_items,
-            guid,
-            attributes,
-        })
+        Ok((
+            Self {
+                version,
+                hash_value,
+                type_hash_value,
+                size,
+                offset,
+                type_id,
+                flags,
+                name: name.to_string(),
+                type_name: type_name.to_string(),
+                comment: comment.to_string(),
+                array_infos,
+                sub_items,
+                guid,
+                attributes,
+            },
+            entry_length as usize,
+        ))
+    }
+}
+
+impl TryFrom<&[u8]> for AdsDataTypeInfo {
+    type Error = AdsTypeInfoError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        let (info, _) = Self::try_from_slice(value)?;
+        Ok(info)
     }
 }

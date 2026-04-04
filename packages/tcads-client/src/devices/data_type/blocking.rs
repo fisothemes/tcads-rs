@@ -116,7 +116,7 @@ impl DataTypeDevice {
             name,
         )?;
 
-        Ok(AdsDataTypeInfo::try_from_slice(&bytes).map_err(AdsError::from)?)
+        Ok(AdsDataTypeInfo::try_from(bytes.as_ref()).map_err(AdsError::from)?)
     }
 
     pub fn get_all_data_type_info(&self) -> crate::Result<Vec<u8>> {
