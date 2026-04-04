@@ -210,6 +210,10 @@ impl AdsDataTypeInfo {
             todo!("Extended enum info section not yet implemented");
         }
 
+        if flags.has_software_protection_levels() {
+            todo!("Software protection levels section not yet implemented");
+        }
+
         Ok((
             Self {
                 version,
