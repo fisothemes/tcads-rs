@@ -14,8 +14,8 @@ use super::error::AdsTypeInfoError;
 /// | 3+n    | m+1  | `value` (null-terminated Windows-1252) |
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct AdsAttribute {
-    pub name: String,
-    pub value: String,
+    name: String,
+    value: String,
 }
 
 impl AdsAttribute {
