@@ -93,6 +93,10 @@ impl AdsDataTypeInfo {
     pub fn attributes(&self) -> &[AdsAttribute] {
         &self.attributes
     }
+    /// Enum info. Non-empty when [`AdsDataTypeFlags::ENUM_INFOS`] is set.
+    pub fn enum_infos(&self) -> &[AdsEnumInfo] {
+        &self.enum_infos
+    }
 
     /// Parses an [`AdsTypeInfo`] from a byte slice.
     pub fn try_from_slice(data: &[u8]) -> Result<(Self, usize), AdsTypeInfoError> {
