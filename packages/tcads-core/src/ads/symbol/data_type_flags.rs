@@ -10,7 +10,10 @@ use std::fmt;
 /// (e.g. [`TYPE_GUID`](Self::TYPE_GUID), [`ATTRIBUTES`](Self::ATTRIBUTES)).
 ///
 /// # Wire Format
-/// 4 bytes, Little Endian `u32`.
+///
+/// | Offset | Size | Field   | Description      |
+/// |--------|------|---------|------------------|
+/// | 0      | 4    | `flags` | Bitmask (LE u32) |
 #[derive(
     serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
 )]

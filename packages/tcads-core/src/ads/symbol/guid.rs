@@ -2,7 +2,18 @@ use super::error::GuidParseError;
 use std::fmt;
 use std::str::FromStr;
 
-/// A 16-byte Globally Unique Identifier (GUID) or Universally Unique Identifier (UUID).
+/// A 16-byte Globally Unique Identifier (GUID) as used in TwinCAT ADS type info entries.
+///
+/// Present in [`AdsDataTypeInfo`](super::AdsDataTypeInfo) when
+/// [`AdsDataTypeFlags::TYPE_GUID`](super::AdsDataTypeFlags::TYPE_GUID) is set.
+/// The bytes are stored in the order they appear on the wire without any field
+/// decomposition. TwinCAT treats GUIDs as opaque identifiers for type versioning.
+///
+/// # Wire Format
+///
+/// | Offset | Size | Field   | Description              |
+/// |--------|------|---------|--------------------------|
+/// | 0      | 16   | `bytes` | Raw GUID bytes, as-is    |
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Guid([u8; 16]);
 

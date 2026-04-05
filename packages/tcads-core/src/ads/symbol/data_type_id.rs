@@ -5,7 +5,10 @@
 /// it identifies the element type; for aliases and enums it identifies the underlying primitive.
 ///
 /// # Wire Format
-/// 4 bytes, Little Endian `u32`. Field name in `TcAdsDef.h`: `dataType`.
+///
+/// | Offset | Size | Field     | Description               |
+/// |--------|------|-----------|---------------------------|
+/// | 0      | 4    | `type_id` | Type identifier (LE u32)  |
 #[derive(
     serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash,
 )]

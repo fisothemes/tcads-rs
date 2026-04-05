@@ -1,10 +1,34 @@
 pub use super::AdsAttribute;
 use crate::ads::symbol::error::AdsTypeInfoError;
 
-/// Represents a single variant of a TwinCAT Enum.
+/// One variant of a TwinCAT enum type.
 ///
-/// Contains the name, raw byte value, and optionally any comments or
-/// attributes attached to this specific variant in the PLC code.
+/// The byte width of `value` matches the parent [`AdsDataTypeInfo::size`](super::AdsDataTypeInfo::size)
+/// field. For example, 1 byte for `BYTE`-based enums, 2 for `WORD`, 4 for `DWORD`.
+///
+/// # Wire Format
+///
+/// Parsed in two separate passes. The standard section appears in the enum info
+/// block; the extended section appears later when
+/// [`AdsDataTypeFlags::EXTENDED_ENUM_INFOS`](super::AdsDataTypeFlags::EXTENDED_ENUM_INFOS) is set.
+///
+/// ## Standard section
+///
+/// | Offset | Size          | Field      | Description                    |
+/// |--------|---------------|------------|--------------------------------|
+/// | 0      | 1             | `name_len` | Byte length of name excl. null |
+/// | 1      | `name_len + 1`| `name`     | Windows-1252, null-terminated  |
+/// | varies | `value_size`  | `value`    | Raw LE bytes, width = enum size|
+///
+/// ## Extended section
+///
+/// | Offset | Size           | Field         | Description                    |
+/// |--------|----------------|---------------|--------------------------------|
+/// | 0      | 2              | `entry_length`| Total size of this section     |
+/// | 2      | 1              | `comment_len` | Byte length of comment         |
+/// | 3      | 1              | `attr_count`  | Number of attributes           |
+/// | 4      | `comment_len+1`| `comment`     | Windows-1252, null-terminated  |
+/// | varies | varies         | `attributes`  | [`AdsAttribute`] entries       |
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct AdsEnumInfo {
     name: String,
