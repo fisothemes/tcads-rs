@@ -137,7 +137,7 @@ pub mod protocol;
 
 pub use ads::{
     AdsAttribute, AdsCommand, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId,
-    AdsDataTypeInfo, AdsDeviceVersion, AdsError, AdsHeader, AdsReturnCode, AdsState,
+    AdsDataTypeInfo, AdsDeviceVersion, AdsEnumInfo, AdsError, AdsHeader, AdsReturnCode, AdsState,
     AdsSymbolUploadInfo, AdsTransMode, DeviceState, Guid, IndexGroup, IndexOffset, InvokeId,
     LogEntry, LogMessageType, NotificationHandle, WindowsFileTime,
 };

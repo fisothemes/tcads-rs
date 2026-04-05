@@ -1,5 +1,7 @@
 use super::error::AdsTypeInfoError;
-use super::{AdsAttribute, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId, Guid};
+use super::{
+    AdsAttribute, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId, AdsEnumInfo, Guid,
+};
 
 /// TwinCAT ADS data type info.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -25,6 +27,8 @@ pub struct AdsDataTypeInfo {
     guid: Option<Guid>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     attributes: Vec<AdsAttribute>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    enum_infos: Vec<AdsEnumInfo>,
 }
 
 impl AdsDataTypeInfo {
@@ -99,17 +103,17 @@ impl AdsDataTypeInfo {
             });
         }
 
-        let entry_length = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
+        let entry_length = u32::from_le_bytes([data[0], data[1], data[2], data[3]]) as usize;
 
-        if data.len() < entry_length as usize {
+        if data.len() < entry_length {
             return Err(AdsTypeInfoError::EntryLengthMismatch {
-                expected: entry_length as usize,
+                expected: entry_length,
                 got: data.len(),
             });
         }
 
         // Work within the declared boundary
-        let entry = &data[..entry_length as usize];
+        let entry = &data[..entry_length];
 
         let version = u32::from_le_bytes(entry[4..8].try_into().unwrap());
         let hash_value = u32::from_le_bytes(entry[8..12].try_into().unwrap());
@@ -131,10 +135,10 @@ impl AdsDataTypeInfo {
         let type_end = name_end + type_length + 1;
         let comment_end = type_end + comment_length + 1;
 
-        if (entry_length as usize) < comment_end {
+        if (entry_length) < comment_end {
             return Err(AdsTypeInfoError::EntryLengthMismatch {
                 expected: comment_end,
-                got: entry_length as usize,
+                got: entry_length,
             });
         }
 
@@ -163,14 +167,14 @@ impl AdsDataTypeInfo {
         }
 
         let mut guid = None;
-        if flags.has_type_guid() && pos + 16 <= entry_length as usize {
+        if flags.has_type_guid() && pos + 16 <= entry_length {
             guid = Some(Guid::try_from_slice(&entry[pos..pos + 16])?);
             pos += Guid::LENGTH;
         }
 
         if flags.has_copy_mask() {
             // Legacy section, skip it
-            pos = (pos + size as usize).min(entry_length as usize);
+            pos = (pos + size as usize).min(entry_length);
         }
 
         if flags.has_method_infos() {
@@ -178,20 +182,29 @@ impl AdsDataTypeInfo {
         }
 
         let mut attributes = Vec::new();
-        if flags.has_attributes() && pos + 2 <= entry_length as usize {
+        if flags.has_attributes() && pos + 2 <= entry_length {
             let attr_count = u16::from_le_bytes(entry[pos..pos + 2].try_into().unwrap()) as usize;
             pos += 2;
 
             attributes.reserve(attr_count);
             for _ in 0..attr_count {
                 let attr = AdsAttribute::try_from_slice(&entry[pos..])?;
-                pos += attr.wire_size(); // Advance by dynamically parsed size
+                pos += attr.wire_size();
                 attributes.push(attr);
             }
         }
 
-        if flags.has_enum_infos() {
-            todo!("Enum info section not yet implemented");
+        let mut enums = Vec::new();
+        if flags.has_enum_infos() && pos + 2 <= entry_length {
+            let enum_count = u16::from_le_bytes([entry[pos], entry[pos + 1]]) as usize;
+            pos += 2;
+            enums.reserve(enum_count);
+            for _ in 0..enum_count {
+                let (enum_info, bytes_consumed) =
+                    AdsEnumInfo::try_from_slice(&entry[pos..], size as usize)?;
+                pos += bytes_consumed;
+                enums.push(enum_info);
+            }
         }
 
         if flags.has_refactor_info() {
@@ -199,15 +212,20 @@ impl AdsDataTypeInfo {
         }
 
         if flags.has_extended_flags() {
-            todo!("Extended flags section not yet implemented");
+            pos += 4;
         }
 
         if flags.is_variant() {
-            todo!("Variant section not yet implemented");
+            todo!("Variant type not yet implemented");
         }
 
         if flags.has_extended_enum_infos() {
-            todo!("Extended enum info section not yet implemented");
+            for enum_info in &mut enums {
+                if pos + 4 <= entry_length {
+                    let bytes_consumed = enum_info.extend_from_slice(&entry[pos..])?;
+                    pos += bytes_consumed;
+                }
+            }
         }
 
         if flags.has_software_protection_levels() {
@@ -230,8 +248,9 @@ impl AdsDataTypeInfo {
                 sub_items,
                 guid,
                 attributes,
+                enum_infos: enums,
             },
-            entry_length as usize,
+            entry_length,
         ))
     }
 }
