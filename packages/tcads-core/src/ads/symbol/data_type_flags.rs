@@ -213,13 +213,15 @@ impl From<AdsDataTypeFlags> for [u8; AdsDataTypeFlags::LENGTH] {
 impl TryFrom<&[u8]> for AdsDataTypeFlags {
     type Error = AdsError;
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        if value.len() < Self::LENGTH {
+        if value.len() != Self::LENGTH {
             return Err(AdsError::UnexpectedDataLength {
                 expected: Self::LENGTH,
                 got: value.len(),
             });
         }
-        Ok(Self(u32::from_le_bytes(value[..4].try_into().unwrap())))
+        Ok(Self(u32::from_le_bytes([
+            value[0], value[1], value[2], value[3],
+        ])))
     }
 }
 
