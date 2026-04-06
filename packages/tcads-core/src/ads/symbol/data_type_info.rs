@@ -1,6 +1,7 @@
 use super::error::AdsTypeInfoError;
 use super::{
-    AdsAttribute, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId, AdsEnumInfo, Guid,
+    AdsAttribute, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId, AdsEnumInfo,
+    AdsMethodInfo, Guid,
 };
 
 /// TwinCAT ADS data type info.
@@ -25,6 +26,8 @@ pub struct AdsDataTypeInfo {
     sub_items: Vec<AdsDataTypeInfo>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     guid: Option<Guid>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    method_infos: Vec<AdsMethodInfo>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     attributes: Vec<AdsAttribute>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -88,6 +91,10 @@ impl AdsDataTypeInfo {
     /// 16-byte type GUID. Present when [`AdsDataTypeFlags::TYPE_GUID`] is set.
     pub fn guid(&self) -> Option<&Guid> {
         self.guid.as_ref()
+    }
+    /// RPC method info. Non-empty when [`AdsDataTypeFlags::METHOD_INFOS`] is set.
+    pub fn method_infos(&self) -> &[AdsMethodInfo] {
+        &self.method_infos
     }
     /// Pragma key-value attributes. Non-empty when [`AdsDataTypeFlags::ATTRIBUTES`] is set.
     pub fn attributes(&self) -> &[AdsAttribute] {
@@ -181,8 +188,17 @@ impl AdsDataTypeInfo {
             pos = (pos + size as usize).min(entry_length);
         }
 
+        let mut method_infos = Vec::new();
         if flags.has_method_infos() {
-            todo!("Method info section not yet implemented");
+            let method_count = u16::from_le_bytes([entry[pos], entry[pos + 1]]) as usize;
+            pos += 2;
+
+            method_infos.reserve(method_count);
+            for _ in 0..method_count {
+                let (method, bytes_consumed) = AdsMethodInfo::try_from_slice(&entry[pos..])?;
+                pos += bytes_consumed;
+                method_infos.push(method);
+            }
         }
 
         let mut attributes = Vec::new();
@@ -251,6 +267,7 @@ impl AdsDataTypeInfo {
                 array_infos,
                 sub_items,
                 guid,
+                method_infos,
                 attributes,
                 enum_infos: enums,
             },
