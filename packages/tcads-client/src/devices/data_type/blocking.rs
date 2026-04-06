@@ -125,7 +125,7 @@ impl DataTypeDevice {
             self.inner.target,
             DATATYPE_UPLOAD_INDEX_GROUP,
             0,
-            info.data_type_byte_size(),
+            info.data_type_blob_size(),
         )
     }
 
