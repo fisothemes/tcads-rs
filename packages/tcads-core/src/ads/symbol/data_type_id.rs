@@ -1,3 +1,5 @@
+use super::error::AdsTypeInfoError;
+
 /// ADS data type identifier.
 ///
 /// Identifies the machine type of a symbol or the base/element type of a composite.
@@ -54,6 +56,11 @@ pub enum AdsDataTypeId {
 impl AdsDataTypeId {
     /// Wire size in bytes.
     pub const LENGTH: usize = 4;
+
+    /// Tries to parse a slice of bytes and construct an [`AdsDataTypeId`] struct.
+    pub fn try_from_slice(data: &[u8]) -> Result<Self, AdsTypeInfoError> {
+        Self::try_from(data)
+    }
 
     /// Creates from a 4-byte little-endian array.
     pub fn from_bytes(bytes: [u8; Self::LENGTH]) -> Self {
@@ -125,6 +132,22 @@ impl From<[u8; Self::LENGTH]> for AdsDataTypeId {
 impl From<AdsDataTypeId> for [u8; AdsDataTypeId::LENGTH] {
     fn from(value: AdsDataTypeId) -> Self {
         value.to_bytes()
+    }
+}
+
+impl TryFrom<&[u8]> for AdsDataTypeId {
+    type Error = AdsTypeInfoError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() != Self::LENGTH {
+            return Err(AdsTypeInfoError::EntryLengthMismatch {
+                expected: Self::LENGTH,
+                got: value.len(),
+            });
+        }
+
+        let id = u32::from_le_bytes([value[0], value[1], value[2], value[3]]);
+        Ok(id.into())
     }
 }
 
