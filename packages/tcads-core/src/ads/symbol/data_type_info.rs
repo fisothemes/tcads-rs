@@ -1,7 +1,7 @@
 use super::error::AdsTypeInfoError;
 use super::{
     AdsAttribute, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId, AdsEnumInfo,
-    AdsMethodInfo, Guid,
+    AdsMethodInfo, AdsRefactorInfo, Guid,
 };
 
 /// TwinCAT ADS data type info.
@@ -32,6 +32,8 @@ pub struct AdsDataTypeInfo {
     attributes: Vec<AdsAttribute>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     enum_infos: Vec<AdsEnumInfo>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    refactor_infos: Vec<AdsRefactorInfo>,
 }
 
 impl AdsDataTypeInfo {
@@ -103,6 +105,10 @@ impl AdsDataTypeInfo {
     /// Enum info. Non-empty when [`AdsDataTypeFlags::ENUM_INFOS`] is set.
     pub fn enum_infos(&self) -> &[AdsEnumInfo] {
         &self.enum_infos
+    }
+    /// Refactoring history. Non-empty when [`AdsDataTypeFlags::REFACTOR_INFO`] is set.
+    pub fn refactor_infos(&self) -> &[AdsRefactorInfo] {
+        &self.refactor_infos
     }
 
     /// Parses an [`AdsTypeInfo`] from a byte slice.
@@ -227,8 +233,11 @@ impl AdsDataTypeInfo {
             }
         }
 
+        let mut refactor_infos = Vec::new();
         if flags.has_refactor_info() {
-            todo!("Refactor info section not yet implemented");
+            let (infos, consumed) = AdsRefactorInfo::parse_chain(&entry[pos..entry_length])?;
+            refactor_infos = infos;
+            pos += consumed;
         }
 
         if flags.has_extended_flags() {
@@ -270,6 +279,7 @@ impl AdsDataTypeInfo {
                 method_infos,
                 attributes,
                 enum_infos: enums,
+                refactor_infos,
             },
             entry_length,
         ))

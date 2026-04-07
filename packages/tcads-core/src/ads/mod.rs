@@ -32,7 +32,7 @@ pub use string::AdsString;
 pub use symbol::{
     AdsAttribute, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId, AdsDataTypeInfo,
     AdsEnumInfo, AdsMethodFlags, AdsMethodInfo, AdsMethodParamFlags, AdsMethodParamInfo,
-    AdsMethodReturnTypeInfo, AdsSymbolUploadInfo, Guid,
+    AdsMethodReturnTypeInfo, AdsRefactorInfo, AdsSymbolUploadInfo, Guid,
 };
 pub use trans_mode::AdsTransMode;
 
