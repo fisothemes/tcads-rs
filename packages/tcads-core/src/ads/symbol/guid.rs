@@ -25,6 +25,12 @@ impl Guid {
         Self(bytes)
     }
 
+    /// Generates a random GUID using the `rand` crate.
+    pub fn random() -> Self {
+        let bytes: [u8; 16] = rand::random();
+        Self::new(bytes)
+    }
+
     /// Returns the inner byte array.
     pub const fn as_bytes(&self) -> &[u8; 16] {
         &self.0
