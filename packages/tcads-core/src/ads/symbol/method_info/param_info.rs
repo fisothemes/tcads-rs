@@ -142,7 +142,7 @@ impl AdsMethodParamInfo {
     }
 
     /// Serializes method parameter info into bytes.
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_vec(&self) -> Vec<u8> {
         let entry_length = self.wire_size() as u32;
 
         let mut buf = Vec::with_capacity(self.wire_size());
@@ -476,7 +476,7 @@ mod tests {
             "UDINT",
         )
         .with_comment("a value");
-        assert_eq!(param.wire_size(), param.to_bytes().len());
+        assert_eq!(param.wire_size(), param.to_vec().len());
     }
 
     #[test]
@@ -496,7 +496,7 @@ mod tests {
             AdsAttribute::new("unit", "mm"),
             AdsAttribute::new("min", "0"),
         ]);
-        assert_eq!(param.wire_size(), param.to_bytes().len());
+        assert_eq!(param.wire_size(), param.to_vec().len());
     }
 
     #[test]
@@ -512,7 +512,7 @@ mod tests {
             "nA",
             "ULINT",
         );
-        let bytes = original.to_bytes();
+        let bytes = original.to_vec();
         let (parsed, consumed) = AdsMethodParamInfo::try_from_slice(&bytes).unwrap();
         assert_eq!(consumed, bytes.len());
         assert_eq!(parsed, original);
@@ -532,7 +532,7 @@ mod tests {
             "LINT",
         )
         .with_comment(" The sum of the inputs");
-        let bytes = original.to_bytes();
+        let bytes = original.to_vec();
         let (parsed, consumed) = AdsMethodParamInfo::try_from_slice(&bytes).unwrap();
         assert_eq!(consumed, bytes.len());
         assert_eq!(parsed, original);
@@ -552,7 +552,7 @@ mod tests {
             "UDINT",
         )
         .with_attributes([AdsAttribute::new("unit", "items")]);
-        let bytes = original.to_bytes();
+        let bytes = original.to_vec();
         let (parsed, consumed) = AdsMethodParamInfo::try_from_slice(&bytes).unwrap();
         assert_eq!(consumed, bytes.len());
         assert_eq!(parsed.attributes().len(), 1);
@@ -562,7 +562,7 @@ mod tests {
     #[test]
     fn roundtrip_real_na_bytes() {
         let (original, _) = AdsMethodParamInfo::try_from_slice(&na_bytes()).unwrap();
-        let bytes = original.to_bytes();
+        let bytes = original.to_vec();
         let (parsed, _) = AdsMethodParamInfo::try_from_slice(&bytes).unwrap();
         assert_eq!(parsed, original);
     }
@@ -570,7 +570,7 @@ mod tests {
     #[test]
     fn roundtrip_real_nout_bytes() {
         let (original, _) = AdsMethodParamInfo::try_from_slice(&nout_bytes()).unwrap();
-        let bytes = original.to_bytes();
+        let bytes = original.to_vec();
         let (parsed, _) = AdsMethodParamInfo::try_from_slice(&bytes).unwrap();
         assert_eq!(parsed, original);
     }
