@@ -244,8 +244,16 @@ impl AdsDataTypeInfo {
             pos += 4;
         }
 
-        if flags.is_variant() {
-            todo!("Variant type not yet implemented");
+        if flags.is_variant() && pos + 2 <= entry_length {
+            // Skip variant/deref type info for now
+            let deref_count = u16::from_le_bytes([entry[pos], entry[pos + 1]]) as usize;
+            pos += 2;
+
+            for _ in 0..deref_count {
+                if pos + 16 <= entry_length {
+                    pos += 16;
+                }
+            }
         }
 
         if flags.has_extended_enum_infos() {
