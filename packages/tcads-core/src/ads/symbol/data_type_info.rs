@@ -257,10 +257,6 @@ impl AdsDataTypeInfo {
             }
         }
 
-        if flags.has_software_protection_levels() {
-            todo!("Software protection levels section not yet implemented");
-        }
-
         Ok((
             Self {
                 version,
