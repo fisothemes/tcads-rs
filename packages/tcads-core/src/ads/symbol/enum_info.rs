@@ -196,7 +196,7 @@ impl AdsEnumInfo {
     /// - **`standard_bytes`**: The base wire format (name length, name, null terminator, raw value).
     /// - **`extended_bytes`**: The extended metadata (entry length, comment, attributes).
     ///   If the enum has no comment or attributes, this vector will be empty.
-    pub fn to_bytes(&self) -> (Vec<u8>, Vec<u8>) {
+    pub fn to_vec(&self) -> (Vec<u8>, Vec<u8>) {
         let mut standard = Vec::new();
 
         let (name_enc, _, _) = encoding_rs::WINDOWS_1252.encode(&self.name);
@@ -275,7 +275,7 @@ mod tests {
     fn test_roundtrip_standard_enum() {
         let original = AdsEnumInfo::new("PS_All", vec![0x01]);
 
-        let (std_bytes, ext_bytes) = original.to_bytes();
+        let (std_bytes, ext_bytes) = original.to_vec();
 
         assert!(ext_bytes.is_empty());
 
@@ -292,7 +292,7 @@ mod tests {
             [AdsAttribute::new("State", "Warning")],
         );
 
-        let (std_bytes, ext_bytes) = original.to_bytes();
+        let (std_bytes, ext_bytes) = original.to_vec();
 
         let (mut parsed, _) = AdsEnumInfo::try_from_slice(&std_bytes, 1).unwrap();
 
