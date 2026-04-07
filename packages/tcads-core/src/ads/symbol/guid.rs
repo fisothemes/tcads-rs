@@ -26,8 +26,15 @@ impl Guid {
     }
 
     /// Generates a random GUID using the `rand` crate.
+    ///
+    /// Tries to be RFC 4122 Version 4 (random) compliant.
     pub fn random() -> Self {
-        let bytes: [u8; 16] = rand::random();
+        let mut bytes: [u8; 16] = rand::random();
+
+        // For RFC 4122 Version 4 (random) compliance, we need to set the version bits to 4.
+        bytes[6] = (bytes[6] & 0x0F) | 0x40;
+        bytes[8] = (bytes[8] & 0x3F) | 0x80;
+
         Self::new(bytes)
     }
 
@@ -85,6 +92,12 @@ impl TryFrom<&[u8]> for Guid {
 
 impl fmt::Debug for Guid {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Guid({})", self)
+    }
+}
+
+impl fmt::Display for Guid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (i, &b) in self.0.iter().enumerate() {
             if i == 4 || i == 6 || i == 8 || i == 10 {
                 write!(f, "-")?;
@@ -92,12 +105,6 @@ impl fmt::Debug for Guid {
             write!(f, "{:02x}", b)?;
         }
         Ok(())
-    }
-}
-
-impl fmt::Display for Guid {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
     }
 }
 
@@ -174,7 +181,7 @@ mod tests {
         let expected = "12345678-9abc-def0-1234-56789abcdef0";
 
         assert_eq!(format!("{}", guid), expected);
-        assert_eq!(format!("{:?}", guid), expected);
+        assert_eq!(format!("{:?}", guid), format!("Guid({})", expected));
     }
 
     #[test]
