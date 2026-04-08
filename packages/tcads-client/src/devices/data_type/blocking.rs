@@ -121,12 +121,14 @@ impl DataTypeDevice {
 
     pub fn get_all_data_type_info(&self) -> crate::Result<Vec<u8>> {
         let info = self.get_upload_info()?;
-        self.inner.device.read(
-            self.inner.target,
-            DATATYPE_UPLOAD_INDEX_GROUP,
-            0,
-            info.data_type_blob_size(),
-        )
+
+        if let Some(size) = info.data_type_blob_size() {
+            self.inner
+                .device
+                .read(self.inner.target, DATATYPE_UPLOAD_INDEX_GROUP, 0, size)
+        } else {
+            Err(crate::Error::InvalidPayload)
+        }
     }
 
     pub fn get_upload_info(&self) -> crate::Result<AdsSymbolUploadInfo> {
@@ -137,6 +139,8 @@ impl DataTypeDevice {
             AdsSymbolUploadInfo::LENGTH as u32,
         )?;
 
-        Ok(AdsSymbolUploadInfo::try_from_slice(&bytes).map_err(AdsError::from)?)
+        let (info, _) = AdsSymbolUploadInfo::try_from_slice(&bytes).map_err(AdsError::from)?;
+
+        Ok(info)
     }
 }

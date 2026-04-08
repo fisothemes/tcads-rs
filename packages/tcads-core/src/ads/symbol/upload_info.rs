@@ -70,6 +70,7 @@ impl AdsSymbolUploadInfo {
         }
     }
 
+    /// Creates a new instance of [`AdsSymbolUploadInfo`] with the given data type count and blob size.
     pub fn with_data_type_count(mut self, count: u32) -> Self {
         self.data_type_count = Some(count);
         self
@@ -160,41 +161,51 @@ impl AdsSymbolUploadInfo {
     }
 
     /// Serialize to bytes (always writes full Version 3 layout)
-    pub fn to_bytes(&self) -> [u8; Self::LENGTH] {
+    pub fn to_bytes(&self) -> ([u8; Self::LENGTH], usize) {
         let mut buf = [0u8; Self::LENGTH];
 
         buf[0..4].copy_from_slice(&self.symbol_count.to_le_bytes());
         buf[4..8].copy_from_slice(&self.symbol_blob_size.to_le_bytes());
 
+        let mut size = Self::LENGTH_V1;
+
         if let Some(v) = self.data_type_count {
             buf[8..12].copy_from_slice(&v.to_le_bytes());
+            size = Self::LENGTH_V2;
         }
         if let Some(v) = self.data_type_blob_size {
             buf[12..16].copy_from_slice(&v.to_le_bytes());
+            size = Self::LENGTH_V2;
         }
         if let Some(v) = self.dyn_symbol_capacity {
             buf[16..20].copy_from_slice(&v.to_le_bytes());
+            size = Self::LENGTH_V2;
         }
         if let Some(v) = self.dyn_symbol_count {
             buf[20..24].copy_from_slice(&v.to_le_bytes());
+            size = Self::LENGTH_V2;
         }
         if let Some(v) = self.invalid_dyn_symbol_count {
             buf[24..28].copy_from_slice(&v.to_le_bytes());
+            size = Self::LENGTH;
         }
         if let Some(v) = self.encoding_code_page {
             buf[28..32].copy_from_slice(&v.to_le_bytes());
+            size = Self::LENGTH;
         }
         if let Some(flags) = self.flags {
             buf[32..36].copy_from_slice(&flags.to_bytes());
+            size = Self::LENGTH;
         }
-
-        buf
+        (buf, size)
     }
 
     /// Parse from slice, supports v1, v2, and v3
-    pub fn try_from_slice(data: &[u8]) -> Result<Self, AdsSymbolUploadInfoError> {
+    ///
+    /// Returns a tuple containing the struct with bytes written.
+    pub fn try_from_slice(data: &[u8]) -> Result<(Self, usize), AdsSymbolUploadInfoError> {
         if data.len() < Self::LENGTH_V1 {
-            return Err(AdsSymbolUploadInfoError::UnexpectedLength {
+            return Err(AdsSymbolUploadInfoError::TooShort {
                 expected: Self::LENGTH_V1,
                 got: data.len(),
             });
@@ -205,12 +216,15 @@ impl AdsSymbolUploadInfo {
             u32::from_le_bytes(data[4..8].try_into().unwrap()),
         );
 
+        let mut size = Self::LENGTH_V1;
+
         if data.len() >= Self::LENGTH_V2 {
             info = info
                 .with_data_type_count(u32::from_le_bytes(data[8..12].try_into().unwrap()))
                 .with_data_type_blob_size(u32::from_le_bytes(data[12..16].try_into().unwrap()))
                 .with_dyn_symbol_capacity(u32::from_le_bytes(data[16..20].try_into().unwrap()))
                 .with_dyn_symbol_count(u32::from_le_bytes(data[20..24].try_into().unwrap()));
+            size = Self::LENGTH_V2;
         }
 
         if data.len() >= Self::LENGTH {
@@ -220,28 +234,33 @@ impl AdsSymbolUploadInfo {
                 .with_flags(AdsSymbolUploadFlags::from_bytes(
                     data[32..36].try_into().unwrap(),
                 ));
+
+            size = Self::LENGTH;
         }
 
-        Ok(info)
+        Ok((info, size))
     }
 }
 
 impl From<&AdsSymbolUploadInfo> for [u8; AdsSymbolUploadInfo::LENGTH] {
     fn from(value: &AdsSymbolUploadInfo) -> Self {
-        value.to_bytes()
+        let (info, _) = value.to_bytes();
+        info
     }
 }
 
 impl From<AdsSymbolUploadInfo> for [u8; AdsSymbolUploadInfo::LENGTH] {
     fn from(value: AdsSymbolUploadInfo) -> Self {
-        value.to_bytes()
+        let (info, _) = value.to_bytes();
+        info
     }
 }
 
 impl TryFrom<&[u8]> for AdsSymbolUploadInfo {
     type Error = AdsSymbolUploadInfoError;
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
-        Self::try_from_slice(data)
+        let (info, _) = Self::try_from_slice(data)?;
+        Ok(info)
     }
 }
 
@@ -249,8 +268,14 @@ impl TryFrom<&[u8]> for AdsSymbolUploadInfo {
 mod tests {
     use super::*;
 
-    // Real captured response from ADSIGRP_SYM_UPLOADINFO2
-    fn real_bytes() -> [u8; 24] {
+    fn real_v1_bytes() -> [u8; AdsSymbolUploadInfo::LENGTH_V1] {
+        [
+            0x91, 0x00, 0x00, 0x00, // symbol_count        = 145
+            0x60, 0x3d, 0x00, 0x00, // symbol_byte_size    = 15712
+        ]
+    }
+
+    fn real_v2_bytes() -> [u8; AdsSymbolUploadInfo::LENGTH_V2] {
         [
             0x91, 0x00, 0x00, 0x00, // symbol_count       = 145
             0x60, 0x3d, 0x00, 0x00, // symbol_byte_size    = 15712
@@ -262,8 +287,8 @@ mod tests {
     }
 
     #[test]
-    fn parses_real_capture() {
-        let info = AdsSymbolUploadInfo::try_from_slice(&real_bytes()).unwrap();
+    fn parses_real_capture_v2() {
+        let info = AdsSymbolUploadInfo::try_from(real_v2_bytes().as_ref()).unwrap();
         assert_eq!(info.symbol_count(), 145);
         assert_eq!(info.symbol_blob_size(), 15712);
         assert_eq!(info.data_type_count().unwrap(), 57);
@@ -274,26 +299,33 @@ mod tests {
 
     #[test]
     fn roundtrip_bytes() {
-        let original = AdsSymbolUploadInfo::try_from_slice(&real_bytes()).unwrap();
-        let bytes = original.to_bytes();
-        let parsed = AdsSymbolUploadInfo::try_from_slice(&bytes).unwrap();
+        let original = AdsSymbolUploadInfo::try_from(real_v2_bytes().as_ref()).unwrap();
+        let (bytes, written) = original.to_bytes();
+        let parsed = AdsSymbolUploadInfo::try_from(&bytes[0..written]).unwrap();
         assert_eq!(original, parsed);
     }
 
     #[test]
     fn to_bytes_length_is_correct() {
-        let info = AdsSymbolUploadInfo::try_from_slice(&real_bytes()).unwrap();
-        assert_eq!(info.to_bytes().len(), AdsSymbolUploadInfo::LENGTH);
+        let (_, written) = AdsSymbolUploadInfo::try_from(real_v1_bytes().as_ref())
+            .unwrap()
+            .to_bytes();
+        assert_eq!(written, AdsSymbolUploadInfo::LENGTH_V1);
+
+        let (_, written) = AdsSymbolUploadInfo::try_from(real_v2_bytes().as_ref())
+            .unwrap()
+            .to_bytes();
+        assert_eq!(written, AdsSymbolUploadInfo::LENGTH_V2);
     }
 
     #[test]
     fn too_short_returns_err() {
-        let err = AdsSymbolUploadInfo::try_from_slice(&[0u8; 23]).unwrap_err();
+        let err = AdsSymbolUploadInfo::try_from_slice(&[0u8; 1]).unwrap_err();
         assert!(matches!(
             err,
-            AdsSymbolUploadInfoError::UnexpectedLength {
-                expected: 24,
-                got: 23
+            AdsSymbolUploadInfoError::TooShort {
+                expected: 8,
+                got: 1
             }
         ));
     }

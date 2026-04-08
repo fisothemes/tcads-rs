@@ -146,6 +146,8 @@ pub enum LogEntryError {
 /// Error returned when parsing [`AdsSymbolUploadInfo`](super::AdsSymbolUploadInfo) fails.
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum AdsSymbolUploadInfoError {
+    #[error("Payload too short: expected at least {expected} bytes, got {got}")]
+    TooShort { expected: usize, got: usize },
     #[error("Unexpected length: expected {expected} bytes, got {got}")]
     UnexpectedLength { expected: usize, got: usize },
 }
