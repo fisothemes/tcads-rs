@@ -15,6 +15,7 @@ use std::str::FromStr;
 /// |--------|------|---------|--------------------------|
 /// | 0      | 16   | `bytes` | Raw GUID bytes, as-is    |
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[repr(transparent)]
 pub struct Guid([u8; 16]);
 
 impl Guid {
