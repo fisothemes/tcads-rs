@@ -117,7 +117,7 @@ pub mod ads;
 /// AMS layer addressing and router management.
 ///
 /// Handles the outer layer of the protocol: network addressing via [`AmsNetId`]
-/// and [`AmsAddr`], as well as the specialised commands used to communicate
+/// and [`AmsAddr`], as well as the specialized commands used to communicate
 /// with the AMS Router itself (e.g. [`PortConnect`](AmsCommand::PortConnect)).
 pub mod ams;
 
@@ -139,9 +139,9 @@ pub use ads::{
     AdsAttribute, AdsCommand, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId,
     AdsDataTypeInfo, AdsDeviceVersion, AdsEnumInfo, AdsError, AdsHeader, AdsMethodFlags,
     AdsMethodInfo, AdsMethodParamFlags, AdsMethodParamInfo, AdsMethodReturnTypeInfo,
-    AdsRefactorInfo, AdsReturnCode, AdsState, AdsSymbolUploadInfo, AdsTransMode, DeviceState, Guid,
-    IndexGroup, IndexOffset, InvokeId, LogEntry, LogMessageType, NotificationHandle,
-    WindowsFileTime,
+    AdsRefactorInfo, AdsReturnCode, AdsState, AdsSymbolUploadFlags, AdsSymbolUploadInfo,
+    AdsTransMode, DeviceState, Guid, IndexGroup, IndexOffset, InvokeId, LogEntry, LogMessageType,
+    NotificationHandle, WindowsFileTime,
 };
 pub use ams::{AmsAddr, AmsCommand, AmsNetId, AmsPort, AmsTcpHeader, RouterState, RuntimeType};
 pub use io::AmsFrame;

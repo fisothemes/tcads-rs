@@ -7,6 +7,7 @@ pub mod enum_info;
 pub mod guid;
 pub mod method_info;
 pub mod refactor_info;
+pub mod upload_flags;
 pub mod upload_info;
 
 use super::error;
@@ -21,4 +22,5 @@ pub use method_info::{
     AdsMethodFlags, AdsMethodInfo, AdsMethodParamFlags, AdsMethodParamInfo, AdsMethodReturnTypeInfo,
 };
 pub use refactor_info::AdsRefactorInfo;
+pub use upload_flags::AdsSymbolUploadFlags;
 pub use upload_info::AdsSymbolUploadInfo;
