@@ -3,7 +3,7 @@ use super::{
 };
 use crate::devices::blocking::AdsDevice;
 use std::net::ToSocketAddrs;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tcads_core::{
     AdsDataTypeInfo, AdsDataTypeIteratorOwned, AdsError, AdsSymbolUploadInfo,
@@ -13,6 +13,7 @@ use tcads_core::{
 pub struct DataTypeDeviceInner {
     pub device: AdsDevice,
     pub target: AmsAddr,
+    pub upload_info: RwLock<Option<AdsSymbolUploadInfo>>,
 }
 
 /// An ADS device client for fetching data type info from a PLC runtime.
@@ -74,7 +75,11 @@ impl DataTypeDevice {
     /// Use this when sharing a connection with other device clients.
     pub fn new(device: AdsDevice, target: AmsAddr) -> Self {
         Self {
-            inner: Arc::new(DataTypeDeviceInner { device, target }),
+            inner: Arc::new(DataTypeDeviceInner {
+                device,
+                target,
+                upload_info: RwLock::new(None),
+            }),
         }
     }
 
@@ -95,7 +100,7 @@ impl DataTypeDevice {
         &self.inner.device
     }
 
-    /// Returns data type info (current raw bytes until I work out the format)
+    /// Fetches the data type information for a specific symbol name.
     pub fn get_data_type_info(&self, name: &str) -> crate::Result<AdsDataTypeInfo> {
         let length_bytes = self.inner.device.read_write(
             self.inner.target,
@@ -119,7 +124,16 @@ impl DataTypeDevice {
             name,
         )?;
 
-        Ok(AdsDataTypeInfo::try_from(bytes.as_ref()).map_err(AdsError::from)?)
+        let info = self.get_upload_info()?;
+        let pp_size = info
+            .flags()
+            .map(|f| if f.is_64bit_platform() { 8 } else { 4 });
+
+        let type_info = AdsDataTypeInfo::try_from(bytes.as_ref())
+            .map_err(AdsError::from)?
+            .with_platform_pointer_size(pp_size);
+
+        Ok(type_info)
     }
 
     /// Fetches all data types from the PLC and returns a lazy iterator.
@@ -127,23 +141,31 @@ impl DataTypeDevice {
     /// The network request is made immediately, but the parsing happens lazily
     /// as you consume the iterator.
     pub fn get_all_data_type_info(&self) -> crate::Result<AdsDataTypeIteratorOwned> {
+        let info = self.get_upload_info()?;
+
         // There is no data type blob size for V1, so we just use a huge number.
         // This is safe because we know the size of the upload info is 8 bytes
         // and the data type blob size is 4 bytes
-        let size = self
-            .get_upload_info()?
-            .data_type_blob_size()
-            .unwrap_or(u32::MAX);
+        let size = info.data_type_blob_size().unwrap_or(u32::MAX);
+
+        let pp_size = info
+            .flags()
+            .map(|f| if f.is_64bit_platform() { 8 } else { 4 });
 
         let raw_blob =
             self.inner
                 .device
                 .read(self.inner.target, DATATYPE_UPLOAD_INDEX_GROUP, 0, size)?;
 
-        Ok(AdsDataTypeIteratorOwned::new(raw_blob))
+        Ok(AdsDataTypeIteratorOwned::new(raw_blob).with_platform_pointer_size(pp_size))
     }
 
+    /// Fetches and caches the symbol upload metadata from the PLC.
     pub fn get_upload_info(&self) -> crate::Result<AdsSymbolUploadInfo> {
+        if let Some(info) = self.inner.upload_info.read()?.as_ref() {
+            return Ok(info.clone());
+        }
+
         let bytes = self.inner.device.read(
             self.inner.target,
             SYMBOL_UPLOAD_INFO_INDEX_GROUP,
@@ -152,6 +174,11 @@ impl DataTypeDevice {
             AdsSymbolUploadInfoV3::LENGTH as u32,
         )?;
 
-        Ok(AdsSymbolUploadInfo::try_from_slice(&bytes).map_err(AdsError::from)?)
+        let info = AdsSymbolUploadInfo::try_from_slice(&bytes).map_err(AdsError::from)?;
+
+        // Update the cache
+        *self.inner.upload_info.write()? = Some(info.clone());
+
+        Ok(info)
     }
 }

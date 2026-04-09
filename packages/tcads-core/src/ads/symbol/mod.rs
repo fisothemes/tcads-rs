@@ -15,7 +15,9 @@ pub use attributes::AdsAttribute;
 pub use data_type_array_info::AdsDataTypeArrayInfo;
 pub use data_type_flags::AdsDataTypeFlags;
 pub use data_type_id::AdsDataTypeId;
-pub use data_type_info::{AdsDataTypeInfo, AdsDataTypeIterator, AdsDataTypeIteratorOwned};
+pub use data_type_info::{
+    AdsDataTypeCategory, AdsDataTypeInfo, AdsDataTypeIterator, AdsDataTypeIteratorOwned,
+};
 pub use enum_info::AdsEnumInfo;
 pub use guid::Guid;
 pub use method_info::{
