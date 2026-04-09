@@ -1,5 +1,6 @@
 use super::AdsSymbolUploadFlags;
 use super::error::AdsSymbolUploadInfoError;
+use crate::AdsSymbolUploadInfo::V3;
 
 /// Metadata describing the symbols and data types available on a PLC runtime.
 ///
@@ -85,6 +86,50 @@ impl AdsSymbolUploadInfo {
             Self::V1(_) => None,
             Self::V2(v) => Some(v.data_type_blob_size()),
             Self::V3(v) => Some(v.data_type_blob_size()),
+        }
+    }
+
+    /// Maximum number of dynamic symbols supported by this runtime.
+    ///
+    /// Returns `None` if the runtime does not support the retrieval of dynamic symbol capacity.
+    pub fn dyn_symbol_capacity(&self) -> Option<u32> {
+        match self {
+            Self::V1(_) => None,
+            Self::V2(v) => Some(v.dyn_symbol_capacity()),
+            Self::V3(v) => Some(v.dyn_symbol_capacity()),
+        }
+    }
+
+    /// Number of dynamic symbols currently in use.
+    ///
+    /// Returns `None` if the runtime does not support the retrieval of dynamic symbol count.
+    pub fn dyn_symbol_count(&self) -> Option<u32> {
+        match self {
+            Self::V1(_) => None,
+            Self::V2(v) => Some(v.dyn_symbol_count()),
+            Self::V3(v) => Some(v.dyn_symbol_count()),
+        }
+    }
+
+    /// String encoding code page for symbol and type names.
+    ///
+    /// `1252` = Windows-1252 (Western European), the default for most TwinCAT runtimes.
+    ///
+    /// Returns `None` if the runtime does not support retreival of the encoding code page.
+    pub fn encoding_code_page(&self) -> Option<u32> {
+        match self {
+            V3(v) => Some(v.encoding_code_page),
+            _ => None,
+        }
+    }
+
+    /// Runtime flags.
+    ///
+    /// Returns `None` if the runtime does no support retrieval of runtime flags.
+    pub fn flags(&self) -> Option<AdsSymbolUploadFlags> {
+        match self {
+            V3(v) => Some(v.flags),
+            _ => None,
         }
     }
 
