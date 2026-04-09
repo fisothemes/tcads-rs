@@ -5,7 +5,9 @@ use crate::devices::blocking::AdsDevice;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
 use std::time::Duration;
-use tcads_core::{AdsDataTypeInfo, AdsError, AdsSymbolUploadInfo, AmsAddr, AmsPort};
+use tcads_core::{
+    AdsDataTypeInfo, AdsError, AdsSymbolUploadInfo, AdsSymbolUploadInfoV3, AmsAddr, AmsPort,
+};
 
 pub struct DataTypeDeviceInner {
     pub device: AdsDevice,
@@ -120,15 +122,17 @@ impl DataTypeDevice {
     }
 
     pub fn get_all_data_type_info(&self) -> crate::Result<Vec<u8>> {
-        let info = self.get_upload_info()?;
+        // There is no data type blob size for V1, so we just use a huge number.
+        // This is safe because we know the size of the upload info is 8 bytes
+        // and the data type blob size is 4 bytes
+        let size = self
+            .get_upload_info()?
+            .data_type_blob_size()
+            .unwrap_or(u32::MAX);
 
-        if let Some(size) = info.data_type_blob_size() {
-            self.inner
-                .device
-                .read(self.inner.target, DATATYPE_UPLOAD_INDEX_GROUP, 0, size)
-        } else {
-            Err(crate::Error::InvalidPayload)
-        }
+        self.inner
+            .device
+            .read(self.inner.target, DATATYPE_UPLOAD_INDEX_GROUP, 0, size)
     }
 
     pub fn get_upload_info(&self) -> crate::Result<AdsSymbolUploadInfo> {
@@ -136,11 +140,10 @@ impl DataTypeDevice {
             self.inner.target,
             SYMBOL_UPLOAD_INFO_INDEX_GROUP,
             0,
-            AdsSymbolUploadInfo::LENGTH as u32,
+            // Using the largest version because server will return the largest version it supports.
+            AdsSymbolUploadInfoV3::LENGTH as u32,
         )?;
 
-        let (info, _) = AdsSymbolUploadInfo::try_from_slice(&bytes).map_err(AdsError::from)?;
-
-        Ok(info)
+        Ok(AdsSymbolUploadInfo::try_from_slice(&bytes).map_err(AdsError::from)?)
     }
 }

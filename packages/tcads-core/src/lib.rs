@@ -140,8 +140,9 @@ pub use ads::{
     AdsDataTypeInfo, AdsDeviceVersion, AdsEnumInfo, AdsError, AdsHeader, AdsMethodFlags,
     AdsMethodInfo, AdsMethodParamFlags, AdsMethodParamInfo, AdsMethodReturnTypeInfo,
     AdsRefactorInfo, AdsReturnCode, AdsState, AdsSymbolUploadFlags, AdsSymbolUploadInfo,
-    AdsTransMode, DeviceState, Guid, IndexGroup, IndexOffset, InvokeId, LogEntry, LogMessageType,
-    NotificationHandle, WindowsFileTime,
+    AdsSymbolUploadInfoV1, AdsSymbolUploadInfoV2, AdsSymbolUploadInfoV3, AdsTransMode, DeviceState,
+    Guid, IndexGroup, IndexOffset, InvokeId, LogEntry, LogMessageType, NotificationHandle,
+    WindowsFileTime,
 };
 pub use ams::{AmsAddr, AmsCommand, AmsNetId, AmsPort, AmsTcpHeader, RouterState, RuntimeType};
 pub use io::AmsFrame;

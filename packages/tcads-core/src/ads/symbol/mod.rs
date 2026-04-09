@@ -23,4 +23,6 @@ pub use method_info::{
 };
 pub use refactor_info::AdsRefactorInfo;
 pub use upload_flags::AdsSymbolUploadFlags;
-pub use upload_info::AdsSymbolUploadInfo;
+pub use upload_info::{
+    AdsSymbolUploadInfo, AdsSymbolUploadInfoV1, AdsSymbolUploadInfoV2, AdsSymbolUploadInfoV3,
+};
