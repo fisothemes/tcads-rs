@@ -186,6 +186,24 @@ impl TryFrom<&[u8]> for AdsSymbolUploadInfo {
     }
 }
 
+impl From<AdsSymbolUploadInfoV1> for AdsSymbolUploadInfo {
+    fn from(value: AdsSymbolUploadInfoV1) -> Self {
+        Self::V1(value)
+    }
+}
+
+impl From<AdsSymbolUploadInfoV2> for AdsSymbolUploadInfo {
+    fn from(value: AdsSymbolUploadInfoV2) -> Self {
+        Self::V2(value)
+    }
+}
+
+impl From<AdsSymbolUploadInfoV3> for AdsSymbolUploadInfo {
+    fn from(value: AdsSymbolUploadInfoV3) -> Self {
+        Self::V3(value)
+    }
+}
+
 /// Version 1 symbol upload info (8 bytes).
 ///
 /// Contains only the symbol count and blob size.
