@@ -298,3 +298,143 @@ impl TryFrom<&[u8]> for AdsDataTypeInfo {
         Ok(info)
     }
 }
+
+/// An iterator that safely consumes a contiguous byte blob of multiple TwinCAT Data Types and
+/// parses them into [`AdsDataTypeInfo`]s.
+///
+/// Because each Data Type has a dynamic length, this iterator lazily reads the length header
+/// of the current entry, parses it, and advances the cursor to the exact start of the next entry.
+///
+/// # Fault Tolerance
+///
+/// If an individual Data Type fails to parse (yielding an `Err`), the iterator uses the wire-format
+/// length header to safely skip the corrupted entry. Subsequent calls to `.next()` will correctly
+/// align with the next valid Data Type in the stream.
+pub struct AdsDataTypeIterator<'a> {
+    data: &'a [u8],
+    cursor: usize,
+}
+
+impl<'a> AdsDataTypeIterator<'a> {
+    /// Creates a new borrowed iterator from a raw byte payload containing multiple Data Types.
+    pub fn new(data: &'a [u8]) -> Self {
+        Self { data, cursor: 0 }
+    }
+
+    /// Converts this borrowed iterator into an owned iterator by copying the underlying slice.
+    ///
+    /// The iteration state (cursor position) is preserved. Any elements already yielded
+    /// by this iterator will not be yielded by the new owned iterator.
+    pub fn into_owned(self) -> AdsDataTypeIteratorOwned {
+        AdsDataTypeIteratorOwned {
+            buffer: self.data.into(),
+            cursor: self.cursor,
+        }
+    }
+
+    /// Creates an owned iterator by cloning the underlying slice.
+    ///
+    /// The iteration state (cursor position) is preserved in the cloned iterator.
+    pub fn to_owned(&self) -> AdsDataTypeIteratorOwned {
+        AdsDataTypeIteratorOwned {
+            buffer: self.data.to_vec(),
+            cursor: self.cursor,
+        }
+    }
+}
+
+impl<'a> Iterator for AdsDataTypeIterator<'a> {
+    type Item = Result<AdsDataTypeInfo, AdsTypeInfoError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        utils::parse_next_entry(self.data, &mut self.cursor)
+    }
+}
+
+/// An owned iterator that lazily parses TwinCAT Data Types from a heap-allocated byte buffer.
+///
+/// This is highly efficient for large PLC memory blobs (which can exceed several megabytes).
+/// The network payload is stored once, and heavy string decoding and struct allocations
+/// only occur when `.next()` is called.
+pub struct AdsDataTypeIteratorOwned {
+    buffer: Vec<u8>,
+    cursor: usize,
+}
+
+impl AdsDataTypeIteratorOwned {
+    /// Creates a new owned iterator from a raw byte payload.
+    pub fn new(buffer: Vec<u8>) -> Self {
+        Self { buffer, cursor: 0 }
+    }
+
+    /// Returns a borrowed view of this iterator.
+    ///
+    /// The returned [`AdsDataTypeIterator`] shares the same cursor position. However, advancing
+    /// the view will *not* advance the cursor of this owned iterator.
+    pub fn as_view(&self) -> AdsDataTypeIterator<'_> {
+        AdsDataTypeIterator {
+            data: &self.buffer,
+            cursor: self.cursor,
+        }
+    }
+}
+
+impl Iterator for AdsDataTypeIteratorOwned {
+    type Item = Result<AdsDataTypeInfo, AdsTypeInfoError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        utils::parse_next_entry(&self.buffer, &mut self.cursor)
+    }
+}
+
+pub mod utils {
+    use super::*;
+
+    /// Shared logic for advancing a cursor and parsing a single Data Type from a byte blob.
+    ///
+    /// # Behavior
+    ///
+    /// - If the buffer is severely truncated or lacks a length header, it poisons the cursor
+    ///   to prevent infinite iteration loops.
+    /// - If the struct parser fails but the boundaries are intact, it yields an `Err` but safely
+    ///   advances the cursor to the next struct.
+    pub fn parse_next_entry(
+        data: &[u8],
+        cursor: &mut usize,
+    ) -> Option<Result<AdsDataTypeInfo, AdsTypeInfoError>> {
+        if *cursor >= data.len() {
+            return None;
+        }
+
+        if *cursor + 4 > data.len() {
+            let err = AdsTypeInfoError::TooShort {
+                expected: *cursor + 4,
+                got: data.len(),
+            };
+            *cursor = data.len(); // Poison iterator to prevent infinite loop
+            return Some(Err(err));
+        }
+
+        let entry_length = u32::from_le_bytes([
+            data[*cursor],
+            data[*cursor + 1],
+            data[*cursor + 2],
+            data[*cursor + 3],
+        ]) as usize;
+
+        if *cursor + entry_length > data.len() {
+            let err = AdsTypeInfoError::EntryLengthMismatch {
+                expected: entry_length,
+                got: data.len() - *cursor,
+            };
+            *cursor = data.len(); // Poison iterator
+            return Some(Err(err));
+        }
+
+        let entry_slice = &data[*cursor..*cursor + entry_length];
+
+        *cursor += entry_length;
+
+        Some(AdsDataTypeInfo::try_from(entry_slice))
+    }
+}
