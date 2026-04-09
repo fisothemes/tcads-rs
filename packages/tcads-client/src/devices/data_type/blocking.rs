@@ -6,7 +6,8 @@ use std::net::ToSocketAddrs;
 use std::sync::Arc;
 use std::time::Duration;
 use tcads_core::{
-    AdsDataTypeInfo, AdsError, AdsSymbolUploadInfo, AdsSymbolUploadInfoV3, AmsAddr, AmsPort,
+    AdsDataTypeInfo, AdsDataTypeIteratorOwned, AdsError, AdsSymbolUploadInfo,
+    AdsSymbolUploadInfoV3, AmsAddr, AmsPort,
 };
 
 pub struct DataTypeDeviceInner {
@@ -121,7 +122,11 @@ impl DataTypeDevice {
         Ok(AdsDataTypeInfo::try_from(bytes.as_ref()).map_err(AdsError::from)?)
     }
 
-    pub fn get_all_data_type_info(&self) -> crate::Result<Vec<u8>> {
+    /// Fetches all data types from the PLC and returns a lazy iterator.
+    ///
+    /// The network request is made immediately, but the parsing happens lazily
+    /// as you consume the iterator.
+    pub fn get_all_data_type_info(&self) -> crate::Result<AdsDataTypeIteratorOwned> {
         // There is no data type blob size for V1, so we just use a huge number.
         // This is safe because we know the size of the upload info is 8 bytes
         // and the data type blob size is 4 bytes
@@ -130,9 +135,12 @@ impl DataTypeDevice {
             .data_type_blob_size()
             .unwrap_or(u32::MAX);
 
-        self.inner
-            .device
-            .read(self.inner.target, DATATYPE_UPLOAD_INDEX_GROUP, 0, size)
+        let raw_blob =
+            self.inner
+                .device
+                .read(self.inner.target, DATATYPE_UPLOAD_INDEX_GROUP, 0, size)?;
+
+        Ok(AdsDataTypeIteratorOwned::new(raw_blob))
     }
 
     pub fn get_upload_info(&self) -> crate::Result<AdsSymbolUploadInfo> {
