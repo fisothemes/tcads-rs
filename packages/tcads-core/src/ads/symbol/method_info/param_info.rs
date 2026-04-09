@@ -41,6 +41,7 @@ impl AdsMethodParamInfo {
     pub const MIN_LENGTH: usize = 48;
 
     /// Creates a new instance of [`AdsMethodParamInfo`] without a comment or attribute.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         size: u32,
         align_size: u32,
@@ -227,18 +228,15 @@ impl AdsMethodParamInfo {
         pos = comment_end;
 
         let mut attributes = Vec::new();
-        if flags.has_attributes() {
-            if pos + 2 <= entry_length {
-                let attr_count =
-                    u16::from_le_bytes(entry[pos..pos + 2].try_into().unwrap()) as usize;
-                pos += 2;
+        if flags.has_attributes() && pos + 2 <= entry_length {
+            let attr_count = u16::from_le_bytes([entry[pos], entry[pos + 1]]) as usize;
+            pos += 2;
 
-                attributes.reserve(attr_count);
-                for _ in 0..attr_count {
-                    let attr = AdsAttribute::try_from_slice(&entry[pos..])?;
-                    pos += attr.wire_size();
-                    attributes.push(attr);
-                }
+            attributes.reserve(attr_count);
+            for _ in 0..attr_count {
+                let attr = AdsAttribute::try_from_slice(&entry[pos..])?;
+                pos += attr.wire_size();
+                attributes.push(attr);
             }
         }
 

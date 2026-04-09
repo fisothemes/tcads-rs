@@ -261,17 +261,15 @@ impl AdsMethodInfo {
         }
 
         let mut attributes = Vec::new();
-        if flags.has_attributes() {
-            if pos + 2 <= entry_length {
-                let attr_count = u16::from_le_bytes([entry[pos], entry[pos + 1]]) as usize;
-                pos += 2;
+        if flags.has_attributes() && pos + 2 <= entry_length {
+            let attr_count = u16::from_le_bytes([entry[pos], entry[pos + 1]]) as usize;
+            pos += 2;
 
-                attributes.reserve(attr_count);
-                for _ in 0..attr_count {
-                    let attr = AdsAttribute::try_from_slice(&entry[pos..])?;
-                    pos += attr.wire_size();
-                    attributes.push(attr);
-                }
+            attributes.reserve(attr_count);
+            for _ in 0..attr_count {
+                let attr = AdsAttribute::try_from_slice(&entry[pos..])?;
+                pos += attr.wire_size();
+                attributes.push(attr);
             }
         }
 
