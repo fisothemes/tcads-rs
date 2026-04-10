@@ -1,0 +1,60 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="P_DataTypesExample" Id="{e2674363-e098-4b6d-9106-aea4ebc035fd}" SpecialFunc="None">
+    <Declaration><![CDATA[// Contains varias TwinCAT Runtime datatypes for tcads-rs's DataTypeDevice
+PROGRAM P_DataTypesExample
+VAR
+	fbCalc 						: FB_EmptyWithRPC;
+	// Interfaces
+	
+	ipEmpty 					: I_Empty;
+	ipEmptyWithExtends 			: I_EmptyWithExtends;
+	ipWithProps					: I_WithProps;
+	ipWithMethods				: I_WithMethods;
+	ipWithMethodPropsAndExtends : I_WithMethodsPropsAndExtends;
+	ipWithRPC					: I_WithRPC;
+	
+	// Function Blocks
+	
+	fbEmpty 					: FB_Empty;
+	fbEmptyWithExtends 			: FB_EmptyWithExtends;
+	fbEmptyWithEmptyImpl		: FB_EmptyWithEmptyImpl;
+	fbWithFields				: FB_WithFields;
+	fbEmptyWithRPC 				: FB_EmptyWithRPC;
+	fbEmptyWithImplRPC 			: FB_EmptyWithImplRPC;
+	
+	// Structs
+	
+	stEmpty						: ST_Empty;
+	STEmptyAlias				: T_STEmptyAlias;	
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <CFC>
+        <XmlArchive>
+          <Data>
+            <o xml:space="preserve" t="CFCImplementationObject">
+              <o n="Items" t="CFCItemList">
+                <l2 n="InnerList" />
+              </o>
+              <n n="ParameterInitializationMethodGenerator" />
+              <o n="RoutingPathTable" t="CFCRoutingPathTable">
+                <d2 n="InnerDictionary" />
+              </o>
+              <v n="AutoSizeCanvas">true</v>
+              <v n="CanvasWidth">2</v>
+              <v n="CanvasHeight">2</v>
+            </o>
+          </Data>
+          <TypeList>
+            <Type n="Boolean">System.Boolean</Type>
+            <Type n="CFCImplementationObject">{32d3375e-c010-41e2-9e43-b2fbf4f2b374}</Type>
+            <Type n="CFCItemList">{cd57ba20-558b-4b98-96c1-73c6000c3087}</Type>
+            <Type n="CFCRoutingPathTable">{4b8bcc79-5980-4868-b49e-005a8148859b}</Type>
+            <Type n="Int32">System.Int32</Type>
+          </TypeList>
+        </XmlArchive>
+      </CFC>
+    </Implementation>
+  </POU>
+</TcPlcObject>

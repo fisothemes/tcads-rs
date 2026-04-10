@@ -1,0 +1,8 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <Itf Name="I_EmptyWithExtends" Id="{0373c7e4-4b8c-4f97-886d-a7995cae6237}">
+    <Declaration><![CDATA[// Empty interface that inherits an empty inteface.
+INTERFACE I_EmptyWithExtends EXTENDS __SYSTEM.IQueryInterface
+]]></Declaration>
+  </Itf>
+</TcPlcObject>

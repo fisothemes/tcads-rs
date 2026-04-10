@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
   <POU Name="F_ResetOnTrue" Id="{729735ce-5665-4b8d-ba92-5661cda9c9d4}" SpecialFunc="None">
     <Declaration><![CDATA[// Sets the boolean value to false if it is true and returns true if it was true before being set.
 FUNCTION F_ResetOnTrue  : BOOL // Whether the value was true before resetting.

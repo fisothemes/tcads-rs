@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <Itf Name="I_WithProps" Id="{67688f97-2ec3-4c9c-acfe-02134d57b9c0}">
+    <Declaration><![CDATA[// Interface with properties only.
+INTERFACE I_WithProps
+]]></Declaration>
+    <Property Name="Prop1" Id="{18b50018-71c0-4ed5-9a01-c25a443ee19f}">
+      <Declaration><![CDATA[// First property.
+PROPERTY Prop1 : BOOL]]></Declaration>
+      <Get Name="Get" Id="{1b0e9dbb-9f30-479a-bf87-0a49d0e48987}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{73240003-0f4d-44c6-bbbc-1c3afe750bfa}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+    <Property Name="Prop2" Id="{76eef3b9-7653-49e8-8fee-56b7b6eae843}">
+      <Declaration><![CDATA[// Second property.
+PROPERTY Prop2 : Tc2_System.ST_CpuCoreInfo]]></Declaration>
+      <Get Name="Get" Id="{95cd5bc9-96fa-46d0-b104-d02da4afac1c}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{8a10adf0-37e3-4675-82f0-bb86641498ce}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+  </Itf>
+</TcPlcObject>
