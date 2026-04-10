@@ -163,6 +163,9 @@ impl AdsDataTypeInfo {
 
         // Alias
         if !self.type_name.is_empty() && self.sub_items.is_empty() && self.method_infos.is_empty() {
+            if self.name == "BOOL" {
+                return AdsDataTypeCategory::Primitive;
+            }
             return AdsDataTypeCategory::Alias;
         }
 
