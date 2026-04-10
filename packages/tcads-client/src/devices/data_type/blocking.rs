@@ -3,7 +3,7 @@ use super::{
 };
 use crate::devices::blocking::AdsDevice;
 use std::net::ToSocketAddrs;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::Duration;
 use tcads_core::{
     AdsDataTypeInfo, AdsDataTypeIteratorOwned, AdsError, AdsSymbolUploadInfo,
@@ -13,7 +13,6 @@ use tcads_core::{
 pub struct DataTypeDeviceInner {
     pub device: AdsDevice,
     pub target: AmsAddr,
-    pub upload_info: RwLock<Option<AdsSymbolUploadInfo>>,
 }
 
 /// An ADS device client for fetching data type info from a PLC runtime.
@@ -75,11 +74,7 @@ impl DataTypeDevice {
     /// Use this when sharing a connection with other device clients.
     pub fn new(device: AdsDevice, target: AmsAddr) -> Self {
         Self {
-            inner: Arc::new(DataTypeDeviceInner {
-                device,
-                target,
-                upload_info: RwLock::new(None),
-            }),
+            inner: Arc::new(DataTypeDeviceInner { device, target }),
         }
     }
 
@@ -162,10 +157,6 @@ impl DataTypeDevice {
 
     /// Fetches and caches the symbol upload metadata from the PLC.
     pub fn get_upload_info(&self) -> crate::Result<AdsSymbolUploadInfo> {
-        if let Some(info) = self.inner.upload_info.read()?.as_ref() {
-            return Ok(info.clone());
-        }
-
         let bytes = self.inner.device.read(
             self.inner.target,
             SYMBOL_UPLOAD_INFO_INDEX_GROUP,
@@ -175,9 +166,6 @@ impl DataTypeDevice {
         )?;
 
         let info = AdsSymbolUploadInfo::try_from_slice(&bytes).map_err(AdsError::from)?;
-
-        // Update the cache
-        *self.inner.upload_info.write()? = Some(info.clone());
 
         Ok(info)
     }
