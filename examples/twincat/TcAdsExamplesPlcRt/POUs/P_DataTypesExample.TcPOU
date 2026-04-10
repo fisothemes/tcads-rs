@@ -4,7 +4,6 @@
     <Declaration><![CDATA[// Contains varias TwinCAT Runtime datatypes for tcads-rs's DataTypeDevice
 PROGRAM P_DataTypesExample
 VAR
-	fbCalc 						: FB_EmptyWithRPC;
 	// Interfaces
 	
 	ipEmpty 					: I_Empty;

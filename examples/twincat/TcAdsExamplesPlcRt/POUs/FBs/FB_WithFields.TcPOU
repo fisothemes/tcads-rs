@@ -5,12 +5,15 @@
 VAR_INPUT
 	InField1 	: INT;
 	InField2 	: Tc2_System.ST_CpuCoreInfo;
+	InField3 	: ARRAY[0..4] OF INT;
 END_VAR
 VAR_IN_OUT
 	InOutField1 : TIME;
 END_VAR
 VAR_OUTPUT
+	{attribute 'hello there' := '42'}
 	OutField1 	: __UXINT;
+	// This is a comment for OutField2!
 	OutField2 	: Tc2_System.E_TcMemoryArea;
 END_VAR
 VAR
