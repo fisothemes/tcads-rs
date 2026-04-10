@@ -217,6 +217,14 @@ impl AdsDataTypeInfo {
         if !self.sub_items.is_empty() || !self.method_infos.is_empty() {
             // FBs and Interfaces often expose methods
             if !self.method_infos.is_empty() {
+                // Check for Interface implementations
+                if self
+                    .attributes
+                    .iter()
+                    .any(|attr| attr.name() == "TcImplements")
+                {
+                    return AdsDataTypeCategory::FunctionBlock;
+                }
                 if self.sub_items.is_empty() {
                     return AdsDataTypeCategory::Interface;
                 }
@@ -249,14 +257,15 @@ impl AdsDataTypeInfo {
             }
 
             // Check for Interface implementations
-            if self.attributes.iter().any(|attr| {
-                attr.name() == "TcImplements" || attr.name() == "generate_implicit_init_function"
-            }) {
+            if self
+                .attributes
+                .iter()
+                .any(|attr| attr.name() == "TcImplements")
+            {
                 return AdsDataTypeCategory::FunctionBlock;
             }
 
-            // Stable Rust fallback for `is_multiple_of(4)`
-            if self.size % 4 == 0 && self.size > 8 {
+            if self.size.is_multiple_of(4) && self.size > 8 {
                 return AdsDataTypeCategory::FunctionBlock;
             }
 
