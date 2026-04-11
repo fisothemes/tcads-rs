@@ -1,6 +1,6 @@
 use super::error::AdsTypeInfoError;
 use super::{
-    AdsAttribute, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId, AdsEnumInfo, AdsFieldInfo,
+    AdsArrayInfo, AdsAttribute, AdsDataTypeFlags, AdsDataTypeId, AdsEnumInfo, AdsFieldInfo,
     AdsMethodInfo, AdsRefactorInfo, Guid,
 };
 
@@ -20,7 +20,7 @@ pub struct AdsDataTypeInfo {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     comment: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    array_infos: Vec<AdsDataTypeArrayInfo>,
+    array_infos: Vec<AdsArrayInfo>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     field_infos: Vec<AdsFieldInfo>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -84,7 +84,7 @@ impl AdsDataTypeInfo {
         &self.comment
     }
     /// Array dimension bounds. Non-empty only for array types.
-    pub fn array_infos(&self) -> &[AdsDataTypeArrayInfo] {
+    pub fn array_infos(&self) -> &[AdsArrayInfo] {
         &self.array_infos
     }
     /// Struct fields, fully inlined. Non-empty only for struct types.
@@ -364,10 +364,10 @@ impl AdsDataTypeInfo {
 
         let mut array_infos = Vec::with_capacity(array_dim_count);
         for _ in 0..array_dim_count {
-            array_infos.push(AdsDataTypeArrayInfo::try_from_slice(
-                &entry[pos..pos + AdsDataTypeArrayInfo::LENGTH],
+            array_infos.push(AdsArrayInfo::try_from_slice(
+                &entry[pos..pos + AdsArrayInfo::LENGTH],
             )?);
-            pos += AdsDataTypeArrayInfo::LENGTH;
+            pos += AdsArrayInfo::LENGTH;
         }
 
         let mut field_infos = Vec::with_capacity(field_count);

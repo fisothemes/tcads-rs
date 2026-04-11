@@ -11,16 +11,16 @@ use super::error::AdsTypeInfoError;
 /// | 0      | 4    | `lower_bound`   | Lower bound (LE i32)                 |
 /// | 4      | 4    | `element_count` | Number of elements (LE u32)          |
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct AdsDataTypeArrayInfo {
+pub struct AdsArrayInfo {
     lower_bound: i32,
     element_count: u32,
 }
 
-impl AdsDataTypeArrayInfo {
+impl AdsArrayInfo {
     /// Wire size in bytes.
     pub const LENGTH: usize = 8;
 
-    /// Creates a new instance of [`AdsDataTypeArrayInfo`].
+    /// Creates a new instance of [`AdsArrayInfo`].
     pub const fn new(lower_bound: i32, element_count: u32) -> Self {
         Self {
             lower_bound,
@@ -62,21 +62,21 @@ impl AdsDataTypeArrayInfo {
     }
 }
 
-impl TryFrom<&[u8]> for AdsDataTypeArrayInfo {
+impl TryFrom<&[u8]> for AdsArrayInfo {
     type Error = AdsTypeInfoError;
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
         Self::try_from_slice(data)
     }
 }
 
-impl From<AdsDataTypeArrayInfo> for [u8; AdsDataTypeArrayInfo::LENGTH] {
-    fn from(info: AdsDataTypeArrayInfo) -> Self {
+impl From<AdsArrayInfo> for [u8; AdsArrayInfo::LENGTH] {
+    fn from(info: AdsArrayInfo) -> Self {
         info.to_bytes()
     }
 }
 
-impl From<&AdsDataTypeArrayInfo> for [u8; AdsDataTypeArrayInfo::LENGTH] {
-    fn from(info: &AdsDataTypeArrayInfo) -> Self {
+impl From<&AdsArrayInfo> for [u8; AdsArrayInfo::LENGTH] {
+    fn from(info: &AdsArrayInfo) -> Self {
         info.to_bytes()
     }
 }
@@ -92,25 +92,25 @@ mod tests {
 
     #[test]
     fn parses_real_capture() {
-        let info = AdsDataTypeArrayInfo::try_from_slice(&real_bytes()).unwrap();
+        let info = AdsArrayInfo::try_from_slice(&real_bytes()).unwrap();
         assert_eq!(info.lower_bound(), 0);
         assert_eq!(info.element_count(), 8);
     }
 
     #[test]
     fn roundtrip() {
-        let original = AdsDataTypeArrayInfo::try_from_slice(&real_bytes()).unwrap();
+        let original = AdsArrayInfo::try_from_slice(&real_bytes()).unwrap();
         let bytes = original.to_bytes();
-        let parsed = AdsDataTypeArrayInfo::try_from_slice(&bytes).unwrap();
+        let parsed = AdsArrayInfo::try_from_slice(&bytes).unwrap();
         assert_eq!(original, parsed);
     }
 
     #[test]
     fn negative_lower_bound_roundtrips() {
         // PLC arrays can start at negative indices e.g. ARRAY [-5..5] OF INT
-        let info = AdsDataTypeArrayInfo::new(-5, 11);
+        let info = AdsArrayInfo::new(-5, 11);
         let bytes = info.to_bytes();
-        let parsed = AdsDataTypeArrayInfo::try_from_slice(&bytes).unwrap();
+        let parsed = AdsArrayInfo::try_from_slice(&bytes).unwrap();
         assert_eq!(parsed.lower_bound(), -5);
         assert_eq!(parsed.element_count(), 11);
     }
@@ -118,7 +118,7 @@ mod tests {
     #[test]
     fn too_short_returns_err() {
         assert!(matches!(
-            AdsDataTypeArrayInfo::try_from_slice(&[0u8; 7]).unwrap_err(),
+            AdsArrayInfo::try_from_slice(&[0u8; 7]).unwrap_err(),
             AdsTypeInfoError::TooShort {
                 expected: 8,
                 got: 7

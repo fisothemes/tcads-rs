@@ -1,5 +1,5 @@
 use super::error::AdsTypeInfoError;
-use super::{AdsAttribute, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId, Guid};
+use super::{AdsArrayInfo, AdsAttribute, AdsDataTypeFlags, AdsDataTypeId, Guid};
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct AdsFieldInfo {
@@ -134,7 +134,7 @@ impl AdsFieldInfo {
 
         // Skip array_infos
         // The array_infos count should be 0, but we're being cautious.
-        pos += AdsDataTypeArrayInfo::LENGTH * array_dim_count;
+        pos += AdsArrayInfo::LENGTH * array_dim_count;
 
         // Skip sub_items this way because their length is dynamic.
         // For a field item the count should be 0, but we're being cautious.

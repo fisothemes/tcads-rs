@@ -1,3 +1,4 @@
+pub mod array_info;
 pub mod attributes;
 pub mod data_type_array_info;
 pub mod data_type_flags;
@@ -12,8 +13,8 @@ pub mod upload_flags;
 pub mod upload_info;
 
 use super::error;
+pub use array_info::AdsArrayInfo;
 pub use attributes::AdsAttribute;
-pub use data_type_array_info::AdsDataTypeArrayInfo;
 pub use data_type_flags::AdsDataTypeFlags;
 pub use data_type_id::AdsDataTypeId;
 pub use data_type_info::{
