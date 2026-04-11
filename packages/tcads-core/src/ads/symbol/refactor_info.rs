@@ -37,6 +37,15 @@ impl AdsRefactorInfo {
     /// Mask for extracting the `next_refactor_info` flag from the packed `u32`.
     pub const NEXT_REFACTOR_INFO_MASK: u32 = 0x01000000;
 
+    /// Creates a new instance.
+    pub fn new(count: u32, name: impl Into<Option<String>>) -> Self {
+        Self {
+            refactor_count: count,
+            next_refactor_info: false, // Managed by chain logic
+            name: name.into(),
+        }
+    }
+
     /// Refactor version counter.
     pub fn refactor_count(&self) -> u32 {
         self.refactor_count
