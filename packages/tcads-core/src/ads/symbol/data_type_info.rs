@@ -1,6 +1,6 @@
 use super::error::AdsTypeInfoError;
 use super::{
-    AdsAttribute, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId, AdsEnumInfo,
+    AdsAttribute, AdsDataTypeArrayInfo, AdsDataTypeFlags, AdsDataTypeId, AdsEnumInfo, AdsFieldInfo,
     AdsMethodInfo, AdsRefactorInfo, Guid,
 };
 
@@ -11,7 +11,6 @@ pub struct AdsDataTypeInfo {
     hash_value: u32,
     type_hash_value: u32,
     size: u32,
-    offset: u32,
     type_id: AdsDataTypeId,
     #[serde(skip_serializing)]
     flags: AdsDataTypeFlags,
@@ -23,7 +22,7 @@ pub struct AdsDataTypeInfo {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     array_infos: Vec<AdsDataTypeArrayInfo>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    sub_items: Vec<AdsDataTypeInfo>,
+    field_infos: Vec<AdsFieldInfo>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     guid: Option<Guid>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -63,11 +62,6 @@ impl AdsDataTypeInfo {
     pub fn size(&self) -> u32 {
         self.size
     }
-    /// Byte offset of this field within its parent struct/function block/array.
-    /// Zero for root type entries.
-    pub fn offset(&self) -> u32 {
-        self.offset
-    }
     /// Primitive type identifier of the base or element type.
     pub fn data_type(&self) -> AdsDataTypeId {
         self.type_id
@@ -94,8 +88,8 @@ impl AdsDataTypeInfo {
         &self.array_infos
     }
     /// Struct fields, fully inlined. Non-empty only for struct types.
-    pub fn sub_items(&self) -> &[AdsDataTypeInfo] {
-        &self.sub_items
+    pub fn field_infos(&self) -> &[AdsFieldInfo] {
+        &self.field_infos
     }
     /// 16-byte type GUID. Present when [`AdsDataTypeFlags::TYPE_GUID`] is set.
     pub fn guid(&self) -> Option<&Guid> {
@@ -162,7 +156,8 @@ impl AdsDataTypeInfo {
         }
 
         // Alias
-        if !self.type_name.is_empty() && self.sub_items.is_empty() && self.method_infos.is_empty() {
+        if !self.type_name.is_empty() && self.field_infos.is_empty() && self.method_infos.is_empty()
+        {
             if self.name == "BOOL" {
                 return AdsDataTypeCategory::Primitive;
             }
@@ -208,7 +203,7 @@ impl AdsDataTypeInfo {
         }
 
         // Unions (Check for memory offset overlap among sub-items)
-        if !self.sub_items.is_empty()
+        if !self.field_infos.is_empty()
             && self.type_name.is_empty()
             && self.method_infos.is_empty()
             && self.has_field_offset_overlap()
@@ -217,7 +212,7 @@ impl AdsDataTypeInfo {
         }
 
         // Complex Types: Interfaces, Function Blocks, and Structs
-        if !self.sub_items.is_empty() || !self.method_infos.is_empty() {
+        if !self.field_infos.is_empty() || !self.method_infos.is_empty() {
             // FBs and Interfaces often expose methods
             if !self.method_infos.is_empty() {
                 // Check for Interface implementations
@@ -228,7 +223,7 @@ impl AdsDataTypeInfo {
                 {
                     return AdsDataTypeCategory::FunctionBlock;
                 }
-                if self.sub_items.is_empty() {
+                if self.field_infos.is_empty() {
                     return AdsDataTypeCategory::Interface;
                 }
                 // Stable Rust alternative to let_chains
@@ -243,7 +238,7 @@ impl AdsDataTypeInfo {
 
             // If the first user-defined sub-item does NOT start at offset 0, it has hidden state (FB)
             if self
-                .sub_items
+                .field_infos
                 .first()
                 .is_some_and(|child| child.offset() > 0)
             {
@@ -254,7 +249,7 @@ impl AdsDataTypeInfo {
         }
 
         // Things are getting funky now...
-        if self.sub_items.is_empty() {
+        if self.field_infos.is_empty() {
             if !self.name.is_empty() && self.size == 0 {
                 return AdsDataTypeCategory::Struct;
             }
@@ -282,12 +277,12 @@ impl AdsDataTypeInfo {
 
     /// Checks if the sub-items of this data type overlap in memory (indicative of a `UNION`).
     fn has_field_offset_overlap(&self) -> bool {
-        if self.sub_items.len() <= 1 {
+        if self.field_infos.len() <= 1 {
             return false;
         }
 
         let mut max_bit_pos = 0;
-        for sub in &self.sub_items {
+        for sub in &self.field_infos {
             // Skip properties and statics as they don't occupy linear instance memory
             if sub.flags().is_prop_item() || sub.flags().is_static() {
                 continue;
@@ -329,27 +324,26 @@ impl AdsDataTypeInfo {
             });
         }
 
-        // Work within the declared boundary
         let entry = &data[..entry_length];
 
-        let version = u32::from_le_bytes(entry[4..8].try_into().unwrap());
-        let hash_value = u32::from_le_bytes(entry[8..12].try_into().unwrap());
-        let type_hash_value = u32::from_le_bytes(entry[12..16].try_into().unwrap());
-        let size = u32::from_le_bytes(entry[16..20].try_into().unwrap());
-        let offset = u32::from_le_bytes(entry[20..24].try_into().unwrap());
-        let type_id = AdsDataTypeId::from(u32::from_le_bytes(entry[24..28].try_into().unwrap()));
-        let flags = AdsDataTypeFlags::from(u32::from_le_bytes(entry[28..32].try_into().unwrap()));
-        let name_length = u16::from_le_bytes(entry[32..34].try_into().unwrap()) as usize;
-        let type_length = u16::from_le_bytes(entry[34..36].try_into().unwrap()) as usize;
-        let comment_length = u16::from_le_bytes(entry[36..38].try_into().unwrap()) as usize;
-        let array_dim_count = u16::from_le_bytes(entry[38..40].try_into().unwrap()) as usize;
-        let sub_item_count = u16::from_le_bytes(entry[40..42].try_into().unwrap()) as usize;
+        let version = u32::from_le_bytes([entry[4], entry[5], entry[6], entry[7]]);
+        let hash_value = u32::from_le_bytes([entry[8], entry[9], entry[10], entry[11]]);
+        let type_hash_value = u32::from_le_bytes([entry[12], entry[13], entry[14], entry[15]]);
+        let size = u32::from_le_bytes([entry[16], entry[17], entry[18], entry[19]]);
+        // Skipped offset because it's always zero for a root type.
+        let type_id = AdsDataTypeId::from([entry[24], entry[25], entry[26], entry[27]]);
+        let flags = AdsDataTypeFlags::from([entry[28], entry[29], entry[30], entry[31]]);
+        let name_length = u16::from_le_bytes([entry[32], entry[33]]) as usize;
+        let type_name_length = u16::from_le_bytes([entry[34], entry[35]]) as usize;
+        let comment_length = u16::from_le_bytes([entry[36], entry[37]]) as usize;
+        let array_dim_count = u16::from_le_bytes([entry[38], entry[39]]) as usize;
+        let field_count = u16::from_le_bytes([entry[40], entry[41]]) as usize;
 
         let mut pos = Self::MIN_LENGTH;
 
         // Null-terminated strings
         let name_end = pos + name_length + 1;
-        let type_end = name_end + type_length + 1;
+        let type_end = name_end + type_name_length + 1;
         let comment_end = type_end + comment_length + 1;
 
         if (entry_length) < comment_end {
@@ -376,16 +370,16 @@ impl AdsDataTypeInfo {
             pos += AdsDataTypeArrayInfo::LENGTH;
         }
 
-        let mut sub_items = Vec::with_capacity(sub_item_count);
-        for _ in 0..sub_item_count {
-            let (sub_item, sub_item_entry_length) = AdsDataTypeInfo::try_from_slice(&entry[pos..])?;
+        let mut field_infos = Vec::with_capacity(field_count);
+        for _ in 0..field_count {
+            let (sub_item, sub_item_entry_length) = AdsFieldInfo::try_from_slice(&entry[pos..])?;
             pos += sub_item_entry_length;
-            sub_items.push(sub_item);
+            field_infos.push(sub_item);
         }
 
         let mut guid = None;
-        if flags.has_type_guid() && pos + 16 <= entry_length {
-            guid = Some(Guid::try_from_slice(&entry[pos..pos + 16])?);
+        if flags.has_type_guid() && pos + Guid::LENGTH <= entry_length {
+            guid = Some(Guid::try_from_slice(&entry[pos..pos + Guid::LENGTH])?);
             pos += Guid::LENGTH;
         }
 
@@ -401,6 +395,9 @@ impl AdsDataTypeInfo {
 
             method_infos.reserve(method_count);
             for _ in 0..method_count {
+                if pos + 4 <= entry_length {
+                    break;
+                }
                 let (method, bytes_consumed) = AdsMethodInfo::try_from_slice(&entry[pos..])?;
                 pos += bytes_consumed;
                 method_infos.push(method);
@@ -409,7 +406,7 @@ impl AdsDataTypeInfo {
 
         let mut attributes = Vec::new();
         if flags.has_attributes() && pos + 2 <= entry_length {
-            let attr_count = u16::from_le_bytes(entry[pos..pos + 2].try_into().unwrap()) as usize;
+            let attr_count = u16::from_le_bytes([entry[pos], entry[pos + 1]]) as usize;
             pos += 2;
 
             attributes.reserve(attr_count);
@@ -417,6 +414,9 @@ impl AdsDataTypeInfo {
                 let attr = AdsAttribute::try_from_slice(&entry[pos..])?;
                 pos += attr.wire_size();
                 attributes.push(attr);
+                if pos >= entry_length {
+                    break;
+                }
             }
         }
 
@@ -430,6 +430,9 @@ impl AdsDataTypeInfo {
                     AdsEnumInfo::try_from_slice(&entry[pos..], size as usize)?;
                 pos += bytes_consumed;
                 enums.push(enum_info);
+                if pos >= entry_length {
+                    break;
+                }
             }
         }
 
@@ -471,14 +474,13 @@ impl AdsDataTypeInfo {
                 hash_value,
                 type_hash_value,
                 size,
-                offset,
                 type_id,
                 flags,
                 name: name.to_string(),
                 type_name: type_name.to_string(),
                 comment: comment.to_string(),
                 array_infos,
-                sub_items,
+                field_infos,
                 guid,
                 method_infos,
                 attributes,
