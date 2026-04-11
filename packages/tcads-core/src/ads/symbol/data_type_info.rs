@@ -1,7 +1,7 @@
 use super::error::AdsTypeInfoError;
 use super::{
-    AdsArrayInfo, AdsAttribute, AdsDataTypeFlags, AdsDataTypeId, AdsEnumInfo, AdsFieldInfo,
-    AdsMethodInfo, AdsRefactorInfo, Guid,
+    AdsArrayInfo, AdsAttribute, AdsDataTypeId, AdsEnumInfo, AdsFieldInfo, AdsMethodInfo,
+    AdsRefactorInfo, AdsTypeFlags, Guid,
 };
 
 /// TwinCAT ADS data type info.
@@ -13,7 +13,7 @@ pub struct AdsDataTypeInfo {
     size: u32,
     type_id: AdsDataTypeId,
     #[serde(skip_serializing)]
-    flags: AdsDataTypeFlags,
+    flags: AdsTypeFlags,
     name: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     type_name: String,
@@ -58,7 +58,7 @@ impl AdsDataTypeInfo {
     pub fn type_hash_value(&self) -> u32 {
         self.type_hash_value
     }
-    /// Byte size of the type. In bits if [`AdsDataTypeFlags::BIT_VALUES`] is set.
+    /// Byte size of the type. In bits if [`AdsTypeFlags::BIT_VALUES`] is set.
     pub fn size(&self) -> u32 {
         self.size
     }
@@ -67,7 +67,7 @@ impl AdsDataTypeInfo {
         self.type_id
     }
     /// Type flags.
-    pub fn flags(&self) -> AdsDataTypeFlags {
+    pub fn flags(&self) -> AdsTypeFlags {
         self.flags
     }
     /// The type or field name (e.g. `"UDINT"`, `"CycleTime"`, `"PLC.PlcTaskSystemInfo"`).
@@ -91,23 +91,23 @@ impl AdsDataTypeInfo {
     pub fn field_infos(&self) -> &[AdsFieldInfo] {
         &self.field_infos
     }
-    /// 16-byte type GUID. Present when [`AdsDataTypeFlags::TYPE_GUID`] is set.
+    /// 16-byte type GUID. Present when [`AdsTypeFlags::TYPE_GUID`] is set.
     pub fn guid(&self) -> Option<&Guid> {
         self.guid.as_ref()
     }
-    /// RPC method info. Non-empty when [`AdsDataTypeFlags::METHOD_INFOS`] is set.
+    /// RPC method info. Non-empty when [`AdsTypeFlags::METHOD_INFOS`] is set.
     pub fn method_infos(&self) -> &[AdsMethodInfo] {
         &self.method_infos
     }
-    /// Pragma key-value attributes. Non-empty when [`AdsDataTypeFlags::ATTRIBUTES`] is set.
+    /// Pragma key-value attributes. Non-empty when [`AdsTypeFlags::ATTRIBUTES`] is set.
     pub fn attributes(&self) -> &[AdsAttribute] {
         &self.attributes
     }
-    /// Enum info. Non-empty when [`AdsDataTypeFlags::ENUM_INFOS`] is set.
+    /// Enum info. Non-empty when [`AdsTypeFlags::ENUM_INFOS`] is set.
     pub fn enum_infos(&self) -> &[AdsEnumInfo] {
         &self.enum_infos
     }
-    /// Refactoring history. Non-empty when [`AdsDataTypeFlags::REFACTOR_INFO`] is set.
+    /// Refactoring history. Non-empty when [`AdsTypeFlags::REFACTOR_INFO`] is set.
     pub fn refactor_infos(&self) -> &[AdsRefactorInfo] {
         &self.refactor_infos
     }
@@ -332,7 +332,7 @@ impl AdsDataTypeInfo {
         let size = u32::from_le_bytes([entry[16], entry[17], entry[18], entry[19]]);
         // Skipped offset because it's always zero for a root type.
         let type_id = AdsDataTypeId::from([entry[24], entry[25], entry[26], entry[27]]);
-        let flags = AdsDataTypeFlags::from([entry[28], entry[29], entry[30], entry[31]]);
+        let flags = AdsTypeFlags::from([entry[28], entry[29], entry[30], entry[31]]);
         let name_length = u16::from_le_bytes([entry[32], entry[33]]) as usize;
         let type_name_length = u16::from_le_bytes([entry[34], entry[35]]) as usize;
         let comment_length = u16::from_le_bytes([entry[36], entry[37]]) as usize;

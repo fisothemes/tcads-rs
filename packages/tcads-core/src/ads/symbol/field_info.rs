@@ -1,5 +1,5 @@
 use super::error::AdsTypeInfoError;
-use super::{AdsArrayInfo, AdsAttribute, AdsDataTypeFlags, AdsDataTypeId, Guid};
+use super::{AdsArrayInfo, AdsAttribute, AdsDataTypeId, AdsTypeFlags, Guid};
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct AdsFieldInfo {
@@ -10,7 +10,7 @@ pub struct AdsFieldInfo {
     offset: u32,
     type_id: AdsDataTypeId,
     #[serde(skip_serializing)]
-    flags: AdsDataTypeFlags,
+    flags: AdsTypeFlags,
     name: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     type_name: String,
@@ -38,7 +38,7 @@ impl AdsFieldInfo {
     pub fn type_hash_value(&self) -> u32 {
         self.type_hash_value
     }
-    /// Byte size of the type. In bits if [`AdsDataTypeFlags::BIT_VALUES`] is set.
+    /// Byte size of the type. In bits if [`AdsTypeFlags::BIT_VALUES`] is set.
     pub fn size(&self) -> u32 {
         self.size
     }
@@ -52,7 +52,7 @@ impl AdsFieldInfo {
         self.type_id
     }
     /// Type flags.
-    pub fn flags(&self) -> AdsDataTypeFlags {
+    pub fn flags(&self) -> AdsTypeFlags {
         self.flags
     }
     /// The type or field name (e.g. `"UDINT"`, `"CycleTime"`, `"PLC.PlcTaskSystemInfo"`).
@@ -68,11 +68,11 @@ impl AdsFieldInfo {
     pub fn comment(&self) -> &str {
         &self.comment
     }
-    /// 16-byte type GUID. Present when [`AdsDataTypeFlags::TYPE_GUID`] is set.
+    /// 16-byte type GUID. Present when [`AdsTypeFlags::TYPE_GUID`] is set.
     pub fn guid(&self) -> Option<&Guid> {
         self.guid.as_ref()
     }
-    /// Pragma key-value attributes. Non-empty when [`AdsDataTypeFlags::ATTRIBUTES`] is set.
+    /// Pragma key-value attributes. Non-empty when [`AdsTypeFlags::ATTRIBUTES`] is set.
     pub fn attributes(&self) -> &[AdsAttribute] {
         &self.attributes
     }
@@ -102,7 +102,7 @@ impl AdsFieldInfo {
         let size = u32::from_le_bytes([entry[16], entry[17], entry[18], entry[19]]);
         let offset = u32::from_le_bytes([entry[20], entry[21], entry[22], entry[23]]);
         let type_id = AdsDataTypeId::from([entry[24], entry[25], entry[26], entry[27]]);
-        let flags = AdsDataTypeFlags::from([entry[28], entry[29], entry[30], entry[31]]);
+        let flags = AdsTypeFlags::from([entry[28], entry[29], entry[30], entry[31]]);
         let name_length = u16::from_le_bytes([entry[32], entry[33]]) as usize;
         let type_name_length = u16::from_le_bytes([entry[34], entry[35]]) as usize;
         let comment_length = u16::from_le_bytes([entry[36], entry[37]]) as usize;

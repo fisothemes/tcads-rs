@@ -19,7 +19,7 @@ bitflags! {
         serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
     )]
     #[repr(transparent)]
-    pub struct AdsDataTypeFlags: u32 {
+    pub struct AdsTypeFlags: u32 {
         /// Entry is a root data type.
         const DATA_TYPE = 0x00000001;
         /// Entry is a data item (struct field / sub-item).
@@ -82,7 +82,7 @@ bitflags! {
     }
 }
 
-impl AdsDataTypeFlags {
+impl AdsTypeFlags {
     /// Wire size in bytes.
     pub const LENGTH: usize = 4;
 
@@ -189,31 +189,31 @@ impl AdsDataTypeFlags {
     }
 }
 
-impl From<u32> for AdsDataTypeFlags {
+impl From<u32> for AdsTypeFlags {
     fn from(raw: u32) -> Self {
         Self::from_bits_retain(raw)
     }
 }
 
-impl From<AdsDataTypeFlags> for u32 {
-    fn from(flags: AdsDataTypeFlags) -> Self {
+impl From<AdsTypeFlags> for u32 {
+    fn from(flags: AdsTypeFlags) -> Self {
         flags.bits()
     }
 }
 
-impl From<[u8; AdsDataTypeFlags::LENGTH]> for AdsDataTypeFlags {
-    fn from(bytes: [u8; AdsDataTypeFlags::LENGTH]) -> Self {
+impl From<[u8; AdsTypeFlags::LENGTH]> for AdsTypeFlags {
+    fn from(bytes: [u8; AdsTypeFlags::LENGTH]) -> Self {
         Self::from_bytes(bytes)
     }
 }
 
-impl From<AdsDataTypeFlags> for [u8; AdsDataTypeFlags::LENGTH] {
-    fn from(flags: AdsDataTypeFlags) -> Self {
+impl From<AdsTypeFlags> for [u8; AdsTypeFlags::LENGTH] {
+    fn from(flags: AdsTypeFlags) -> Self {
         flags.to_bytes()
     }
 }
 
-impl TryFrom<&[u8]> for AdsDataTypeFlags {
+impl TryFrom<&[u8]> for AdsTypeFlags {
     type Error = AdsTypeInfoError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
@@ -227,7 +227,7 @@ impl TryFrom<&[u8]> for AdsDataTypeFlags {
     }
 }
 
-impl fmt::Display for AdsDataTypeFlags {
+impl fmt::Display for AdsTypeFlags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.is_empty() {
             f.write_str("None")
@@ -237,7 +237,7 @@ impl fmt::Display for AdsDataTypeFlags {
     }
 }
 
-impl fmt::Debug for AdsDataTypeFlags {
+impl fmt::Debug for AdsTypeFlags {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple(stringify!(AdsDataTypeFlags))
             .field(&format_args!("{:#010X}", self.bits()))
@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn parses_data_type_with_guid() {
-        let flags = AdsDataTypeFlags::new(DATA_TYPE_WITH_GUID);
+        let flags = AdsTypeFlags::new(DATA_TYPE_WITH_GUID);
         assert!(flags.is_data_type());
         assert!(flags.has_type_guid());
         assert!(!flags.is_data_item());
@@ -266,7 +266,7 @@ mod tests {
 
     #[test]
     fn parses_data_type_with_guid_and_attrs() {
-        let flags = AdsDataTypeFlags::new(DATA_TYPE_WITH_GUID_ATTRS);
+        let flags = AdsTypeFlags::new(DATA_TYPE_WITH_GUID_ATTRS);
         assert!(flags.is_data_type());
         assert!(flags.has_type_guid());
         assert!(flags.has_attributes());
@@ -274,7 +274,7 @@ mod tests {
 
     #[test]
     fn parses_data_item_with_guid() {
-        let flags = AdsDataTypeFlags::new(DATA_ITEM_WITH_GUID);
+        let flags = AdsTypeFlags::new(DATA_ITEM_WITH_GUID);
         assert!(flags.is_data_item());
         assert!(flags.has_type_guid());
         assert!(!flags.is_data_type());
@@ -282,13 +282,13 @@ mod tests {
 
     #[test]
     fn roundtrip_bytes() {
-        let flags = AdsDataTypeFlags::new(DATA_TYPE_WITH_GUID_ATTRS);
-        assert_eq!(AdsDataTypeFlags::from_bytes(flags.to_bytes()), flags);
+        let flags = AdsTypeFlags::new(DATA_TYPE_WITH_GUID_ATTRS);
+        assert_eq!(AdsTypeFlags::from_bytes(flags.to_bytes()), flags);
     }
 
     #[test]
     fn display_shows_active_flags() {
-        let flags = AdsDataTypeFlags::new(DATA_TYPE_WITH_GUID_ATTRS);
+        let flags = AdsTypeFlags::new(DATA_TYPE_WITH_GUID_ATTRS);
         let s = flags.to_string();
         assert!(s.contains("DATA_TYPE"));
         assert!(s.contains("TYPE_GUID"));
@@ -298,13 +298,13 @@ mod tests {
 
     #[test]
     fn zero_displays_none() {
-        assert_eq!(AdsDataTypeFlags::default().to_string(), "None");
+        assert_eq!(AdsTypeFlags::default().to_string(), "None");
     }
 
     #[test]
     fn bitor_combines() {
-        let a = AdsDataTypeFlags::DATA_TYPE;
-        let b = AdsDataTypeFlags::TYPE_GUID;
+        let a = AdsTypeFlags::DATA_TYPE;
+        let b = AdsTypeFlags::TYPE_GUID;
         assert_eq!((a | b).as_raw(), DATA_TYPE_WITH_GUID);
     }
 }

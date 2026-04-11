@@ -10,7 +10,7 @@ use crate::ads::symbol::error::AdsTypeInfoError;
 ///
 /// Parsed in two separate passes. The standard section appears in the enum info
 /// block; the extended section appears later when
-/// [`AdsDataTypeFlags::EXTENDED_ENUM_INFOS`](super::AdsDataTypeFlags::EXTENDED_ENUM_INFOS) is set.
+/// [`AdsDataTypeFlags::EXTENDED_ENUM_INFOS`](super::AdsTypeFlags::EXTENDED_ENUM_INFOS) is set.
 ///
 /// ## Standard section
 ///

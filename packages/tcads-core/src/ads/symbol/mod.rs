@@ -9,13 +9,13 @@ pub mod field_info;
 pub mod guid;
 pub mod method_info;
 pub mod refactor_info;
+pub mod type_flags;
 pub mod upload_flags;
 pub mod upload_info;
 
 use super::error;
 pub use array_info::AdsArrayInfo;
 pub use attributes::AdsAttribute;
-pub use data_type_flags::AdsDataTypeFlags;
 pub use data_type_id::AdsDataTypeId;
 pub use data_type_info::{
     AdsDataTypeCategory, AdsDataTypeInfo, AdsDataTypeIterator, AdsDataTypeIteratorOwned,
@@ -27,6 +27,7 @@ pub use method_info::{
     AdsMethodFlags, AdsMethodInfo, AdsMethodParamFlags, AdsMethodParamInfo, AdsMethodReturnTypeInfo,
 };
 pub use refactor_info::AdsRefactorInfo;
+pub use type_flags::AdsTypeFlags;
 pub use upload_flags::AdsSymbolUploadFlags;
 pub use upload_info::{
     AdsSymbolUploadInfo, AdsSymbolUploadInfoV1, AdsSymbolUploadInfoV2, AdsSymbolUploadInfoV3,
