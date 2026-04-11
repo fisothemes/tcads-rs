@@ -1,6 +1,26 @@
 use super::error::AdsTypeInfoError;
 use super::{AdsArrayInfo, AdsAttribute, AdsTypeFlags, AdsTypeId, Guid};
 
+/// Type information about a specific member or variable instance within a parent
+/// `Union`, `Struct`, or `Function Block`.
+///
+/// # Wire Format
+///
+/// | Offset | Size | Field             | Description                              |
+/// |--------|------|-------------------|------------------------------------------|
+/// | 0      | 4    | `entry_length`    | Total size including dynamic tail        |
+/// | 16     | 4    | `size`            | Byte size of this specific field         |
+/// | 20     | 4    | `offset`          | Relative byte offset in the parent type  |
+/// | 24     | 4    | `type_id`         | Base type ID ([`AdsTypeId`])             |
+/// | 28     | 4    | `flags`           | Field flags (e.g. Static, Property)      |
+/// | 32     | 2    | `name_len`        | Length of name excl. null                |
+/// | 34     | 2    | `type_len`        | Length of type_name excl. null           |
+/// | 36     | 2    | `comment_len`     | Length of comment excl. null             |
+/// | 38     | 2    | `array_dim_count` | Usually 0 for fields                     |
+/// | 40     | 2    | `sub_item_count`  | Usually 0 for fields                     |
+/// | 42     | dyn  | `Strings`         | Windows-1252, null-terminated            |
+/// | dyn    | dyn  | `type_guid`       | 16-byte GUID if flag is set              |
+/// | dyn    | dyn  | `Attributes`      | Prefixed by `u16` count if flag is set   |
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct AdsFieldInfo {
     version: u32,
@@ -75,6 +95,113 @@ impl AdsFieldInfo {
     /// Pragma key-value attributes. Non-empty when [`AdsTypeFlags::ATTRIBUTES`] is set.
     pub fn attributes(&self) -> &[AdsAttribute] {
         &self.attributes
+    }
+
+    /// Computes and returns the wire size in bytes.
+    pub fn wire_size(&self) -> usize {
+        let mut size = Self::MIN_LENGTH;
+
+        let (name_bytes, _, _) = encoding_rs::WINDOWS_1252.encode(self.name());
+        let (type_name_bytes, _, _) = encoding_rs::WINDOWS_1252.encode(self.type_name());
+        let (comment_bytes, _, _) = encoding_rs::WINDOWS_1252.encode(self.comment());
+
+        size += name_bytes.len() + 1;
+        size += type_name_bytes.len() + 1;
+        size += comment_bytes.len() + 1;
+
+        if self.flags.has_type_guid() {
+            size += Guid::LENGTH;
+        }
+
+        if self.flags.has_copy_mask() {
+            size += self.size as usize;
+        }
+
+        if self.flags().has_attributes() {
+            size += 2;
+            size += self
+                .attributes
+                .iter()
+                .map(|attr| attr.wire_size())
+                .sum::<usize>();
+        }
+
+        size
+    }
+
+    /// Serializes this field info to a byte vector.
+    pub fn to_vec(&self) -> Vec<u8> {
+        let (name_bytes, _, _) = encoding_rs::WINDOWS_1252.encode(self.name());
+        let (type_name_bytes, _, _) = encoding_rs::WINDOWS_1252.encode(self.type_name());
+        let (comment_bytes, _, _) = encoding_rs::WINDOWS_1252.encode(self.comment());
+
+        let mut entry_len = Self::MIN_LENGTH
+            + name_bytes.len()
+            + 1
+            + type_name_bytes.len()
+            + 1
+            + comment_bytes.len()
+            + 1;
+
+        if self.flags.has_type_guid() {
+            entry_len += Guid::LENGTH;
+        }
+
+        if self.flags.has_copy_mask() {
+            entry_len += self.size as usize;
+        }
+
+        let mut attr_bytes = Vec::new();
+        if self.flags.has_attributes() {
+            attr_bytes.extend_from_slice(&(self.attributes.len() as u16).to_le_bytes());
+            attr_bytes.extend(self.attributes.iter().flat_map(|a| a.to_vec()));
+            entry_len += attr_bytes.len();
+        };
+
+        let mut buf = Vec::with_capacity(entry_len);
+
+        // Header
+        buf.extend_from_slice(&(entry_len as u32).to_le_bytes());
+        buf.extend_from_slice(&self.version.to_le_bytes());
+        buf.extend_from_slice(&self.hash_value.to_le_bytes());
+        buf.extend_from_slice(&self.type_hash_value.to_le_bytes());
+        buf.extend_from_slice(&self.size.to_le_bytes());
+        buf.extend_from_slice(&self.offset.to_le_bytes());
+        buf.extend_from_slice(&self.type_id.to_bytes());
+        buf.extend_from_slice(&self.flags.to_bytes());
+        // String lengths (excl. null)
+        buf.extend_from_slice(&(name_bytes.len() as u16).to_le_bytes());
+        buf.extend_from_slice(&(type_name_bytes.len() as u16).to_le_bytes());
+        buf.extend_from_slice(&(comment_bytes.len() as u16).to_le_bytes());
+        // Counts (Array/Sub-items are 0 for FieldInfo)
+        buf.extend_from_slice(&0u16.to_le_bytes());
+        buf.extend_from_slice(&0u16.to_le_bytes());
+
+        // Dynamic Strings
+        buf.extend_from_slice(&name_bytes);
+        buf.push(0);
+        buf.extend_from_slice(&type_name_bytes);
+        buf.push(0);
+        buf.extend_from_slice(&comment_bytes);
+        buf.push(0);
+
+        if self.flags.has_type_guid() {
+            buf.extend_from_slice(
+                self.guid
+                    .as_ref()
+                    .map_or(Guid::default().as_bytes(), |g| g.as_bytes()),
+            );
+        }
+
+        if self.flags.has_copy_mask() {
+            buf.resize(buf.len() + self.size as usize, 0);
+        }
+
+        if self.flags.has_attributes() {
+            buf.extend_from_slice(&attr_bytes);
+        }
+
+        buf
     }
 
     pub fn try_from_slice(data: &[u8]) -> Result<(Self, usize), AdsTypeInfoError> {
@@ -215,5 +342,71 @@ impl AdsFieldInfo {
             },
             entry_length,
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Captured bytes
+    #[rustfmt::skip]
+    fn complex_field_bytes() -> &'static [u8] {
+        const BYTES: [u8; 147] = [
+            147, 0, 0, 0, 1, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 56, 0, 0, 0, 19, 0, 0, 0,
+            130, 16, 0, 0, 9, 0, 25, 0, 33, 0, 0, 0, 0, 0, 79, 117, 116, 70, 105, 101, 108, 100,
+            50, 0, 84, 99, 50, 95, 83, 121, 115, 116, 101, 109, 46, 69, 95, 84, 99, 77, 101, 109,
+            111, 114, 121, 65, 114, 101, 97, 0, 32, 84, 104, 105, 115, 32, 105, 115, 32, 97, 32,
+            99, 111, 109, 109, 101, 110, 116, 32, 102, 111, 114, 32, 79, 117, 116, 70, 105, 101,
+            108, 100, 50, 33, 0, 17, 70, 164, 80, 70, 136, 246, 162, 120, 191, 230, 194, 31, 223,
+            55, 174, 1, 0, 11, 2, 104, 101, 108, 108, 111, 32, 116, 104, 101, 114, 101, 0, 52, 50, 0
+        ];
+        &BYTES
+    }
+
+    #[test]
+    fn test_parse_complex_field_capture() {
+        let data = complex_field_bytes();
+        let (field, consumed) =
+            AdsFieldInfo::try_from_slice(data).expect("Should parse complex field");
+
+        assert_eq!(consumed, 147);
+        assert_eq!(field.name(), "OutField2");
+        assert_eq!(field.type_name(), "Tc2_System.E_TcMemoryArea");
+        assert_eq!(field.comment(), " This is a comment for OutField2!");
+        assert_eq!(field.offset(), 56);
+        assert_eq!(field.size(), 4);
+
+        // Flags check: 0x1082
+        assert!(field.flags().has_attributes());
+        assert!(field.flags().has_type_guid());
+
+        // Attribute check
+        assert_eq!(field.attributes().len(), 1);
+        assert_eq!(field.attributes()[0].name(), "hello there");
+        assert_eq!(field.attributes()[0].value(), "42");
+
+        // GUID check
+        assert!(field.guid().is_some());
+    }
+
+    #[test]
+    fn test_complex_field_wire_size() {
+        let data = complex_field_bytes();
+        let (field, _) = AdsFieldInfo::try_from_slice(data).unwrap();
+
+        // The computed wire size must exactly match the entry_length from the capture
+        assert_eq!(field.wire_size(), 147);
+    }
+
+    #[test]
+    fn test_complex_field_roundtrip() {
+        let data = complex_field_bytes();
+        let (field, _) = AdsFieldInfo::try_from_slice(data).unwrap();
+
+        let serialized = field.to_vec();
+
+        // Verify byte-for-byte symmetry
+        assert_eq!(serialized, data);
     }
 }
