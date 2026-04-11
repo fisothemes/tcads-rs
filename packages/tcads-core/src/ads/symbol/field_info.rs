@@ -1,5 +1,5 @@
 use super::error::AdsTypeInfoError;
-use super::{AdsArrayInfo, AdsAttribute, AdsDataTypeId, AdsTypeFlags, Guid};
+use super::{AdsArrayInfo, AdsAttribute, AdsTypeFlags, AdsTypeId, Guid};
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct AdsFieldInfo {
@@ -8,7 +8,7 @@ pub struct AdsFieldInfo {
     type_hash_value: u32,
     size: u32,
     offset: u32,
-    type_id: AdsDataTypeId,
+    type_id: AdsTypeId,
     #[serde(skip_serializing)]
     flags: AdsTypeFlags,
     name: String,
@@ -48,7 +48,7 @@ impl AdsFieldInfo {
         self.offset
     }
     /// Primitive type identifier of the base or element type.
-    pub fn data_type(&self) -> AdsDataTypeId {
+    pub fn data_type(&self) -> AdsTypeId {
         self.type_id
     }
     /// Type flags.
@@ -101,7 +101,7 @@ impl AdsFieldInfo {
         let type_hash_value = u32::from_le_bytes([entry[12], entry[13], entry[14], entry[15]]);
         let size = u32::from_le_bytes([entry[16], entry[17], entry[18], entry[19]]);
         let offset = u32::from_le_bytes([entry[20], entry[21], entry[22], entry[23]]);
-        let type_id = AdsDataTypeId::from([entry[24], entry[25], entry[26], entry[27]]);
+        let type_id = AdsTypeId::from([entry[24], entry[25], entry[26], entry[27]]);
         let flags = AdsTypeFlags::from([entry[28], entry[29], entry[30], entry[31]]);
         let name_length = u16::from_le_bytes([entry[32], entry[33]]) as usize;
         let type_name_length = u16::from_le_bytes([entry[34], entry[35]]) as usize;

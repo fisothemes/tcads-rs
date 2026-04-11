@@ -1,4 +1,4 @@
-use super::{AdsDataTypeId, Guid};
+use super::{AdsTypeId, Guid};
 
 /// The return type of a TwinCAT RPC method.
 ///
@@ -10,7 +10,7 @@ use super::{AdsDataTypeId, Guid};
 pub struct AdsMethodReturnTypeInfo {
     size: u32,
     align_size: u32,
-    type_id: AdsDataTypeId,
+    type_id: AdsTypeId,
     guid: Guid,
     name: String,
 }
@@ -19,7 +19,7 @@ impl AdsMethodReturnTypeInfo {
     pub fn new(
         size: u32,
         align_size: u32,
-        type_id: AdsDataTypeId,
+        type_id: AdsTypeId,
         guid: Guid,
         name: impl Into<String>,
     ) -> Self {
@@ -40,7 +40,7 @@ impl AdsMethodReturnTypeInfo {
         self.align_size
     }
 
-    pub fn type_id(&self) -> AdsDataTypeId {
+    pub fn type_id(&self) -> AdsTypeId {
         self.type_id
     }
 
@@ -60,11 +60,10 @@ mod test {
     #[test]
     fn test_ads_method_return_type_info_new() {
         let guid: Guid = "12345678-9abc-def0-1234-56789abcdef0".parse().unwrap();
-        let info =
-            AdsMethodReturnTypeInfo::new(10, 20, AdsDataTypeId::Int32, guid.clone(), "MyType");
+        let info = AdsMethodReturnTypeInfo::new(10, 20, AdsTypeId::Int32, guid.clone(), "MyType");
         assert_eq!(info.size(), 10);
         assert_eq!(info.align_size(), 20);
-        assert_eq!(info.type_id(), AdsDataTypeId::Int32);
+        assert_eq!(info.type_id(), AdsTypeId::Int32);
         assert_eq!(*info.guid(), guid);
         assert_eq!(info.name(), "MyType");
     }

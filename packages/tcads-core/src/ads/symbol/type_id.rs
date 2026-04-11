@@ -14,7 +14,7 @@ use super::error::AdsTypeInfoError;
 #[derive(
     serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash,
 )]
-pub enum AdsDataTypeId {
+pub enum AdsTypeId {
     /// Void / empty (`0`).
     Void,
     /// `INT` - signed 16-bit integer (`2`).
@@ -53,11 +53,11 @@ pub enum AdsDataTypeId {
     Unknown(u32),
 }
 
-impl AdsDataTypeId {
+impl AdsTypeId {
     /// Wire size in bytes.
     pub const LENGTH: usize = 4;
 
-    /// Tries to parse a slice of bytes and construct an [`AdsDataTypeId`] struct.
+    /// Tries to parse a slice of bytes and construct an [`AdsTypeId`] struct.
     pub fn try_from_slice(data: &[u8]) -> Result<Self, AdsTypeInfoError> {
         Self::try_from(data)
     }
@@ -73,7 +73,7 @@ impl AdsDataTypeId {
     }
 }
 
-impl From<u32> for AdsDataTypeId {
+impl From<u32> for AdsTypeId {
     fn from(value: u32) -> Self {
         match value {
             0 => Self::Void,
@@ -98,44 +98,44 @@ impl From<u32> for AdsDataTypeId {
     }
 }
 
-impl From<AdsDataTypeId> for u32 {
-    fn from(value: AdsDataTypeId) -> Self {
+impl From<AdsTypeId> for u32 {
+    fn from(value: AdsTypeId) -> Self {
         match value {
-            AdsDataTypeId::Void => 0,
-            AdsDataTypeId::Int16 => 2,
-            AdsDataTypeId::Int32 => 3,
-            AdsDataTypeId::Real32 => 4,
-            AdsDataTypeId::Real64 => 5,
-            AdsDataTypeId::Int8 => 16,
-            AdsDataTypeId::UInt8 => 17,
-            AdsDataTypeId::UInt16 => 18,
-            AdsDataTypeId::UInt32 => 19,
-            AdsDataTypeId::Int64 => 20,
-            AdsDataTypeId::UInt64 => 21,
-            AdsDataTypeId::String => 30,
-            AdsDataTypeId::WString => 31,
-            AdsDataTypeId::Real80 => 32,
-            AdsDataTypeId::Bit => 33,
-            AdsDataTypeId::MaxTypes => 34,
-            AdsDataTypeId::BigType => 65,
-            AdsDataTypeId::Unknown(value) => value,
+            AdsTypeId::Void => 0,
+            AdsTypeId::Int16 => 2,
+            AdsTypeId::Int32 => 3,
+            AdsTypeId::Real32 => 4,
+            AdsTypeId::Real64 => 5,
+            AdsTypeId::Int8 => 16,
+            AdsTypeId::UInt8 => 17,
+            AdsTypeId::UInt16 => 18,
+            AdsTypeId::UInt32 => 19,
+            AdsTypeId::Int64 => 20,
+            AdsTypeId::UInt64 => 21,
+            AdsTypeId::String => 30,
+            AdsTypeId::WString => 31,
+            AdsTypeId::Real80 => 32,
+            AdsTypeId::Bit => 33,
+            AdsTypeId::MaxTypes => 34,
+            AdsTypeId::BigType => 65,
+            AdsTypeId::Unknown(value) => value,
         }
     }
 }
 
-impl From<[u8; Self::LENGTH]> for AdsDataTypeId {
+impl From<[u8; Self::LENGTH]> for AdsTypeId {
     fn from(bytes: [u8; Self::LENGTH]) -> Self {
         Self::from_bytes(bytes)
     }
 }
 
-impl From<AdsDataTypeId> for [u8; AdsDataTypeId::LENGTH] {
-    fn from(value: AdsDataTypeId) -> Self {
+impl From<AdsTypeId> for [u8; AdsTypeId::LENGTH] {
+    fn from(value: AdsTypeId) -> Self {
         value.to_bytes()
     }
 }
 
-impl TryFrom<&[u8]> for AdsDataTypeId {
+impl TryFrom<&[u8]> for AdsTypeId {
     type Error = AdsTypeInfoError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
@@ -157,30 +157,26 @@ mod tests {
 
     #[test]
     fn known_ids_from_captures() {
-        assert_eq!(AdsDataTypeId::from(19u32), AdsDataTypeId::UInt32); // UDINT
-        assert_eq!(AdsDataTypeId::from(20u32), AdsDataTypeId::Int64); // LINT
-        assert_eq!(AdsDataTypeId::from(18u32), AdsDataTypeId::UInt16); // UINT
-        assert_eq!(AdsDataTypeId::from(30u32), AdsDataTypeId::String); // STRING
-        assert_eq!(AdsDataTypeId::from(33u32), AdsDataTypeId::Bit); // BOOL
-        assert_eq!(AdsDataTypeId::from(65u32), AdsDataTypeId::BigType); // struct/reference
-        assert_eq!(AdsDataTypeId::from(17u32), AdsDataTypeId::UInt8); // BYTE
+        assert_eq!(AdsTypeId::from(19u32), AdsTypeId::UInt32); // UDINT
+        assert_eq!(AdsTypeId::from(20u32), AdsTypeId::Int64); // LINT
+        assert_eq!(AdsTypeId::from(18u32), AdsTypeId::UInt16); // UINT
+        assert_eq!(AdsTypeId::from(30u32), AdsTypeId::String); // STRING
+        assert_eq!(AdsTypeId::from(33u32), AdsTypeId::Bit); // BOOL
+        assert_eq!(AdsTypeId::from(65u32), AdsTypeId::BigType); // struct/reference
+        assert_eq!(AdsTypeId::from(17u32), AdsTypeId::UInt8); // BYTE
     }
 
     #[test]
     fn unknown_preserves_value() {
-        let id = AdsDataTypeId::from(0xDEAD_BEEFu32);
-        assert_eq!(id, AdsDataTypeId::Unknown(0xDEAD_BEEF));
+        let id = AdsTypeId::from(0xDEAD_BEEFu32);
+        assert_eq!(id, AdsTypeId::Unknown(0xDEAD_BEEF));
         assert_eq!(u32::from(id), 0xDEAD_BEEF);
     }
 
     #[test]
     fn bytes_roundtrip() {
-        for id in [
-            AdsDataTypeId::UInt32,
-            AdsDataTypeId::Int64,
-            AdsDataTypeId::BigType,
-        ] {
-            assert_eq!(AdsDataTypeId::from_bytes(id.to_bytes()), id);
+        for id in [AdsTypeId::UInt32, AdsTypeId::Int64, AdsTypeId::BigType] {
+            assert_eq!(AdsTypeId::from_bytes(id.to_bytes()), id);
         }
     }
 }

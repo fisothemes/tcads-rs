@@ -151,7 +151,7 @@ impl AdsMethodInfo {
                     r.type_id(),
                     r.name().to_owned(),
                 ),
-                None => (0, 0, Guid::default(), AdsDataTypeId::Void, String::new()),
+                None => (0, 0, Guid::default(), AdsTypeId::Void, String::new()),
             };
 
         let mut buf = Vec::with_capacity(self.wire_size());
@@ -217,7 +217,7 @@ impl AdsMethodInfo {
         let return_size = u32::from_le_bytes([entry[12], entry[13], entry[14], entry[15]]);
         let return_align_size = u32::from_le_bytes([entry[16], entry[17], entry[18], entry[19]]);
         let return_type_guid = Guid::try_from_slice(&entry[24..40])?;
-        let return_data_type = AdsDataTypeId::try_from_slice(&entry[40..44])?;
+        let return_data_type = AdsTypeId::try_from_slice(&entry[40..44])?;
 
         let flags = AdsMethodFlags::try_from(&entry[44..48])?;
 
@@ -407,7 +407,7 @@ mod tests {
     #[test]
     fn with_return_type_sets_return_type() {
         let guid: Guid = "95190718-0000-0000-0000-000000000008".parse().unwrap();
-        let ret = AdsMethodReturnTypeInfo::new(4, 4, AdsDataTypeId::UInt32, guid, "UDINT");
+        let ret = AdsMethodReturnTypeInfo::new(4, 4, AdsTypeId::UInt32, guid, "UDINT");
         let method = AdsMethodInfo::new(0, AdsMethodFlags::PLC_CALLING_CONVENTION, "GetCount")
             .with_return_type(ret);
         let rt = method.return_type().unwrap();
@@ -421,7 +421,7 @@ mod tests {
         let param = AdsMethodParamInfo::new(
             4,
             4,
-            AdsDataTypeId::UInt32,
+            AdsTypeId::UInt32,
             AdsMethodParamFlags::IN,
             guid,
             0,
@@ -455,7 +455,7 @@ mod tests {
         let param = AdsMethodParamInfo::new(
             4,
             4,
-            AdsDataTypeId::UInt32,
+            AdsTypeId::UInt32,
             AdsMethodParamFlags::IN,
             guid,
             0,
@@ -483,7 +483,7 @@ mod tests {
         let param = AdsMethodParamInfo::new(
             8,
             8,
-            AdsDataTypeId::UInt64,
+            AdsTypeId::UInt64,
             AdsMethodParamFlags::IN,
             guid,
             0,
@@ -502,7 +502,7 @@ mod tests {
     #[test]
     fn roundtrip_with_return_type() {
         let guid: Guid = "95190718-0000-0000-0000-000000000008".parse().unwrap();
-        let ret = AdsMethodReturnTypeInfo::new(4, 4, AdsDataTypeId::UInt32, guid, "UDINT");
+        let ret = AdsMethodReturnTypeInfo::new(4, 4, AdsTypeId::UInt32, guid, "UDINT");
         let original = AdsMethodInfo::new(1, AdsMethodFlags::PLC_CALLING_CONVENTION, "GetCount")
             .with_return_type(ret);
         let bytes = original.to_vec();

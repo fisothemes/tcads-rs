@@ -1,7 +1,7 @@
 use super::error::AdsTypeInfoError;
 use super::{
-    AdsArrayInfo, AdsAttribute, AdsDataTypeId, AdsEnumInfo, AdsFieldInfo, AdsMethodInfo,
-    AdsRefactorInfo, AdsTypeFlags, Guid,
+    AdsArrayInfo, AdsAttribute, AdsEnumInfo, AdsFieldInfo, AdsMethodInfo, AdsRefactorInfo,
+    AdsTypeFlags, AdsTypeId, Guid,
 };
 
 /// TwinCAT ADS data type info.
@@ -11,7 +11,7 @@ pub struct AdsDataTypeInfo {
     hash_value: u32,
     type_hash_value: u32,
     size: u32,
-    type_id: AdsDataTypeId,
+    type_id: AdsTypeId,
     #[serde(skip_serializing)]
     flags: AdsTypeFlags,
     name: String,
@@ -63,7 +63,7 @@ impl AdsDataTypeInfo {
         self.size
     }
     /// Primitive type identifier of the base or element type.
-    pub fn data_type(&self) -> AdsDataTypeId {
+    pub fn data_type(&self) -> AdsTypeId {
         self.type_id
     }
     /// Type flags.
@@ -166,20 +166,20 @@ impl AdsDataTypeInfo {
 
         match self.type_id {
             // Primitives
-            AdsDataTypeId::Int8
-            | AdsDataTypeId::UInt8
-            | AdsDataTypeId::Int16
-            | AdsDataTypeId::UInt16
-            | AdsDataTypeId::Int32
-            | AdsDataTypeId::UInt32
-            | AdsDataTypeId::Int64
-            | AdsDataTypeId::UInt64
-            | AdsDataTypeId::Real32
-            | AdsDataTypeId::Real64
-            | AdsDataTypeId::Real80
-            | AdsDataTypeId::Bit => return AdsDataTypeCategory::Primitive,
+            AdsTypeId::Int8
+            | AdsTypeId::UInt8
+            | AdsTypeId::Int16
+            | AdsTypeId::UInt16
+            | AdsTypeId::Int32
+            | AdsTypeId::UInt32
+            | AdsTypeId::Int64
+            | AdsTypeId::UInt64
+            | AdsTypeId::Real32
+            | AdsTypeId::Real64
+            | AdsTypeId::Real80
+            | AdsTypeId::Bit => return AdsDataTypeCategory::Primitive,
             // Strings
-            AdsDataTypeId::String | AdsDataTypeId::WString => return AdsDataTypeCategory::String,
+            AdsTypeId::String | AdsTypeId::WString => return AdsDataTypeCategory::String,
             _ => {
                 if matches!(
                     self.name.as_str(),
@@ -331,7 +331,7 @@ impl AdsDataTypeInfo {
         let type_hash_value = u32::from_le_bytes([entry[12], entry[13], entry[14], entry[15]]);
         let size = u32::from_le_bytes([entry[16], entry[17], entry[18], entry[19]]);
         // Skipped offset because it's always zero for a root type.
-        let type_id = AdsDataTypeId::from([entry[24], entry[25], entry[26], entry[27]]);
+        let type_id = AdsTypeId::from([entry[24], entry[25], entry[26], entry[27]]);
         let flags = AdsTypeFlags::from([entry[28], entry[29], entry[30], entry[31]]);
         let name_length = u16::from_le_bytes([entry[32], entry[33]]) as usize;
         let type_name_length = u16::from_le_bytes([entry[34], entry[35]]) as usize;

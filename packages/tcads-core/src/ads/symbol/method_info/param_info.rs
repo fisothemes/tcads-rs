@@ -1,5 +1,5 @@
 use super::error::AdsTypeInfoError;
-use super::{AdsAttribute, AdsDataTypeId, AdsMethodParamFlags, Guid};
+use super::{AdsAttribute, AdsMethodParamFlags, AdsTypeId, Guid};
 
 /// Represents a parameter for an RPC Method attached to a TwinCAT Struct/Function Block.
 ///
@@ -24,7 +24,7 @@ use super::{AdsAttribute, AdsDataTypeId, AdsMethodParamFlags, Guid};
 pub struct AdsMethodParamInfo {
     size: u32,
     align_size: u32,
-    type_id: AdsDataTypeId,
+    type_id: AdsTypeId,
     flags: AdsMethodParamFlags,
     guid: Guid,
     length_is_param: u16,
@@ -45,7 +45,7 @@ impl AdsMethodParamInfo {
     pub fn new(
         size: u32,
         align_size: u32,
-        type_id: AdsDataTypeId,
+        type_id: AdsTypeId,
         flags: AdsMethodParamFlags,
         guid: Guid,
         length_is_param: u16,
@@ -90,7 +90,7 @@ impl AdsMethodParamInfo {
         self.align_size
     }
     /// The base data type identifier of the parameter.
-    pub fn type_id(&self) -> AdsDataTypeId {
+    pub fn type_id(&self) -> AdsTypeId {
         self.type_id
     }
     /// The parameter flags (e.g., IN, OUT, BY_REF).
@@ -199,7 +199,7 @@ impl AdsMethodParamInfo {
 
         let size = u32::from_le_bytes(entry[4..8].try_into().unwrap());
         let align_size = u32::from_le_bytes(entry[8..12].try_into().unwrap());
-        let type_id = AdsDataTypeId::from(u32::from_le_bytes(entry[12..16].try_into().unwrap()));
+        let type_id = AdsTypeId::from(u32::from_le_bytes(entry[12..16].try_into().unwrap()));
         let flags = AdsMethodParamFlags::new(u32::from_le_bytes(entry[16..20].try_into().unwrap()));
 
         let mut guid_bytes = [0u8; 16];
@@ -327,7 +327,7 @@ mod tests {
         assert_eq!(param.type_name(), "ULINT");
         assert_eq!(param.size(), 8);
         assert_eq!(param.align_size(), 8);
-        assert_eq!(param.type_id(), AdsDataTypeId::UInt64);
+        assert_eq!(param.type_id(), AdsTypeId::UInt64);
         assert!(param.flags().is_input());
         assert!(!param.flags().is_output());
         assert!(param.comment().is_empty());
@@ -342,7 +342,7 @@ mod tests {
         assert_eq!(param.name(), "nOut");
         assert_eq!(param.type_name(), "LINT");
         assert_eq!(param.size(), 8);
-        assert_eq!(param.type_id(), AdsDataTypeId::Int64);
+        assert_eq!(param.type_id(), AdsTypeId::Int64);
         assert!(param.flags().is_output());
         assert!(!param.flags().is_input());
         assert_eq!(param.comment(), " The sum of the inputs");
@@ -362,7 +362,7 @@ mod tests {
         let param = AdsMethodParamInfo::new(
             4,
             4,
-            AdsDataTypeId::UInt32,
+            AdsTypeId::UInt32,
             AdsMethodParamFlags::IN,
             guid,
             0,
@@ -381,7 +381,7 @@ mod tests {
         let param = AdsMethodParamInfo::new(
             4,
             4,
-            AdsDataTypeId::UInt32,
+            AdsTypeId::UInt32,
             AdsMethodParamFlags::IN,
             guid,
             0,
@@ -398,7 +398,7 @@ mod tests {
         let param = AdsMethodParamInfo::new(
             4,
             4,
-            AdsDataTypeId::UInt32,
+            AdsTypeId::UInt32,
             AdsMethodParamFlags::IN,
             guid,
             0,
@@ -417,7 +417,7 @@ mod tests {
         let param = AdsMethodParamInfo::new(
             8,
             8,
-            AdsDataTypeId::UInt64,
+            AdsTypeId::UInt64,
             AdsMethodParamFlags::IN,
             guid,
             0,
@@ -433,7 +433,7 @@ mod tests {
         let param = AdsMethodParamInfo::new(
             8,
             8,
-            AdsDataTypeId::UInt64,
+            AdsTypeId::UInt64,
             AdsMethodParamFlags::IN,
             guid,
             2,
@@ -450,7 +450,7 @@ mod tests {
         let param = AdsMethodParamInfo::new(
             8,
             8,
-            AdsDataTypeId::UInt64,
+            AdsTypeId::UInt64,
             AdsMethodParamFlags::IN,
             guid,
             1,
@@ -466,7 +466,7 @@ mod tests {
         let param = AdsMethodParamInfo::new(
             4,
             4,
-            AdsDataTypeId::UInt32,
+            AdsTypeId::UInt32,
             AdsMethodParamFlags::IN,
             guid,
             0,
@@ -483,7 +483,7 @@ mod tests {
         let param = AdsMethodParamInfo::new(
             4,
             4,
-            AdsDataTypeId::UInt32,
+            AdsTypeId::UInt32,
             AdsMethodParamFlags::IN,
             guid,
             0,
@@ -503,7 +503,7 @@ mod tests {
         let original = AdsMethodParamInfo::new(
             8,
             8,
-            AdsDataTypeId::UInt64,
+            AdsTypeId::UInt64,
             AdsMethodParamFlags::IN,
             guid,
             0,
@@ -522,7 +522,7 @@ mod tests {
         let original = AdsMethodParamInfo::new(
             8,
             8,
-            AdsDataTypeId::Int64,
+            AdsTypeId::Int64,
             AdsMethodParamFlags::OUT,
             guid,
             0,
@@ -542,7 +542,7 @@ mod tests {
         let original = AdsMethodParamInfo::new(
             4,
             4,
-            AdsDataTypeId::UInt32,
+            AdsTypeId::UInt32,
             AdsMethodParamFlags::IN,
             guid,
             0,
