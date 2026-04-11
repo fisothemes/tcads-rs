@@ -194,7 +194,7 @@ impl AdsTypeInfo {
 
             method_infos.reserve(method_count);
             for _ in 0..method_count {
-                if pos + 4 <= entry_length {
+                if pos + 4 > entry_length {
                     break;
                 }
                 let (method, bytes_consumed) = AdsMethodInfo::try_from_slice(&entry[pos..])?;
