@@ -5,6 +5,7 @@ use crate::devices::blocking::AdsDevice;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
 use std::time::Duration;
+use tcads_core::ads::error::AdsTypeInfoError;
 use tcads_core::{
     AdsError, AdsSymbolUploadInfo, AdsSymbolUploadInfoV3, AdsTypeInfo, AdsTypeInfoIteratorOwned,
     AmsAddr, AmsPort,
@@ -135,7 +136,9 @@ impl DataTypeDevice {
     ///
     /// The network request is made immediately, but the parsing happens lazily
     /// as you consume the iterator.
-    pub fn get_all_data_type_info(&self) -> crate::Result<AdsTypeInfoIteratorOwned> {
+    pub fn get_all_data_type_info(
+        &self,
+    ) -> crate::Result<impl Iterator<Item = Result<AdsTypeInfo, AdsTypeInfoError>>> {
         let info = self.get_upload_info()?;
 
         // There is no data type blob size for V1, so we just use a huge number.
