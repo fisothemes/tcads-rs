@@ -30,11 +30,11 @@ pub use return_codes::AdsReturnCode;
 pub use state_flag::StateFlag;
 pub use string::AdsString;
 pub use symbol::{
-    AdsArrayInfo, AdsAttribute, AdsDataTypeCategory, AdsDataTypeInfo, AdsDataTypeIterator,
-    AdsDataTypeIteratorOwned, AdsEnumInfo, AdsFieldInfo, AdsMethodFlags, AdsMethodInfo,
+    AdsArrayInfo, AdsAttribute, AdsEnumInfo, AdsFieldInfo, AdsMethodFlags, AdsMethodInfo,
     AdsMethodParamFlags, AdsMethodParamInfo, AdsMethodReturnTypeInfo, AdsRefactorInfo,
     AdsSymbolUploadFlags, AdsSymbolUploadInfo, AdsSymbolUploadInfoV1, AdsSymbolUploadInfoV2,
-    AdsSymbolUploadInfoV3, AdsTypeFlags, AdsTypeId, Guid,
+    AdsSymbolUploadInfoV3, AdsTypeCategory, AdsTypeFlags, AdsTypeId, AdsTypeInfo,
+    AdsTypeInfoIterator, AdsTypeInfoIteratorOwned, Guid,
 };
 pub use trans_mode::AdsTransMode;
 

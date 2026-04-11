@@ -6,8 +6,8 @@ use std::net::ToSocketAddrs;
 use std::sync::Arc;
 use std::time::Duration;
 use tcads_core::{
-    AdsDataTypeInfo, AdsDataTypeIteratorOwned, AdsError, AdsSymbolUploadInfo,
-    AdsSymbolUploadInfoV3, AmsAddr, AmsPort,
+    AdsError, AdsSymbolUploadInfo, AdsSymbolUploadInfoV3, AdsTypeInfo, AdsTypeInfoIteratorOwned,
+    AmsAddr, AmsPort,
 };
 
 pub struct DataTypeDeviceInner {
@@ -96,7 +96,7 @@ impl DataTypeDevice {
     }
 
     /// Fetches the data type information for a specific symbol name.
-    pub fn get_data_type_info(&self, name: &str) -> crate::Result<AdsDataTypeInfo> {
+    pub fn get_data_type_info(&self, name: &str) -> crate::Result<AdsTypeInfo> {
         let length_bytes = self.inner.device.read_write(
             self.inner.target,
             DATATYPE_INFO_BY_NAME_INDEX_GROUP,
@@ -124,7 +124,7 @@ impl DataTypeDevice {
             .flags()
             .map(|f| if f.is_64bit_platform() { 8 } else { 4 });
 
-        let type_info = AdsDataTypeInfo::try_from(bytes.as_ref())
+        let type_info = AdsTypeInfo::try_from(bytes.as_ref())
             .map_err(AdsError::from)?
             .with_platform_pointer_size(pp_size);
 
@@ -135,7 +135,7 @@ impl DataTypeDevice {
     ///
     /// The network request is made immediately, but the parsing happens lazily
     /// as you consume the iterator.
-    pub fn get_all_data_type_info(&self) -> crate::Result<AdsDataTypeIteratorOwned> {
+    pub fn get_all_data_type_info(&self) -> crate::Result<AdsTypeInfoIteratorOwned> {
         let info = self.get_upload_info()?;
 
         // There is no data type blob size for V1, so we just use a huge number.
@@ -152,7 +152,7 @@ impl DataTypeDevice {
                 .device
                 .read(self.inner.target, DATATYPE_UPLOAD_INDEX_GROUP, 0, size)?;
 
-        Ok(AdsDataTypeIteratorOwned::new(raw_blob).with_platform_pointer_size(pp_size))
+        Ok(AdsTypeInfoIteratorOwned::new(raw_blob).with_platform_pointer_size(pp_size))
     }
 
     /// Fetches and caches the symbol upload metadata from the PLC.

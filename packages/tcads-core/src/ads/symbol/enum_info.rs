@@ -3,7 +3,7 @@ use crate::ads::symbol::error::AdsTypeInfoError;
 
 /// One variant of a TwinCAT enum type.
 ///
-/// The byte width of `value` matches the parent [`AdsDataTypeInfo::size`](super::AdsDataTypeInfo::size)
+/// The byte width of `value` matches the parent [`AdsDataTypeInfo::size`](super::AdsTypeInfo::size)
 /// field. For example, 1 byte for `BYTE`-based enums, 2 for `WORD`, 4 for `DWORD`.
 ///
 /// # Wire Format

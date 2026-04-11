@@ -6,7 +6,7 @@ use super::{
 
 /// TwinCAT ADS data type info.
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct AdsDataTypeInfo {
+pub struct AdsTypeInfo {
     version: u32,
     hash_value: u32,
     type_hash_value: u32,
@@ -37,7 +37,7 @@ pub struct AdsDataTypeInfo {
     platform_pointer_size: Option<u8>,
 }
 
-impl AdsDataTypeInfo {
+impl AdsTypeInfo {
     /// Byte size of the fixed header.
     pub const MIN_LENGTH: usize = 42;
 
@@ -112,56 +112,56 @@ impl AdsDataTypeInfo {
         &self.refactor_infos
     }
     /// Size of the platform-specific pointer (i.e. 32-bit = 4 bytes, 64-bit = 8 bytes).
-    /// Must be set manually and is only needed for working out if the [`AdsDataTypeCategory`]
+    /// Must be set manually and is only needed for working out if the [`AdsTypeCategory`]
     /// is an interface.
     pub fn platform_pointer_size(&self) -> Option<u8> {
         self.platform_pointer_size
     }
 
-    /// Set the platform-specific pointer size. Without this, the [`AdsDataTypeCategory`]
+    /// Set the platform-specific pointer size. Without this, the [`AdsTypeCategory`]
     /// for an interface will be inferred.
     pub fn set_platform_pointer_size(&mut self, size: impl Into<Option<u8>>) {
         self.platform_pointer_size = size.into();
     }
 
     /// Evaluates the metadata and structure to determine the high-level category of this type.
-    pub fn category(&self) -> AdsDataTypeCategory {
+    pub fn category(&self) -> AdsTypeCategory {
         // Pointers
         if self.flags.is_plc_pointer_type()
             || self.name == "PVOID"
             || self.name == "PCCH"
             || self.name.starts_with("POINTER TO")
         {
-            return AdsDataTypeCategory::Pointer;
+            return AdsTypeCategory::Pointer;
         }
 
         // References
         if self.flags.is_reference_to() || self.name.starts_with("REFERENCE TO") {
-            return AdsDataTypeCategory::Reference;
+            return AdsTypeCategory::Reference;
         }
 
         // Arrays
         if !self.array_infos.is_empty() {
-            return AdsDataTypeCategory::Array;
+            return AdsTypeCategory::Array;
         }
 
         // Enums
         if self.flags.has_enum_infos() {
-            return AdsDataTypeCategory::Enum;
+            return AdsTypeCategory::Enum;
         }
 
         // Sub-ranges
         if self.name.contains("..") && self.name.contains('(') && self.name.contains(')') {
-            return AdsDataTypeCategory::SubRange;
+            return AdsTypeCategory::SubRange;
         }
 
         // Alias
         if !self.type_name.is_empty() && self.field_infos.is_empty() && self.method_infos.is_empty()
         {
             if self.name == "BOOL" {
-                return AdsDataTypeCategory::Primitive;
+                return AdsTypeCategory::Primitive;
             }
-            return AdsDataTypeCategory::Alias;
+            return AdsTypeCategory::Alias;
         }
 
         match self.type_id {
@@ -177,9 +177,9 @@ impl AdsDataTypeInfo {
             | AdsTypeId::Real32
             | AdsTypeId::Real64
             | AdsTypeId::Real80
-            | AdsTypeId::Bit => return AdsDataTypeCategory::Primitive,
+            | AdsTypeId::Bit => return AdsTypeCategory::Primitive,
             // Strings
-            AdsTypeId::String | AdsTypeId::WString => return AdsDataTypeCategory::String,
+            AdsTypeId::String | AdsTypeId::WString => return AdsTypeCategory::String,
             _ => {
                 if matches!(
                     self.name.as_str(),
@@ -197,7 +197,7 @@ impl AdsDataTypeInfo {
                         | "__XINT"
                         | "__XWORD"
                 ) {
-                    return AdsDataTypeCategory::Primitive;
+                    return AdsTypeCategory::Primitive;
                 }
             }
         }
@@ -208,7 +208,7 @@ impl AdsDataTypeInfo {
             && self.method_infos.is_empty()
             && self.has_field_offset_overlap()
         {
-            return AdsDataTypeCategory::Union;
+            return AdsTypeCategory::Union;
         }
 
         // Complex Types: Interfaces, Function Blocks, and Structs
@@ -221,19 +221,19 @@ impl AdsDataTypeInfo {
                     .iter()
                     .any(|attr| attr.name() == "TcImplements")
                 {
-                    return AdsDataTypeCategory::FunctionBlock;
+                    return AdsTypeCategory::FunctionBlock;
                 }
                 if self.field_infos.is_empty() {
-                    return AdsDataTypeCategory::Interface;
+                    return AdsTypeCategory::Interface;
                 }
                 // Stable Rust alternative to let_chains
                 if self
                     .platform_pointer_size
                     .is_some_and(|plat_size| self.size == plat_size as u32)
                 {
-                    return AdsDataTypeCategory::Interface;
+                    return AdsTypeCategory::Interface;
                 }
-                return AdsDataTypeCategory::FunctionBlock;
+                return AdsTypeCategory::FunctionBlock;
             }
 
             // If the first user-defined sub-item does NOT start at offset 0, it has hidden state (FB)
@@ -242,16 +242,16 @@ impl AdsDataTypeInfo {
                 .first()
                 .is_some_and(|child| child.offset() > 0)
             {
-                return AdsDataTypeCategory::FunctionBlock;
+                return AdsTypeCategory::FunctionBlock;
             }
 
-            return AdsDataTypeCategory::Struct;
+            return AdsTypeCategory::Struct;
         }
 
         // Things are getting funky now...
         if self.field_infos.is_empty() {
             if !self.name.is_empty() && self.size == 0 {
-                return AdsDataTypeCategory::Struct;
+                return AdsTypeCategory::Struct;
             }
 
             // Check for Interface implementations
@@ -260,19 +260,19 @@ impl AdsDataTypeInfo {
                 .iter()
                 .any(|attr| attr.name() == "TcImplements")
             {
-                return AdsDataTypeCategory::FunctionBlock;
+                return AdsTypeCategory::FunctionBlock;
             }
 
             if self.size.is_multiple_of(4) && self.size > 8 {
-                return AdsDataTypeCategory::FunctionBlock;
+                return AdsTypeCategory::FunctionBlock;
             }
 
             if self.size == 4 || self.size == 8 {
-                return AdsDataTypeCategory::Interface;
+                return AdsTypeCategory::Interface;
             }
         }
 
-        AdsDataTypeCategory::None
+        AdsTypeCategory::None
     }
 
     /// Checks if the sub-items of this data type overlap in memory (indicative of a `UNION`).
@@ -493,7 +493,7 @@ impl AdsDataTypeInfo {
     }
 }
 
-impl TryFrom<&[u8]> for AdsDataTypeInfo {
+impl TryFrom<&[u8]> for AdsTypeInfo {
     type Error = AdsTypeInfoError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
@@ -509,7 +509,7 @@ impl TryFrom<&[u8]> for AdsDataTypeInfo {
 #[derive(
     serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash, Default,
 )]
-pub enum AdsDataTypeCategory {
+pub enum AdsTypeCategory {
     /// Uninitialized or unknown data type.
     #[default]
     None,
@@ -546,7 +546,7 @@ pub enum AdsDataTypeCategory {
 }
 
 /// An iterator that safely consumes a contiguous byte blob of multiple TwinCAT Data Types and
-/// parses them into [`AdsDataTypeInfo`]s.
+/// parses them into [`AdsTypeInfo`]s.
 ///
 /// Because each Data Type has a dynamic length, this iterator lazily reads the length header
 /// of the current entry, parses it, and advances the cursor to the exact start of the next entry.
@@ -556,13 +556,13 @@ pub enum AdsDataTypeCategory {
 /// If an individual Data Type fails to parse (yielding an `Err`), the iterator uses the wire-format
 /// length header to safely skip the corrupted entry. Subsequent calls to `.next()` will correctly
 /// align with the next valid Data Type in the stream.
-pub struct AdsDataTypeIterator<'a> {
+pub struct AdsTypeInfoIterator<'a> {
     data: &'a [u8],
     cursor: usize,
     platform_pointer_size: Option<u8>,
 }
 
-impl<'a> AdsDataTypeIterator<'a> {
+impl<'a> AdsTypeInfoIterator<'a> {
     /// Creates a new borrowed iterator from a raw byte payload containing multiple Data Types.
     pub fn new(data: &'a [u8]) -> Self {
         Self {
@@ -585,8 +585,8 @@ impl<'a> AdsDataTypeIterator<'a> {
     ///
     /// The iteration state (cursor position) is preserved. Any elements already yielded
     /// by this iterator will not be yielded by the new owned iterator.
-    pub fn into_owned(self) -> AdsDataTypeIteratorOwned {
-        AdsDataTypeIteratorOwned {
+    pub fn into_owned(self) -> AdsTypeInfoIteratorOwned {
+        AdsTypeInfoIteratorOwned {
             buffer: self.data.into(),
             cursor: self.cursor,
             platform_pointer_size: self.platform_pointer_size,
@@ -596,8 +596,8 @@ impl<'a> AdsDataTypeIterator<'a> {
     /// Creates an owned iterator by cloning the underlying slice.
     ///
     /// The iteration state (cursor position) is preserved in the cloned iterator.
-    pub fn to_owned(&self) -> AdsDataTypeIteratorOwned {
-        AdsDataTypeIteratorOwned {
+    pub fn to_owned(&self) -> AdsTypeInfoIteratorOwned {
+        AdsTypeInfoIteratorOwned {
             buffer: self.data.to_vec(),
             cursor: self.cursor,
             platform_pointer_size: self.platform_pointer_size,
@@ -605,8 +605,8 @@ impl<'a> AdsDataTypeIterator<'a> {
     }
 }
 
-impl<'a> Iterator for AdsDataTypeIterator<'a> {
-    type Item = Result<AdsDataTypeInfo, AdsTypeInfoError>;
+impl<'a> Iterator for AdsTypeInfoIterator<'a> {
+    type Item = Result<AdsTypeInfo, AdsTypeInfoError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         utils::parse_next_entry(self.data, &mut self.cursor, self.platform_pointer_size)
@@ -618,13 +618,13 @@ impl<'a> Iterator for AdsDataTypeIterator<'a> {
 /// This is highly efficient for large PLC memory blobs (which can exceed several megabytes).
 /// The network payload is stored once, and heavy string decoding and struct allocations
 /// only occur when `.next()` is called.
-pub struct AdsDataTypeIteratorOwned {
+pub struct AdsTypeInfoIteratorOwned {
     buffer: Vec<u8>,
     cursor: usize,
     platform_pointer_size: Option<u8>,
 }
 
-impl AdsDataTypeIteratorOwned {
+impl AdsTypeInfoIteratorOwned {
     /// Creates a new owned iterator from a raw byte payload.
     pub fn new(buffer: Vec<u8>) -> Self {
         Self {
@@ -645,10 +645,10 @@ impl AdsDataTypeIteratorOwned {
 
     /// Returns a borrowed view of this iterator.
     ///
-    /// The returned [`AdsDataTypeIterator`] shares the same cursor position. However, advancing
+    /// The returned [`AdsTypeInfoIterator`] shares the same cursor position. However, advancing
     /// the view will *not* advance the cursor of this owned iterator.
-    pub fn as_view(&self) -> AdsDataTypeIterator<'_> {
-        AdsDataTypeIterator {
+    pub fn as_view(&self) -> AdsTypeInfoIterator<'_> {
+        AdsTypeInfoIterator {
             data: &self.buffer,
             cursor: self.cursor,
             platform_pointer_size: self.platform_pointer_size,
@@ -656,8 +656,8 @@ impl AdsDataTypeIteratorOwned {
     }
 }
 
-impl Iterator for AdsDataTypeIteratorOwned {
-    type Item = Result<AdsDataTypeInfo, AdsTypeInfoError>;
+impl Iterator for AdsTypeInfoIteratorOwned {
+    type Item = Result<AdsTypeInfo, AdsTypeInfoError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         utils::parse_next_entry(&self.buffer, &mut self.cursor, self.platform_pointer_size)
@@ -679,7 +679,7 @@ pub mod utils {
         data: &[u8],
         cursor: &mut usize,
         platform_pointer_size: Option<u8>,
-    ) -> Option<Result<AdsDataTypeInfo, AdsTypeInfoError>> {
+    ) -> Option<Result<AdsTypeInfo, AdsTypeInfoError>> {
         if *cursor >= data.len() {
             return None;
         }
@@ -713,7 +713,7 @@ pub mod utils {
 
         *cursor += entry_length;
 
-        let result = AdsDataTypeInfo::try_from(entry_slice);
+        let result = AdsTypeInfo::try_from(entry_slice);
 
         if result.is_err() {
             return Some(result);

@@ -2,7 +2,7 @@ use super::error::AdsTypeInfoError;
 
 /// Refactoring history entry attached to a TwinCAT data type.
 ///
-/// Present in [`AdsDataTypeInfo`](super::AdsDataTypeInfo) when
+/// Present in [`AdsDataTypeInfo`](super::AdsTypeInfo) when
 /// [`AdsDataTypeFlags::REFACTOR_INFO`](super::AdsTypeFlags::REFACTOR_INFO) is set.
 ///
 /// # Note

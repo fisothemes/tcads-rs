@@ -4,8 +4,8 @@ use std::str::FromStr;
 
 /// A 16-byte Globally Unique Identifier (GUID) as used in TwinCAT ADS type info entries.
 ///
-/// Present in [`AdsDataTypeInfo`](super::AdsDataTypeInfo) when
-/// [`AdsDataTypeFlags::TYPE_GUID`](super::AdsTypeFlags::TYPE_GUID) is set.
+/// Present in [`AdsTypeInfo`](super::AdsTypeInfo) when
+/// [`AdsTypeFlags::TYPE_GUID`](super::AdsTypeFlags::TYPE_GUID) is set.
 /// The bytes are stored in the order they appear on the wire without any field
 /// decomposition. TwinCAT treats GUIDs as opaque identifiers for type versioning.
 ///

@@ -3,7 +3,7 @@ use bitflags::bitflags;
 use std::fmt;
 
 bitflags! {
-    /// Flags describing the properties and optional wire sections of an [`AdsDataTypeInfo`](super::AdsDataTypeInfo) entry.
+    /// Flags describing the properties and optional wire sections of an [`AdsDataTypeInfo`](super::AdsTypeInfo) entry.
     ///
     /// This is a bitmask, so multiple flags can be set simultaneously. The flags serve two purposes:
     /// describing the nature of the type (e.g. [`PERSISTENT`](Self::PERSISTENT), [`STATIC`](Self::STATIC))

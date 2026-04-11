@@ -152,7 +152,7 @@ pub enum AdsSymbolUploadInfoError {
     UnexpectedLength { expected: usize, got: usize },
 }
 
-/// Error returned when parsing an [`AdsDataTypeInfo`](super::AdsDataTypeInfo) entry fails.
+/// Error returned when parsing an [`AdsTypeInfo`](super::AdsTypeInfo) entry fails.
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum AdsTypeInfoError {
     #[error("Unexpected length: expected {expected} bytes, got {got}")]
