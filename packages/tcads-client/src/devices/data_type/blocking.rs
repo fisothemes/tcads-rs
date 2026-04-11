@@ -120,16 +120,7 @@ impl DataTypeDevice {
             name,
         )?;
 
-        let info = self.get_upload_info()?;
-        let pp_size = info
-            .flags()
-            .map(|f| if f.is_64bit_platform() { 8 } else { 4 });
-
-        let type_info = AdsTypeInfo::try_from(bytes.as_ref())
-            .map_err(AdsError::from)?
-            .with_platform_pointer_size(pp_size);
-
-        Ok(type_info)
+        Ok(AdsTypeInfo::try_from(bytes.as_ref()).map_err(AdsError::from)?)
     }
 
     /// Fetches all data types from the PLC and returns a lazy iterator.
@@ -139,23 +130,20 @@ impl DataTypeDevice {
     pub fn get_all_data_type_info(
         &self,
     ) -> crate::Result<impl Iterator<Item = Result<AdsTypeInfo, AdsTypeInfoError>>> {
-        let info = self.get_upload_info()?;
-
         // There is no data type blob size for V1, so we just use a huge number.
         // This is safe because we know the size of the upload info is 8 bytes
         // and the data type blob size is 4 bytes
-        let size = info.data_type_blob_size().unwrap_or(u32::MAX);
-
-        let pp_size = info
-            .flags()
-            .map(|f| if f.is_64bit_platform() { 8 } else { 4 });
+        let size = self
+            .get_upload_info()?
+            .data_type_blob_size()
+            .unwrap_or(u32::MAX);
 
         let raw_blob =
             self.inner
                 .device
                 .read(self.inner.target, DATATYPE_UPLOAD_INDEX_GROUP, 0, size)?;
 
-        Ok(AdsTypeInfoIteratorOwned::new(raw_blob).with_platform_pointer_size(pp_size))
+        Ok(AdsTypeInfoIteratorOwned::new(raw_blob))
     }
 
     /// Fetches and caches the symbol upload metadata from the PLC.

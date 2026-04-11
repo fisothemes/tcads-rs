@@ -33,18 +33,11 @@ pub struct AdsTypeInfo {
     enum_infos: Vec<AdsEnumInfo>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     refactor_infos: Vec<AdsRefactorInfo>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    platform_pointer_size: Option<u8>,
 }
 
 impl AdsTypeInfo {
     /// Byte size of the fixed header.
     pub const MIN_LENGTH: usize = 42;
-
-    pub fn with_platform_pointer_size(mut self, size: impl Into<Option<u8>>) -> Self {
-        self.platform_pointer_size = size.into();
-        self
-    }
 
     /// Structure version.
     pub fn version(&self) -> u32 {
@@ -63,7 +56,7 @@ impl AdsTypeInfo {
         self.size
     }
     /// Primitive type identifier of the base or element type.
-    pub fn data_type(&self) -> AdsTypeId {
+    pub fn type_id(&self) -> AdsTypeId {
         self.type_id
     }
     /// Type flags.
@@ -110,200 +103,6 @@ impl AdsTypeInfo {
     /// Refactoring history. Non-empty when [`AdsTypeFlags::REFACTOR_INFO`] is set.
     pub fn refactor_infos(&self) -> &[AdsRefactorInfo] {
         &self.refactor_infos
-    }
-    /// Size of the platform-specific pointer (i.e. 32-bit = 4 bytes, 64-bit = 8 bytes).
-    /// Must be set manually and is only needed for working out if the [`AdsTypeCategory`]
-    /// is an interface.
-    pub fn platform_pointer_size(&self) -> Option<u8> {
-        self.platform_pointer_size
-    }
-
-    /// Set the platform-specific pointer size. Without this, the [`AdsTypeCategory`]
-    /// for an interface will be inferred.
-    pub fn set_platform_pointer_size(&mut self, size: impl Into<Option<u8>>) {
-        self.platform_pointer_size = size.into();
-    }
-
-    /// Evaluates the metadata and structure to determine the high-level category of this type.
-    pub fn category(&self) -> AdsTypeCategory {
-        // Pointers
-        if self.flags.is_plc_pointer_type()
-            || self.name == "PVOID"
-            || self.name == "PCCH"
-            || self.name.starts_with("POINTER TO")
-        {
-            return AdsTypeCategory::Pointer;
-        }
-
-        // References
-        if self.flags.is_reference_to() || self.name.starts_with("REFERENCE TO") {
-            return AdsTypeCategory::Reference;
-        }
-
-        // Arrays
-        if !self.array_infos.is_empty() {
-            return AdsTypeCategory::Array;
-        }
-
-        // Enums
-        if self.flags.has_enum_infos() {
-            return AdsTypeCategory::Enum;
-        }
-
-        // Sub-ranges
-        if self.name.contains("..") && self.name.contains('(') && self.name.contains(')') {
-            return AdsTypeCategory::SubRange;
-        }
-
-        // Alias
-        if !self.type_name.is_empty() && self.field_infos.is_empty() && self.method_infos.is_empty()
-        {
-            if self.name == "BOOL" {
-                return AdsTypeCategory::Primitive;
-            }
-            return AdsTypeCategory::Alias;
-        }
-
-        match self.type_id {
-            // Primitives
-            AdsTypeId::Int8
-            | AdsTypeId::UInt8
-            | AdsTypeId::Int16
-            | AdsTypeId::UInt16
-            | AdsTypeId::Int32
-            | AdsTypeId::UInt32
-            | AdsTypeId::Int64
-            | AdsTypeId::UInt64
-            | AdsTypeId::Real32
-            | AdsTypeId::Real64
-            | AdsTypeId::Real80
-            | AdsTypeId::Bit => return AdsTypeCategory::Primitive,
-            // Strings
-            AdsTypeId::String | AdsTypeId::WString => return AdsTypeCategory::String,
-            _ => {
-                if matches!(
-                    self.name.as_str(),
-                    "TOD"
-                        | "DT"
-                        | "TIME"
-                        | "DATE"
-                        | "LTIME"
-                        | "TIME_OF_DAY"
-                        | "DATE_AND_TIME"
-                        | "UXINT"
-                        | "XINT"
-                        | "XWORD"
-                        | "__UXINT"
-                        | "__XINT"
-                        | "__XWORD"
-                ) {
-                    return AdsTypeCategory::Primitive;
-                }
-            }
-        }
-
-        // Unions (Check for memory offset overlap among sub-items)
-        if !self.field_infos.is_empty()
-            && self.type_name.is_empty()
-            && self.method_infos.is_empty()
-            && self.has_field_offset_overlap()
-        {
-            return AdsTypeCategory::Union;
-        }
-
-        // Complex Types: Interfaces, Function Blocks, and Structs
-        if !self.field_infos.is_empty() || !self.method_infos.is_empty() {
-            // FBs and Interfaces often expose methods
-            if !self.method_infos.is_empty() {
-                // Check for Interface implementations
-                if self
-                    .attributes
-                    .iter()
-                    .any(|attr| attr.name() == "TcImplements")
-                {
-                    return AdsTypeCategory::FunctionBlock;
-                }
-                if self.field_infos.is_empty() {
-                    return AdsTypeCategory::Interface;
-                }
-                // Stable Rust alternative to let_chains
-                if self
-                    .platform_pointer_size
-                    .is_some_and(|plat_size| self.size == plat_size as u32)
-                {
-                    return AdsTypeCategory::Interface;
-                }
-                return AdsTypeCategory::FunctionBlock;
-            }
-
-            // If the first user-defined sub-item does NOT start at offset 0, it has hidden state (FB)
-            if self
-                .field_infos
-                .first()
-                .is_some_and(|child| child.offset() > 0)
-            {
-                return AdsTypeCategory::FunctionBlock;
-            }
-
-            return AdsTypeCategory::Struct;
-        }
-
-        // Things are getting funky now...
-        if self.field_infos.is_empty() {
-            if !self.name.is_empty() && self.size == 0 {
-                return AdsTypeCategory::Struct;
-            }
-
-            // Check for Interface implementations
-            if self
-                .attributes
-                .iter()
-                .any(|attr| attr.name() == "TcImplements")
-            {
-                return AdsTypeCategory::FunctionBlock;
-            }
-
-            if self.size.is_multiple_of(4) && self.size > 8 {
-                return AdsTypeCategory::FunctionBlock;
-            }
-
-            if self.size == 4 || self.size == 8 {
-                return AdsTypeCategory::Interface;
-            }
-        }
-
-        AdsTypeCategory::None
-    }
-
-    /// Checks if the sub-items of this data type overlap in memory (indicative of a `UNION`).
-    fn has_field_offset_overlap(&self) -> bool {
-        if self.field_infos.len() <= 1 {
-            return false;
-        }
-
-        let mut max_bit_pos = 0;
-        for sub in &self.field_infos {
-            // Skip properties and statics as they don't occupy linear instance memory
-            if sub.flags().is_prop_item() || sub.flags().is_static() {
-                continue;
-            }
-
-            let bit_offset = if sub.flags().is_bit_values() {
-                sub.offset()
-            } else {
-                sub.offset() * 8
-            };
-            if bit_offset < max_bit_pos {
-                return true; // Overlap detected!
-            }
-            let bit_size = if sub.flags().is_bit_values() {
-                sub.size()
-            } else {
-                sub.size() * 8
-            };
-            max_bit_pos += bit_size;
-        }
-        false
     }
 
     /// Parses an [`AdsTypeInfo`] from a byte slice.
@@ -486,7 +285,6 @@ impl AdsTypeInfo {
                 attributes,
                 enum_infos: enums,
                 refactor_infos,
-                platform_pointer_size: None,
             },
             entry_length,
         ))
@@ -500,49 +298,6 @@ impl TryFrom<&[u8]> for AdsTypeInfo {
         let (info, _) = Self::try_from_slice(value)?;
         Ok(info)
     }
-}
-
-/// Category of a TwinCAT Data Type or Instance.
-///
-/// This provides a high-level classification of the memory layout, simplifying
-/// how consumers interpret the nested fields and properties of a PLC variable.
-#[derive(
-    serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash, Default,
-)]
-pub enum AdsTypeCategory {
-    /// Uninitialized or unknown data type.
-    #[default]
-    None,
-    /// Simple base data type (e.g., `BOOL`, `INT`, `REAL`).
-    Primitive,
-    /// Type alias pointing to a base type.
-    Alias,
-    /// Enumeration type.
-    Enum,
-    /// Array data type.
-    Array,
-    /// Structure data type.
-    Struct,
-    /// Function block (POU) instance.
-    FunctionBlock,
-    /// Program (POU) instance.
-    Program,
-    /// Function (POU) instance.
-    Function,
-    /// Sub-range type.
-    SubRange,
-    /// String type (e.g., `STRING`, `WSTRING`).
-    String,
-    /// Bitset type.
-    Bitset,
-    /// Pointer type (`POINTER TO ...`, `PVOID`).
-    Pointer,
-    /// Union type (overlapping memory fields).
-    Union,
-    /// Reference type (`REFERENCE TO ...`).
-    Reference,
-    /// Interface pointer.
-    Interface,
 }
 
 /// An iterator that safely consumes a contiguous byte blob of multiple TwinCAT Data Types and
@@ -559,26 +314,12 @@ pub enum AdsTypeCategory {
 pub struct AdsTypeInfoIterator<'a> {
     data: &'a [u8],
     cursor: usize,
-    platform_pointer_size: Option<u8>,
 }
 
 impl<'a> AdsTypeInfoIterator<'a> {
     /// Creates a new borrowed iterator from a raw byte payload containing multiple Data Types.
     pub fn new(data: &'a [u8]) -> Self {
-        Self {
-            data,
-            cursor: 0,
-            platform_pointer_size: None,
-        }
-    }
-
-    /// Adds a platform pointer size to the borrowed iterator.
-    pub fn with_platform_pointer_size(
-        mut self,
-        platform_pointer_size: impl Into<Option<u8>>,
-    ) -> Self {
-        self.platform_pointer_size = platform_pointer_size.into();
-        self
+        Self { data, cursor: 0 }
     }
 
     /// Converts this borrowed iterator into an owned iterator by copying the underlying slice.
@@ -589,7 +330,6 @@ impl<'a> AdsTypeInfoIterator<'a> {
         AdsTypeInfoIteratorOwned {
             buffer: self.data.into(),
             cursor: self.cursor,
-            platform_pointer_size: self.platform_pointer_size,
         }
     }
 
@@ -600,7 +340,6 @@ impl<'a> AdsTypeInfoIterator<'a> {
         AdsTypeInfoIteratorOwned {
             buffer: self.data.to_vec(),
             cursor: self.cursor,
-            platform_pointer_size: self.platform_pointer_size,
         }
     }
 }
@@ -609,7 +348,7 @@ impl<'a> Iterator for AdsTypeInfoIterator<'a> {
     type Item = Result<AdsTypeInfo, AdsTypeInfoError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        utils::parse_next_entry(self.data, &mut self.cursor, self.platform_pointer_size)
+        utils::parse_next_entry(self.data, &mut self.cursor)
     }
 }
 
@@ -621,26 +360,12 @@ impl<'a> Iterator for AdsTypeInfoIterator<'a> {
 pub struct AdsTypeInfoIteratorOwned {
     buffer: Vec<u8>,
     cursor: usize,
-    platform_pointer_size: Option<u8>,
 }
 
 impl AdsTypeInfoIteratorOwned {
     /// Creates a new owned iterator from a raw byte payload.
     pub fn new(buffer: Vec<u8>) -> Self {
-        Self {
-            buffer,
-            cursor: 0,
-            platform_pointer_size: None,
-        }
-    }
-
-    /// Adds a platform pointer size to the owned iterator.
-    pub fn with_platform_pointer_size(
-        mut self,
-        platform_pointer_size: impl Into<Option<u8>>,
-    ) -> Self {
-        self.platform_pointer_size = platform_pointer_size.into();
-        self
+        Self { buffer, cursor: 0 }
     }
 
     /// Returns a borrowed view of this iterator.
@@ -651,7 +376,6 @@ impl AdsTypeInfoIteratorOwned {
         AdsTypeInfoIterator {
             data: &self.buffer,
             cursor: self.cursor,
-            platform_pointer_size: self.platform_pointer_size,
         }
     }
 }
@@ -660,7 +384,7 @@ impl Iterator for AdsTypeInfoIteratorOwned {
     type Item = Result<AdsTypeInfo, AdsTypeInfoError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        utils::parse_next_entry(&self.buffer, &mut self.cursor, self.platform_pointer_size)
+        utils::parse_next_entry(&self.buffer, &mut self.cursor)
     }
 }
 
@@ -678,7 +402,6 @@ pub mod utils {
     pub fn parse_next_entry(
         data: &[u8],
         cursor: &mut usize,
-        platform_pointer_size: Option<u8>,
     ) -> Option<Result<AdsTypeInfo, AdsTypeInfoError>> {
         if *cursor >= data.len() {
             return None;
@@ -713,14 +436,6 @@ pub mod utils {
 
         *cursor += entry_length;
 
-        let result = AdsTypeInfo::try_from(entry_slice);
-
-        if result.is_err() {
-            return Some(result);
-        }
-
-        let dt = result.unwrap();
-
-        Some(Ok(dt.with_platform_pointer_size(platform_pointer_size)))
+        Some(AdsTypeInfo::try_from(entry_slice))
     }
 }
