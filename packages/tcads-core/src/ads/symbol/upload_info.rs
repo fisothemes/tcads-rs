@@ -1,6 +1,5 @@
 use super::AdsSymbolUploadFlags;
 use super::error::AdsSymbolUploadInfoError;
-use crate::AdsSymbolUploadInfo::V3;
 
 /// Metadata describing the symbols and data types available on a PLC runtime.
 ///
@@ -118,7 +117,7 @@ impl AdsSymbolUploadInfo {
     /// Returns `None` if the runtime does not support retreival of the encoding code page.
     pub fn encoding_code_page(&self) -> Option<u32> {
         match self {
-            V3(v) => Some(v.encoding_code_page),
+            Self::V3(v) => Some(v.encoding_code_page),
             _ => None,
         }
     }
@@ -128,7 +127,7 @@ impl AdsSymbolUploadInfo {
     /// Returns `None` if the runtime does no support retrieval of runtime flags.
     pub fn flags(&self) -> Option<AdsSymbolUploadFlags> {
         match self {
-            V3(v) => Some(v.flags),
+            Self::V3(v) => Some(v.flags),
             _ => None,
         }
     }
