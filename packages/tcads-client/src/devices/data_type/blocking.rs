@@ -136,7 +136,7 @@ impl DataTypeDevice {
         let size = self
             .get_upload_info()?
             .data_type_blob_size()
-            .unwrap_or(u32::MAX);
+            .unwrap_or(1_048_576);
 
         let raw_blob =
             self.inner
