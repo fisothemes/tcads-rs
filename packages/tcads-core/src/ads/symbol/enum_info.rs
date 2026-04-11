@@ -108,6 +108,23 @@ impl AdsEnumInfo {
         &self.attributes
     }
 
+    /// Returns the wire size of the standard enum section.
+    pub fn standard_wire_size(&self) -> usize {
+        let (name_bytes, _, _) = encoding_rs::WINDOWS_1252.encode(&self.name);
+        // 1 (name_len) + encoded name + 1 (null) + raw value bytes
+        1 + name_bytes.len() + 1 + self.value.len()
+    }
+
+    /// Returns the wire size of the extended enum section.
+    pub fn extended_wire_size(&self) -> usize {
+        if self.comment.is_empty() && self.attributes.is_empty() {
+            return 0;
+        }
+        let (comment_bytes, _, _) = encoding_rs::WINDOWS_1252.encode(&self.comment);
+        // 2 (entry_len) + 1 (comment_len) + 1 (attr_count) + comment + 1 (null) + attributes
+        4 + comment_bytes.len() + 1 + self.attributes.iter().map(|a| a.wire_size()).sum::<usize>()
+    }
+
     /// Parses an Enum Info entry from a byte slice and extracts the name and value.
     ///
     /// Note: `value_size` is required because the raw value length is dictated by the parent type.
@@ -284,6 +301,15 @@ mod tests {
     }
 
     #[test]
+    fn test_standard_wire_size_logic() {
+        let variant = AdsEnumInfo::new("PS_None", 0u8.to_le_bytes());
+        assert_eq!(variant.standard_wire_size(), 10);
+
+        let variant_complex = AdsEnumInfo::new("Static", 1u32.to_le_bytes());
+        assert_eq!(variant_complex.standard_wire_size(), 12);
+    }
+
+    #[test]
     fn test_roundtrip_extended_enum() {
         let original = AdsEnumInfo::new_ext(
             "PS_Partial",
@@ -306,5 +332,19 @@ mod tests {
         assert_eq!(consumed, ext_bytes.len());
 
         assert_eq!(original, parsed);
+    }
+
+    #[test]
+    fn test_extended_wire_size_logic() {
+        let variant = AdsEnumInfo::new("PS_Partial", vec![0x02])
+            .with_comment("Few restored")
+            .with_attributes([AdsAttribute::new("Unit", "ms")]);
+
+        let (comment_enc, _, _) = encoding_rs::WINDOWS_1252.encode("Few restored");
+        let attr_size = AdsAttribute::new("Unit", "ms").wire_size();
+
+        let expected = 4 + comment_enc.len() + 1 + attr_size;
+
+        assert_eq!(variant.extended_wire_size(), expected);
     }
 }
