@@ -97,7 +97,8 @@ impl DataTypeDevice {
     }
 
     /// Fetches the data type information for a specific symbol name.
-    pub fn get_data_type_info(&self, name: &str) -> crate::Result<AdsTypeInfo> {
+    pub fn get_data_type_info(&self, name: impl AsRef<str>) -> crate::Result<AdsTypeInfo> {
+        let name = name.as_ref();
         let length_bytes = self.inner.device.read_write(
             self.inner.target,
             DATATYPE_INFO_BY_NAME_INDEX_GROUP,
