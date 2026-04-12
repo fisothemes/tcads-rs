@@ -4,7 +4,36 @@ use super::{
     AdsTypeFlags, AdsTypeId, Guid,
 };
 
-/// TwinCAT ADS data type info.
+/// Type information about a PLC data type such as primitives/scalars, structs, enums, arrays,
+/// alias, function block, etc. Struct fields and function block members are represented as
+/// [`AdsFieldInfo`] entries accessible via [`field_infos`](Self::field_infos).
+///
+/// # Wire Format
+///
+/// | Offset | Size | Field             | Description                                            |
+/// |--------|------|-------------------|--------------------------------------------------------|
+/// | 0      | 4    | `entry_length`    | Total size including dynamic tail                      |
+/// | 4      | 4    | `version`         | Metadata version (usually 1)                           |
+/// | 8      | 4    | `hash_value`      | Type hash for change detection                         |
+/// | 12     | 4    | `type_hash_value` | Hash of the base type                                  |
+/// | 16     | 4    | `size`            | Total byte size of the data type                       |
+/// | 20     | 4    | `offset`          | Always 0 for root types (burned)                       |
+/// | 24     | 4    | `type_id`         | Base type ID ([`AdsTypeId`])                           |
+/// | 28     | 4    | `flags`           | Type flags ([`AdsTypeFlags`])                          |
+/// | 32     | 2    | `name_len`        | Length of name excl. null                              |
+/// | 34     | 2    | `type_len`        | Length of type_name excl. null                         |
+/// | 36     | 2    | `comment_len`     | Length of comment excl. null                           |
+/// | 38     | 2    | `array_dim_count` | Number of array dimensions                             |
+/// | 40     | 2    | `field_count`     | Number of fields ([`AdsFieldInfo`])                    |
+/// | 42     | dyn  | `Strings`         | Windows-1252, null-terminated                          |
+/// | dyn    | dyn  | `array_infos`     | `array_dim_count` x [`AdsArrayInfo`]                   |
+/// | dyn    | dyn  | `field_infos`     | `field_count` x [`AdsFieldInfo`] entries               |
+/// | dyn    | dyn  | `type_guid`       | 16-byte GUID if flag is set                            |
+/// | dyn    | dyn  | `method_infos`    | `u16` count + [`AdsMethodInfo`] entries if flag is set |
+/// | dyn    | dyn  | `Attributes`      | Prefixed by `u16` count if flag is set                 |
+/// | dyn    | dyn  | `enum_infos`      | `u16` count + [`AdsEnumInfo`] entries if flag is set   |
+/// | dyn    | dyn  | `refactor_infos`  | Chained [`AdsRefactorInfo`] entries if flag is set     |
+/// | dyn    | dyn  | remaining         | Extended flags, variant, extended enum infos etc.      |
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct AdsTypeInfo {
     version: u32,
@@ -33,6 +62,8 @@ pub struct AdsTypeInfo {
     enum_infos: Vec<AdsEnumInfo>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     refactor_infos: Vec<AdsRefactorInfo>,
+    #[serde(skip)]
+    reserved: usize,
 }
 
 impl AdsTypeInfo {
@@ -76,11 +107,11 @@ impl AdsTypeInfo {
     pub fn comment(&self) -> &str {
         &self.comment
     }
-    /// Array dimension bounds. Non-empty only for array types.
+    /// Array dimension bounds.
     pub fn array_infos(&self) -> &[AdsArrayInfo] {
         &self.array_infos
     }
-    /// Struct fields, fully inlined. Non-empty only for struct types.
+    /// Struct/Union/Function Block fields.
     pub fn field_infos(&self) -> &[AdsFieldInfo] {
         &self.field_infos
     }
@@ -103,6 +134,175 @@ impl AdsTypeInfo {
     /// Refactoring history. Non-empty when [`AdsTypeFlags::REFACTOR_INFO`] is set.
     pub fn refactor_infos(&self) -> &[AdsRefactorInfo] {
         &self.refactor_infos
+    }
+
+    /// Computes and returns the wire size of this type in bytes.
+    pub fn wire_size(&self) -> usize {
+        let mut size = Self::MIN_LENGTH;
+
+        let (name_bytes, _, _) = encoding_rs::WINDOWS_1252.encode(self.name());
+        let (type_name_bytes, _, _) = encoding_rs::WINDOWS_1252.encode(self.type_name());
+        let (comment_bytes, _, _) = encoding_rs::WINDOWS_1252.encode(self.comment());
+
+        size += name_bytes.len() + 1 + type_name_bytes.len() + 1 + comment_bytes.len() + 1;
+        size += self.array_infos.len() * AdsArrayInfo::LENGTH;
+        size += self
+            .field_infos
+            .iter()
+            .map(|f| f.wire_size())
+            .sum::<usize>();
+
+        if self.flags.has_type_guid() {
+            size += Guid::LENGTH;
+        }
+        if self.flags.has_copy_mask() {
+            size += self.size as usize;
+        }
+
+        if self.flags.has_method_infos() {
+            size += 2 + self
+                .method_infos
+                .iter()
+                .map(|m| m.wire_size())
+                .sum::<usize>();
+        }
+
+        if self.flags.has_attributes() {
+            size += 2 + self.attributes.iter().map(|a| a.wire_size()).sum::<usize>();
+        }
+
+        if self.flags.has_enum_infos() {
+            size += 2 + self
+                .enum_infos
+                .iter()
+                .map(|e| e.standard_wire_size())
+                .sum::<usize>();
+        }
+
+        if self.flags.has_refactor_info() {
+            size += 2 + self
+                .refactor_infos
+                .iter()
+                .map(|r| r.wire_size())
+                .sum::<usize>();
+        }
+
+        if self.flags.has_extended_flags() {
+            size += 4;
+        }
+
+        if self.flags.is_variant() {
+            size += 2
+        }
+
+        if self.flags.has_extended_enum_infos() {
+            size += 4 + self
+                .enum_infos
+                .iter()
+                .map(|e| e.extended_wire_size())
+                .sum::<usize>();
+        }
+
+        size += self.reserved;
+
+        size
+    }
+
+    /// Serializes this type definition to a byte vector.
+    pub fn to_vec(&self) -> Vec<u8> {
+        let (name_bytes, _, _) = encoding_rs::WINDOWS_1252.encode(self.name());
+        let (type_name_bytes, _, _) = encoding_rs::WINDOWS_1252.encode(self.type_name());
+        let (comment_bytes, _, _) = encoding_rs::WINDOWS_1252.encode(self.comment());
+
+        let mut buf = Vec::with_capacity(Self::MIN_LENGTH);
+
+        // Fixed header
+        buf.extend_from_slice(&0u32.to_le_bytes()); // Add entry length later
+        buf.extend_from_slice(&self.version.to_le_bytes());
+        buf.extend_from_slice(&self.hash_value.to_le_bytes());
+        buf.extend_from_slice(&self.type_hash_value.to_le_bytes());
+        buf.extend_from_slice(&self.size.to_le_bytes());
+        buf.extend_from_slice(&0u32.to_le_bytes()); // Offset always 0
+        buf.extend_from_slice(&self.type_id.to_bytes());
+        buf.extend_from_slice(&self.flags.to_bytes());
+        buf.extend_from_slice(&(name_bytes.len() as u16).to_le_bytes());
+        buf.extend_from_slice(&(type_name_bytes.len() as u16).to_le_bytes());
+        buf.extend_from_slice(&(comment_bytes.len() as u16).to_le_bytes());
+        buf.extend_from_slice(&(self.array_infos.len() as u16).to_le_bytes());
+        buf.extend_from_slice(&(self.field_infos.len() as u16).to_le_bytes());
+
+        // Dynamic Section
+        buf.extend_from_slice(&name_bytes);
+        buf.push(0);
+        buf.extend_from_slice(&type_name_bytes);
+        buf.push(0);
+        buf.extend_from_slice(&comment_bytes);
+        buf.push(0);
+
+        for array in &self.array_infos {
+            buf.extend_from_slice(&array.to_bytes());
+        }
+
+        for field in &self.field_infos {
+            buf.extend_from_slice(&field.to_vec());
+        }
+
+        // Optionals
+        if self.flags.has_type_guid() {
+            buf.extend_from_slice(self.guid.as_ref().map_or(&[0u8; 16], |g| g.as_bytes()));
+        }
+
+        if self.flags.has_copy_mask() {
+            buf.resize(buf.len() + self.size as usize, 0);
+        }
+
+        if self.flags.has_method_infos() {
+            buf.extend_from_slice(&(self.method_infos.len() as u16).to_le_bytes());
+            for method in &self.method_infos {
+                buf.extend_from_slice(&method.to_vec());
+            }
+        }
+
+        if self.flags.has_attributes() {
+            buf.extend_from_slice(&(self.attributes.len() as u16).to_le_bytes());
+            for attr in &self.attributes {
+                buf.extend_from_slice(&attr.to_vec());
+            }
+        }
+
+        if self.flags.has_enum_infos() {
+            buf.extend_from_slice(&(self.enum_infos.len() as u16).to_le_bytes());
+            for enum_info in &self.enum_infos {
+                let (std, _) = enum_info.to_vec();
+                buf.extend_from_slice(&std);
+            }
+        }
+
+        if self.flags.has_refactor_info() {
+            buf.extend_from_slice(&AdsRefactorInfo::entries_to_vec(&self.refactor_infos));
+        }
+
+        if self.flags.has_extended_flags() {
+            buf.extend_from_slice(&0u32.to_le_bytes());
+        }
+
+        if self.flags.is_variant() {
+            buf.extend_from_slice(&0u16.to_le_bytes());
+        }
+
+        if self.flags.has_extended_enum_infos() {
+            for enum_info in &self.enum_infos {
+                let (_, ext) = enum_info.to_vec();
+                buf.extend_from_slice(&ext);
+            }
+        }
+
+        buf.resize(buf.len() + self.reserved, 0);
+
+        let entry_len = buf.len() as u32;
+        buf[..4].copy_from_slice(&entry_len.to_le_bytes());
+
+        buf
     }
 
     /// Parses an [`AdsTypeInfo`] from a byte slice.
@@ -267,6 +467,13 @@ impl AdsTypeInfo {
             }
         }
 
+        if pos > entry_length {
+            return Err(AdsTypeInfoError::EntryLengthMismatch {
+                expected: entry_length,
+                got: pos,
+            });
+        }
+
         Ok((
             Self {
                 version,
@@ -285,6 +492,7 @@ impl AdsTypeInfo {
                 attributes,
                 enum_infos: enums,
                 refactor_infos,
+                reserved: entry_length.saturating_sub(pos),
             },
             entry_length,
         ))
@@ -437,5 +645,68 @@ pub mod utils {
         *cursor += entry_length;
 
         Some(AdsTypeInfo::try_from(entry_slice))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_parse_array_of_byte() {
+        let data = [
+            96, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 17, 0, 0, 0,
+            129, 0, 0, 0, 20, 0, 4, 0, 0, 0, 1, 0, 0, 0, 65, 82, 82, 65, 89, 32, 91, 48, 46, 46,
+            55, 93, 32, 79, 70, 32, 66, 89, 84, 69, 0, 66, 89, 84, 69, 0, 0, 0, 0, 0, 0, 8, 0, 0,
+            0, 133, 93, 86, 254, 123, 146, 8, 45, 16, 67, 18, 79, 95, 146, 30, 53, 0, 0, 0,
+        ];
+
+        let (info, consumed) = AdsTypeInfo::try_from_slice(&data).unwrap();
+
+        assert_eq!(consumed, 96);
+        assert_eq!(info.name(), "ARRAY [0..7] OF BYTE");
+        assert_eq!(info.size(), 8);
+        assert_eq!(info.array_infos().len(), 1);
+        assert_eq!(info.array_infos()[0].element_count(), 8);
+
+        // Round-trip check
+        assert_eq!(info.wire_size(), 96);
+        assert_eq!(info.to_vec(), data.to_vec());
+    }
+
+    #[test]
+    fn test_parse_amsaddr_struct() {
+        let data = [
+            216, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 65, 0, 0, 0,
+            129, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 2, 0, 65, 77, 83, 65, 68, 68, 82, 0, 0, 0, 74, 0,
+            0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 17, 0, 0, 0, 130, 0,
+            0, 0, 5, 0, 8, 0, 0, 0, 0, 0, 0, 0, 110, 101, 116, 73, 100, 0, 65, 77, 83, 78, 69, 84,
+            73, 68, 0, 0, 149, 25, 7, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65, 69, 0, 0, 0, 1, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 6, 0, 0, 0, 18, 0, 0, 0, 130, 0, 0, 0, 4, 0,
+            4, 0, 0, 0, 0, 0, 0, 0, 112, 111, 114, 116, 0, 87, 79, 82, 68, 0, 0, 149, 25, 7, 24, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 149, 25, 7, 24, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 66,
+            0, 0, 0, 0, 0,
+        ];
+
+        let (info, consumed) = AdsTypeInfo::try_from_slice(&data).unwrap();
+
+        assert_eq!(consumed, 216);
+        assert_eq!(info.name(), "AMSADDR");
+        assert_eq!(info.field_infos().len(), 2);
+
+        // Check Field 1: netId
+        let f1 = &info.field_infos()[0];
+        assert_eq!(f1.name(), "netId");
+        assert_eq!(f1.offset(), 0);
+        assert_eq!(f1.size(), 6);
+
+        // Check Field 2: port
+        let f2 = &info.field_infos()[1];
+        assert_eq!(f2.name(), "port");
+        assert_eq!(f2.offset(), 6);
+        assert_eq!(f2.size(), 2);
+
+        assert_eq!(info.wire_size(), 216);
+        assert_eq!(info.to_vec(), data.to_vec());
     }
 }
