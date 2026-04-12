@@ -29,35 +29,37 @@ pub struct DataTypeDevice {
 }
 
 impl DataTypeDevice {
-    /// Connects to the local target ADS device at a given `port` using the local
-    /// AMS router at `127.0.0.1:48898`.
+    /// Connects to a specific `port` on the local AMS router at `127.0.0.1:48898`.
     ///
-    /// The `port` is the [`AmsPort`] of the run-time/free-task ADS Device you wish to interact
-    /// with based on the target's AMS address.
+    /// Automatically discovers the local Net ID and targets `local_net_id:port`.
+    /// The `port` is the [`AmsPort`] of the target PLC runtime (e.g. 851).
     ///
-    /// See [`AdsDevice::connect`] for more details.
+    /// # Note
+    ///
+    /// On Windows, connecting via `127.0.0.1` requires the `EnableAmsTcpLoopback`
+    /// registry key to be set. This is enabled by default in TwinCAT 4024.5 and newer.
     pub fn connect(port: AmsPort, timeout: impl Into<Option<Duration>>) -> crate::Result<Self> {
-        let device = AdsDevice::connect_to("127.0.0.1:48898", timeout)?;
+        let device = AdsDevice::connect(timeout)?;
         let target = AmsAddr::new(device.get_local_net_id()?, port);
         Ok(Self::new(device, target))
     }
 
-    /// Connects to the `target` ADS device using the local AMS router at `127.0.0.1:48898`.
+    /// Connects to the explicit `target` address via the local AMS router.
     ///
-    /// The `target` is the [`AmsAddr`] of the run-time/free-task ADS Device you wish to interact with.
+    /// Use this when the target ADS device has a different AMS Net ID than the
+    /// local router's primary Net ID (e.g. targeting a specific UmRT).
     pub fn connect_to(
         target: AmsAddr,
         timeout: impl Into<Option<Duration>>,
     ) -> crate::Result<Self> {
-        let device = AdsDevice::connect_to("127.0.0.1:48898", timeout)?;
+        let device = AdsDevice::connect(timeout)?;
         Ok(Self::new(device, target))
     }
 
-    /// Connects directly to a remote AMS router without a local router.
+    /// Connects directly to a remote AMS router on a system without a local router.
     ///
     /// The `source` address must be pre-configured as a static route on the
-    /// remote router. The `target` address is the address of the run-time/free-task ADS
-    /// Device you wish to interact with.
+    /// remote router. The `target` address is the full address of the PLC runtime.
     ///
     /// See [`AdsDevice::connect_remote`] for more details.
     pub fn connect_remote(
