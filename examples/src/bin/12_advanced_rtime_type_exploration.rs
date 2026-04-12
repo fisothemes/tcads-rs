@@ -37,11 +37,11 @@ fn main() -> Result<()> {
     // 3. Targeted Type Lookup
     // Demonstrates fetching the blueprint of a specific type by its name.
     let lookup_type_name = "ST_LibVersion";
-    if let Ok(st_info) = device.get_data_type_info(lookup_type_name) {
+    if let Ok(dt_info) = device.get_data_type_info(lookup_type_name) {
         println!("Targeted Lookup [{lookup_type_name}]:");
-        println!("  Size:    {} bytes", st_info.size());
-        println!("  Fields:  {}", st_info.field_infos().len());
-        println!("  Comment: {}", st_info.comment());
+        println!("  Size:    {} bytes", dt_info.size());
+        println!("  Fields:  {}", dt_info.field_infos().len());
+        println!("  Comment: {}", dt_info.comment());
         println!();
     }
 
