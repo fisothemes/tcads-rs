@@ -73,35 +73,43 @@ pub struct Logger {
 }
 
 impl Logger {
-    /// Connects to the local AMS router at `127.0.0.1:48898`.
+    /// Connects to the Logger (Port 100) of the local AMS router at `127.0.0.1:48898`.
+    ///
+    /// Automatically discovers the local Net ID and targets `local_net_id:100`.
+    ///
+    /// Performs a [`PortConnect`](tcads_core::protocol::PortConnectRequest) handshake
+    /// to obtain a dynamically assigned source address from the local router.
     ///
     /// # Note
     ///
-    /// On Windows, connecting via `127.0.0.1` requires the
-    /// `EnableAmsTcpLoopback` registry key to be set. This is enabled by
-    /// default in TwinCAT 4024.5 and newer.
+    /// On Windows, connecting via `127.0.0.1` requires the `EnableAmsTcpLoopback`
+    /// registry key to be set. This is enabled by default in TwinCAT 4024.5 and newer.
     pub async fn connect(timeout: impl Into<Option<Duration>>) -> crate::Result<Self> {
-        Self::connect_to("127.0.0.1:48898", timeout).await
-    }
-
-    /// Connects to an AMS router at `addr`.
-    ///
-    /// Performs a [`PortConnect`](tcads_core::protocol::PortConnectRequest) handshake
-    /// to obtain a dynamically assigned source address.
-    pub async fn connect_to(
-        addr: impl ToSocketAddrs,
-        timeout: impl Into<Option<Duration>>,
-    ) -> crate::Result<Self> {
-        let device = AdsDevice::connect_to(addr, timeout).await?;
+        let device = AdsDevice::connect(timeout).await?;
         let net_id = device.get_local_net_id().await?;
         Ok(Self::new(device, net_id))
     }
 
-    /// Connects directly to a remote AMS router without a local router.
+    /// Connects to the Logger (Port 100) of a specific `net_id` using the local AMS router.
+    ///
+    /// Use this when targeting a specific device on the same router that has a
+    /// different AMS Net ID (e.g., a UMRT or a specific PLC instance connected to the
+    /// local AMS Router).
+    ///
+    /// Performs a [`PortConnect`](tcads_core::protocol::PortConnectRequest) handshake
+    /// to obtain a dynamically assigned source address from the local router
+    pub async fn connect_to(
+        net_id: AmsNetId,
+        timeout: impl Into<Option<Duration>>,
+    ) -> crate::Result<Self> {
+        let device = AdsDevice::connect(timeout).await?;
+        Ok(Self::new(device, net_id))
+    }
+
+    /// Connects directly to the Logger of a remote AMS router without a local router.
     ///
     /// The `source` address must be pre-configured as a static route on the
-    /// remote router. The `net_id` should be the Net ID of the remote router
-    /// and is used to address the logger target (`net_id:100`).
+    /// remote router. The `net_id` is the Net ID of the remote target.
     ///
     /// The [`PortConnect`](tcads_core::protocol::PortConnectRequest) handshake
     /// is **not** performed. See [`AdsDevice::connect_remote`] for details.
