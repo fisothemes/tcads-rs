@@ -124,10 +124,20 @@ impl AdsSymbolUploadInfo {
 
     /// Runtime flags.
     ///
-    /// Returns `None` if the runtime does no support retrieval of runtime flags.
+    /// Returns `None` if the runtime does not support retrieval of runtime flags.
     pub fn flags(&self) -> Option<AdsSymbolUploadFlags> {
         match self {
             Self::V3(v) => Some(v.flags),
+            _ => None,
+        }
+    }
+
+    /// The pointer size in bytes of the target runtime (4 or 8)
+    ///
+    /// Returns `None` if the runtime does not support retrieval of the platform pointer size.
+    pub fn platform_ptr_size(&self) -> Option<u8> {
+        match self {
+            Self::V3(v) => Some(v.platform_ptr_size()),
             _ => None,
         }
     }
@@ -530,6 +540,11 @@ impl AdsSymbolUploadInfoV3 {
     /// Runtime flags.
     pub fn flags(&self) -> AdsSymbolUploadFlags {
         self.flags
+    }
+
+    /// The pointer size in bytes of the target runtime (4 or 8).
+    pub fn platform_ptr_size(&self) -> u8 {
+        if self.flags.is_64bit_platform() { 8 } else { 4 }
     }
 
     /// Serializes to bytes. Reserved bytes are written as zero.
