@@ -44,6 +44,17 @@ pub enum AdsTypeCategory {
 }
 
 impl AdsTypeCategory {
+    /// Determines the category of a TwinCAT data type from its [`AdsTypeInfo`].
+    ///
+    /// `platform_ptr_size` is the pointer size in bytes of the target runtime (4 or 8),
+    /// used to distinguish interfaces from function blocks when both have methods.
+    /// Pass `None` if the platform pointer size is unknown, this may cause some
+    /// interfaces to be classified as [`FunctionBlock`](Self::FunctionBlock) instead.
+    ///
+    /// # Important
+    ///
+    /// Empty function blocks with no interface will be classified as an interface. Inheritance
+    /// plays no part unless the parent has fields or implements an interface.
     pub fn determine(info: &AdsTypeInfo, platform_ptr_size: impl Into<Option<u8>>) -> Self {
         let platform_ptr_size = platform_ptr_size.into();
 
@@ -94,8 +105,8 @@ impl AdsTypeCategory {
             | AdsTypeId::UInt64
             | AdsTypeId::Real32
             | AdsTypeId::Real64
-            | AdsTypeId::Real80
-            | AdsTypeId::Bit => return Self::Primitive,
+            | AdsTypeId::Real80 => return Self::Primitive,
+            AdsTypeId::Bit => return Self::Bitset,
             // Strings
             AdsTypeId::String | AdsTypeId::WString => return Self::String,
             _ => {
@@ -146,7 +157,6 @@ impl AdsTypeCategory {
                 if info.field_infos().is_empty() {
                     return Self::Interface;
                 }
-                // Stable Rust alternative to let_chains
                 if platform_ptr_size.is_some_and(|size| info.size() == size as u32) {
                     return Self::Interface;
                 }
@@ -190,5 +200,79 @@ impl AdsTypeCategory {
             }
         }
         Self::None
+    }
+
+    /// Returns `true` if the type is a primitive (e.g. `BOOL`, `INT`, `REAL`).
+    pub fn is_primitive(info: &AdsTypeInfo) -> bool {
+        Self::determine(info, None) == Self::Primitive
+    }
+
+    /// Returns `true` if the type is an alias.
+    pub fn is_alias(info: &AdsTypeInfo) -> bool {
+        Self::determine(info, None) == Self::Alias
+    }
+
+    /// Returns `true` if the type is an enum.
+    pub fn is_enum(info: &AdsTypeInfo) -> bool {
+        Self::determine(info, None) == Self::Enum
+    }
+
+    // Returns `true` if the type is an array.
+    pub fn is_array(info: &AdsTypeInfo) -> bool {
+        Self::determine(info, None) == Self::Array
+    }
+
+    /// Returns `true` if the type is a struct.
+    pub fn is_struct(info: &AdsTypeInfo) -> bool {
+        Self::determine(info, None) == Self::Struct
+    }
+
+    /// Returns `true` if the type is a function block.
+    pub fn is_function_block(info: &AdsTypeInfo) -> bool {
+        Self::determine(info, None) == Self::FunctionBlock
+    }
+
+    /// Returns `true` if the type is a sub-range (e.g. `INT(0..100)`).
+    pub fn is_sub_range(info: &AdsTypeInfo) -> bool {
+        Self::determine(info, None) == Self::SubRange
+    }
+
+    /// Returns `true` if the type is a string (`STRING` or `WSTRING`).
+    pub fn is_string(info: &AdsTypeInfo) -> bool {
+        Self::determine(info, None) == Self::String
+    }
+
+    /// Returns `true` if the type is a bitset (single-bit type)
+    pub fn is_bitset(info: &AdsTypeInfo) -> bool {
+        Self::determine(info, None) == Self::Bitset
+    }
+
+    /// Returns `true` if the type is a pointer (`POINTER TO ...` or `PVOID`).
+    pub fn is_pointer(info: &AdsTypeInfo) -> bool {
+        Self::determine(info, None) == Self::Pointer
+    }
+
+    /// Returns `true` if the type is a union (fields share the same memory offset).
+    pub fn is_union(info: &AdsTypeInfo) -> bool {
+        Self::determine(info, None) == Self::Union
+    }
+
+    /// Returns `true` if the type is a reference (`REFERENCE TO ...`).
+    pub fn is_reference(info: &AdsTypeInfo) -> bool {
+        Self::determine(info, None) == Self::Reference
+    }
+
+    /// Returns `true` if the type is an interface pointer.
+    ///
+    /// `platform_ptr_size` is required to distinguish interfaces from function blocks,
+    /// pass the pointer size in bytes (4 or 8) from
+    /// [`AdsSymbolUploadInfo`](super::AdsSymbolUploadInfo).
+    ///
+    /// # Important
+    ///
+    /// Empty function blocks with no interface will be classified as an interface. Inheritance
+    /// plays no part unless the parent has fields or implements an interface.
+    pub fn is_interface(info: &AdsTypeInfo, platform_ptr_size: impl Into<Option<u8>>) -> bool {
+        Self::determine(info, platform_ptr_size) == Self::Interface
     }
 }
