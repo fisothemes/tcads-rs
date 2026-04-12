@@ -129,6 +129,7 @@ impl<'a> AdsLoggerWriteRequest<'a> {
     /// Parses only the ADS data payload (after the ADS header).
     ///
     /// Returns `(timestamp, message_type, task_name, message, arg)`.
+    #[allow(clippy::type_complexity)]
     pub fn parse_payload(
         data: &'a [u8],
     ) -> Result<
