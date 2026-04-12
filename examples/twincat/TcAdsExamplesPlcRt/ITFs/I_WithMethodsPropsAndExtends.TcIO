@@ -1,0 +1,58 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <Itf Name="I_WithMethodsPropsAndExtends" Id="{7ddef0b9-681e-4d66-b951-df1d6c6fc727}">
+    <Declaration><![CDATA[// Interface with inheritence, methods and properties.
+INTERFACE I_WithMethodsPropsAndExtends EXTENDS __SYSTEM.IQueryInterface
+]]></Declaration>
+    <Method Name="FullMethod" Id="{bdac14fd-4503-477d-9291-7988a7499f62}">
+      <Declaration><![CDATA[// A method with all types of input and outputs as well as a return type.
+METHOD FullMethod : UDINT
+VAR_INPUT
+	InArg1  	: STRING(64);
+	InArg2		: Tc2_System.ST_CpuCoreInfo; 
+END_VAR
+VAR_IN_OUT
+	InOutArg1	: POINTER TO __UXINT;
+END_VAR
+VAR_OUTPUT
+	OutArg1		: Tc2_System.E_SeekOrigin;
+	OutArg2		: Tc2_System.T_MaxString;
+END_VAR
+]]></Declaration>
+    </Method>
+    <Property Name="Prop1" Id="{d7e5fa71-b754-40fe-8474-07190dc97ca7}">
+      <Declaration><![CDATA[// First property.
+PROPERTY Prop1 : BOOL]]></Declaration>
+      <Get Name="Get" Id="{ee7bd1fe-2f38-49c7-b0d3-be9e6659e525}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{7c1ae845-0f35-4e0d-af74-826b2edf5014}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+    <Property Name="Prop2" Id="{1d3501b6-9972-4d3f-8209-1e339b6b3d95}">
+      <Declaration><![CDATA[// Second property.
+PROPERTY Prop2 : Tc2_System.ST_CpuCoreInfo]]></Declaration>
+      <Get Name="Get" Id="{088480d2-f58f-4d47-a06c-57a08026944b}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Get>
+      <Set Name="Set" Id="{20d82f4b-acf2-426d-bda8-f16b34da4bd5}">
+        <Declaration><![CDATA[]]></Declaration>
+      </Set>
+    </Property>
+    <Method Name="ReturnOnlyMethod" Id="{a1ee2f29-1425-46fa-94e6-d8b562f483df}">
+      <Declaration><![CDATA[// A method with only a return type an no args.
+METHOD ReturnOnlyMethod : BOOL
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+    <Method Name="VoidMethod" Id="{5c57952e-29f4-41ff-b08b-68cb0e01831f}">
+      <Declaration><![CDATA[// A method that has no arguments.
+METHOD VoidMethod
+VAR_INPUT
+END_VAR
+]]></Declaration>
+    </Method>
+  </Itf>
+</TcPlcObject>

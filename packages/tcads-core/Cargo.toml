@@ -15,8 +15,10 @@ thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "net", "macros"] }
 tokio-test = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+rand = { workspace = true }
 encoding_rs = { workspace = true }
 chrono = { workspace = true , features = ["default", "serde"]}
+bitflags = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
 serde_json = { workspace = true }

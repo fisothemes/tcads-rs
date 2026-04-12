@@ -1,0 +1,90 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_EmptyWithImplRPC" Id="{79c30132-5eef-47f4-b006-5599731dc524}" SpecialFunc="None">
+    <Declaration><![CDATA[{attribute 'no_explicit_call' := 'direct call for this function block is not allowed'}
+FUNCTION_BLOCK FINAL FB_EmptyWithImplRPC
+IMPLEMENTS I_WithRPC
+VAR
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <CFC>
+        <XmlArchive>
+          <Data>
+            <o xml:space="preserve" t="CFCImplementationObject">
+              <o n="Items" t="CFCItemList">
+                <l2 n="InnerList" />
+              </o>
+              <n n="ParameterInitializationMethodGenerator" />
+              <o n="RoutingPathTable" t="CFCRoutingPathTable">
+                <d2 n="InnerDictionary" />
+              </o>
+              <v n="AutoSizeCanvas">true</v>
+              <v n="CanvasWidth">2</v>
+              <v n="CanvasHeight">2</v>
+            </o>
+          </Data>
+          <TypeList>
+            <Type n="Boolean">System.Boolean</Type>
+            <Type n="CFCImplementationObject">{32d3375e-c010-41e2-9e43-b2fbf4f2b374}</Type>
+            <Type n="CFCItemList">{cd57ba20-558b-4b98-96c1-73c6000c3087}</Type>
+            <Type n="CFCRoutingPathTable">{4b8bcc79-5980-4868-b49e-005a8148859b}</Type>
+            <Type n="Int32">System.Int32</Type>
+          </TypeList>
+        </XmlArchive>
+      </CFC>
+    </Implementation>
+    <Method Name="FullMethod" Id="{62458351-a809-4bc8-a012-d482669530a0}">
+      <Declaration><![CDATA[// A method with all types of input and outputs as well as a return type.
+{attribute 'TcRpcEnable'}
+METHOD FullMethod : UDINT
+VAR_INPUT
+	InArg1  	: STRING(64);
+	InArg2		: Tc2_System.ST_CpuCoreInfo; 
+END_VAR
+VAR_IN_OUT
+	InOutArg1	: POINTER TO __UXINT;
+END_VAR
+VAR_OUTPUT
+	OutArg1		: Tc2_System.E_SeekOrigin;
+	OutArg2		: Tc2_System.T_MaxString;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="Prop1" Id="{736d1615-1bcd-4628-99c3-7c6dbe81338d}">
+      <Declaration><![CDATA[// First property.
+{attribute 'TcRpcEnable'}
+PROPERTY Prop1 : BOOL]]></Declaration>
+      <Get Name="Get" Id="{6660328d-863a-454c-a315-18eca600c6b8}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Get>
+      <Set Name="Set" Id="{87ee97cf-fae3-4766-b9df-cba583e1a2fa}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[]]></ST>
+        </Implementation>
+      </Set>
+    </Property>
+    <Method Name="VoidMethod" Id="{5089172c-8c37-45c0-806f-614ab22dceeb}">
+      <Declaration><![CDATA[// A method that has no arguments.
+{attribute 'TcRpcEnable'}
+METHOD VoidMethod
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

@@ -1,0 +1,7 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <DUT Name="T_STEmptyAlias" Id="{862137b1-4234-4f62-beec-37448c3603ef}">
+    <Declaration><![CDATA[TYPE T_STEmptyAlias : ST_Empty; END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>
