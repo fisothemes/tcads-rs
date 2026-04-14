@@ -16,7 +16,7 @@ use crate::protocol::ProtocolError;
 /// * **Command ID:** `0x1000`
 /// * **Payload Length:** 2 bytes
 /// * **Payload:** 16-bit integer (Little Endian) representing the desired port.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PortConnectRequest {
     desired_port: AmsPort,
 }
@@ -50,6 +50,12 @@ impl PortConnectRequest {
     /// Creates a raw [`AmsFrame`] from the request (cloning).
     pub fn to_frame(&self) -> AmsFrame {
         self.into()
+    }
+}
+
+impl Default for PortConnectRequest {
+    fn default() -> Self {
+        Self::new(0)
     }
 }
 
