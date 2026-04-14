@@ -7,8 +7,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tcads_core::protocol::AdsLoggerWriteRequestOwned;
 use tcads_core::{
-    AdsNotificationSampleOwned, AdsTransMode, AmsAddr, AmsNetId, NotificationHandle,
-    WindowsFileTime,
+    AdsNotificationAttrib, AdsNotificationSampleOwned, AdsTransMode, AmsAddr, AmsNetId,
+    NotificationHandle, WindowsFileTime,
 };
 use tokio::sync::mpsc::UnboundedReceiver as Receiver;
 use tokio::sync::mpsc::error::TryRecvError;
@@ -215,10 +215,12 @@ impl Logger {
                 self.inner.target,
                 LOGGER_INDEX_GROUP,
                 LOGGER_INDEX_OFFSET,
-                LogEntry::MAX_PAYLOAD_LEN,
-                AdsTransMode::ServerCycle,
-                0,
-                0,
+                AdsNotificationAttrib::new(
+                    LogEntry::MAX_PAYLOAD_LEN,
+                    AdsTransMode::ServerCycle,
+                    0,
+                    0,
+                ),
             )
             .await?;
 

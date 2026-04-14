@@ -1,6 +1,6 @@
 use std::time::Duration;
 use tcads_client::devices::ads_device::blocking::AdsDevice;
-use tcads_client::{AdsState, AdsTransMode, AmsAddr};
+use tcads_core::{AdsNotificationAttrib, AdsState, AdsTransMode, AmsAddr};
 
 const GET_SYMHANDLE_BYNAME: u32 = 0xF003;
 const READ_WRITE_SYMVAL_BYHANDLE: u32 = 0xF005;
@@ -65,10 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         target,
         READ_WRITE_SYMVAL_BYHANDLE,
         var_handle,
-        size_of::<u32>() as u32,
-        AdsTransMode::ServerOnChange,
-        0,
-        10,
+        AdsNotificationAttrib::new(size_of::<u32>() as u32, AdsTransMode::ServerOnChange, 0, 10),
     )?;
 
     println!("Device notification added: {:?}", notif_handle);

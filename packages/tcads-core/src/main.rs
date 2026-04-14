@@ -1,5 +1,7 @@
 use tcads_core::AdsTransMode;
-use tcads_core::ads::{AdsCommand, AdsHeader, AdsReturnCode, AdsState, NotificationHandle};
+use tcads_core::ads::{
+    AdsCommand, AdsHeader, AdsNotificationAttrib, AdsReturnCode, AdsState, NotificationHandle,
+};
 use tcads_core::ams::{AmsAddr, AmsCommand};
 use tcads_core::io::blocking::AmsStream;
 use tcads_core::protocol::{
@@ -199,10 +201,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 0x999,
                                 0xF005,
                                 var_handle,
-                                size_of::<u32>() as u32,
-                                AdsTransMode::ServerOnChange,
-                                0,
-                                10,
+                                AdsNotificationAttrib {
+                                    length: size_of::<u32>() as u32,
+                                    trans_mode: AdsTransMode::ServerOnChange,
+                                    max_delay: 0,
+                                    cycle_time: 10_000 * 10,
+                                },
                             )
                             .into(),
                         )?;

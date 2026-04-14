@@ -17,9 +17,9 @@ use tcads_core::protocol::{
     GetLocalNetIdResponse, PortCloseRequest, PortConnectRequest, PortConnectResponse,
 };
 use tcads_core::{
-    AdsDeviceVersion, AdsHeader, AdsReturnCode, AdsState, AdsTransMode, AmsAddr, AmsCommand,
-    AmsFrame, AmsNetId, DeviceState, IndexGroup, IndexOffset, InvokeId, NotificationHandle,
-    RouterState,
+    AdsDeviceVersion, AdsHeader, AdsNotificationAttrib, AdsReturnCode, AdsState, AmsAddr,
+    AmsCommand, AmsFrame, AmsNetId, DeviceState, IndexGroup, IndexOffset, InvokeId,
+    NotificationHandle, RouterState,
 };
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::RwLock;
@@ -509,16 +509,12 @@ impl AdsDevice {
     /// # Note
     ///
     /// The target device may fire an initial sample immediately upon registration.
-    #[allow(clippy::too_many_arguments)]
     pub async fn add_notification(
         &self,
         target: AmsAddr,
         index_group: IndexGroup,
         index_offset: IndexOffset,
-        length: u32,
-        trans_mode: AdsTransMode,
-        max_delay: u32,
-        cycle_time: u32,
+        notif_attr: AdsNotificationAttrib,
     ) -> crate::Result<(Receiver<AdsNotificationSampleOwned>, NotificationHandle)> {
         let invoke_id = self.next_invoke_id();
 
@@ -530,10 +526,7 @@ impl AdsDevice {
             invoke_id,
             index_group,
             index_offset,
-            length,
-            trans_mode,
-            max_delay,
-            cycle_time,
+            notif_attr,
         )
         .into_frame();
         let resp = AdsAddDeviceNotificationResponse::try_from(

@@ -19,6 +19,8 @@ pub enum AdsError {
     /// Invalid ADS notification transmission mode format or content.
     #[error("Invalid ADS notification transmission mode: {0}")]
     InvalidAdsTransMode(#[from] AdsTransModeError),
+    #[error("Invalid ADS notification attribute: {0}")]
+    InvalidAdsNotificationAttrib(#[from] AdsNotificationAttribError),
     /// Invalid command format or content
     #[error("Invalid ADS command: {0}")]
     InvalidCommand(#[from] AdsCommandError),
@@ -90,6 +92,12 @@ pub enum AdsDeviceVersionError {
 
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum AdsTransModeError {
+    #[error("Unexpected length: expected {expected} bytes, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
+}
+
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum AdsNotificationAttribError {
     #[error("Unexpected length: expected {expected} bytes, got {got}")]
     UnexpectedLength { expected: usize, got: usize },
 }

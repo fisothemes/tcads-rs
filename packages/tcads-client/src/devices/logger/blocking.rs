@@ -8,8 +8,8 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tcads_core::protocol::AdsLoggerWriteRequestOwned;
 use tcads_core::{
-    AdsNotificationSampleOwned, AdsTransMode, AmsAddr, AmsNetId, NotificationHandle,
-    WindowsFileTime,
+    AdsNotificationAttrib, AdsNotificationSampleOwned, AdsTransMode, AmsAddr, AmsNetId,
+    NotificationHandle, WindowsFileTime,
 };
 
 /// Shared state of an [`AdsDevice`] client for the TwinCAT system logger.
@@ -195,10 +195,7 @@ impl Logger {
             self.inner.target,
             LOGGER_INDEX_GROUP,
             LOGGER_INDEX_OFFSET,
-            LogEntry::MAX_PAYLOAD_LEN,
-            AdsTransMode::ServerCycle,
-            0,
-            0,
+            AdsNotificationAttrib::new(LogEntry::MAX_PAYLOAD_LEN, AdsTransMode::ServerCycle, 0, 0),
         )?;
         match self.inner.handles.lock() {
             Ok(mut handles) => handles.insert(handle),

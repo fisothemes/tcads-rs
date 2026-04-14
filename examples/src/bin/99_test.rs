@@ -14,10 +14,7 @@ fn main() -> Result<()> {
         (target, 851).into(),
         0xF008,
         0,
-        1,
-        AdsTransMode::ServerOnChange,
-        0,
-        0,
+        AdsNotificationAttrib::new(1, AdsTransMode::ServerOnChange, 0, 0),
     )?;
 
     while let Ok(sample) = rx.recv() {

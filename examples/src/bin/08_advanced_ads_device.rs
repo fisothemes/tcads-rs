@@ -13,7 +13,9 @@ use std::sync::mpsc::Receiver;
 use std::thread;
 use std::time::Duration;
 use tcads::client::devices::blocking::AdsDevice;
-use tcads::client::{AdsNotificationSampleOwned, AdsTransMode, AmsAddr, NotificationHandle};
+use tcads::core::{
+    AdsNotificationAttrib, AdsNotificationSampleOwned, AdsTransMode, AmsAddr, NotificationHandle,
+};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -126,9 +128,11 @@ fn add_notification<T: Sized>(
         target,
         READ_WRITE_SYMVAL_BYHANDLE,
         handle,
-        size_of::<T>() as u32,
-        AdsTransMode::ServerOnChange,
-        0,
-        10,
+        AdsNotificationAttrib {
+            length: size_of::<T>() as u32,
+            trans_mode: AdsTransMode::ServerOnChange,
+            max_delay: 0,
+            cycle_time: 10_000 * 10, // 10 ms
+        },
     )?)
 }

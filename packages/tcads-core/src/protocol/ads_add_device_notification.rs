@@ -1,7 +1,7 @@
 use super::{ProtocolError, parse_ads_frame};
 use crate::ads::{
-    AdsCommand, AdsError, AdsHeader, AdsReturnCode, AdsTransMode, IndexGroup, IndexOffset,
-    InvokeId, NotificationHandle, StateFlag,
+    AdsCommand, AdsError, AdsHeader, AdsNotificationAttrib, AdsReturnCode, AdsTransMode,
+    IndexGroup, IndexOffset, InvokeId, NotificationHandle, StateFlag,
 };
 use crate::ams::{AmsAddr, AmsCommand};
 use crate::io::AmsFrame;
@@ -30,11 +30,11 @@ use crate::io::AmsFrame;
 ///   * **Index Group:** 4 bytes ([`IndexGroup`])
 ///   * **Index Offset:** 4 bytes ([`IndexOffset`])
 ///   * **Length:** 4 bytes (u32) - the length of bytes which should be sent every notification.
-///   * **Trans Mode:** 4 bytes ([`AdsTransMode`]) - when to send notifications.
-///   * **Max Delay:** 4 bytes (u32, milliseconds) - maximum time the server may buffer
+///   * **Trans Mode:** 4 bytes ([`AdsTransMode`]) - how and when to send notifications.
+///   * **Max Delay:** 4 bytes (u32, 100ns steps) - maximum time the server may buffer
 ///     a notification before sending it. `0` means send it immediately.
-///   * **Cycle Time:** 4 bytes (u32, milliseconds) - how often the server checks the
-///     variable for changes. Only meaningful for cyclic trans modes.
+///   * **Cycle Time:** 4 bytes (u32, 100ns steps) - how often the server checks the
+///     variable for changes.
 ///   * **Reserved:** 16 bytes - always zero.
 ///
 /// # Note
@@ -45,10 +45,7 @@ pub struct AdsAddDeviceNotificationRequest {
     header: AdsHeader,
     index_group: IndexGroup,
     index_offset: IndexOffset,
-    length: u32,
-    trans_mode: AdsTransMode,
-    max_delay: u32,
-    cycle_time: u32,
+    notif_attr: AdsNotificationAttrib,
     reserved: [u8; AdsAddDeviceNotificationRequest::RESERVED_SIZE],
 }
 
@@ -64,17 +61,13 @@ impl AdsAddDeviceNotificationRequest {
     /// * `length` - the length of bytes which should be sent every notification.
     /// * `max_delay` - maximum buffering delay in milliseconds (`0` = send it immediately).
     /// * `cycle_time` - check interval in milliseconds (relevant for cyclic trans modes).
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         target: AmsAddr,
         source: AmsAddr,
         invoke_id: InvokeId,
         index_group: IndexGroup,
         index_offset: IndexOffset,
-        length: u32,
-        trans_mode: AdsTransMode,
-        max_delay: u32,
-        cycle_time: u32,
+        notif_attr: AdsNotificationAttrib,
     ) -> Self {
         Self::with_reserved(
             target,
@@ -82,10 +75,7 @@ impl AdsAddDeviceNotificationRequest {
             invoke_id,
             index_group,
             index_offset,
-            length,
-            trans_mode,
-            max_delay,
-            cycle_time,
+            notif_attr,
             [0; Self::RESERVED_SIZE],
         )
     }
@@ -102,10 +92,7 @@ impl AdsAddDeviceNotificationRequest {
         invoke_id: InvokeId,
         index_group: IndexGroup,
         index_offset: IndexOffset,
-        length: u32,
-        trans_mode: AdsTransMode,
-        max_delay: u32,
-        cycle_time: u32,
+        notif_attr: AdsNotificationAttrib,
         reserved: [u8; Self::RESERVED_SIZE],
     ) -> Self {
         let header = AdsHeader::new(
@@ -122,10 +109,7 @@ impl AdsAddDeviceNotificationRequest {
             header,
             index_group,
             index_offset,
-            length,
-            trans_mode,
-            max_delay,
-            cycle_time,
+            notif_attr,
             reserved,
         }
     }
@@ -162,22 +146,22 @@ impl AdsAddDeviceNotificationRequest {
 
     /// Returns the length of bytes which should be sent every notification.
     pub fn length(&self) -> u32 {
-        self.length
+        self.notif_attr.length
     }
 
     /// Returns the transmission mode.
     pub fn trans_mode(&self) -> AdsTransMode {
-        self.trans_mode
+        self.notif_attr.trans_mode
     }
 
-    /// Returns the maximum buffering delay in milliseconds.
+    /// Returns the maximum buffering delay in 100ns steps.
     pub fn max_delay(&self) -> u32 {
-        self.max_delay
+        self.notif_attr.max_delay
     }
 
-    /// Returns the cyclic check interval in milliseconds.
+    /// Returns the cyclic check interval in 100ns steps.
     pub fn cycle_time(&self) -> u32 {
-        self.cycle_time
+        self.notif_attr.cycle_time
     }
 
     /// Returns the reserved bytes at the end of the payload.
@@ -194,7 +178,7 @@ impl AdsAddDeviceNotificationRequest {
     #[allow(clippy::type_complexity)]
     pub fn parse_payload(
         payload: &[u8],
-    ) -> Result<(IndexGroup, IndexOffset, u32, AdsTransMode, u32, u32, &[u8]), ProtocolError> {
+    ) -> Result<(IndexGroup, IndexOffset, AdsNotificationAttrib, &[u8]), ProtocolError> {
         if payload.len() != Self::PAYLOAD_SIZE {
             return Err(AdsError::UnexpectedDataLength {
                 expected: Self::PAYLOAD_SIZE,
@@ -213,10 +197,7 @@ impl AdsAddDeviceNotificationRequest {
         Ok((
             index_group,
             index_offset,
-            length,
-            trans_mode,
-            max_delay,
-            cycle_time,
+            AdsNotificationAttrib::new(length, trans_mode, max_delay, cycle_time),
             reserved,
         ))
     }
@@ -230,10 +211,7 @@ impl From<&AdsAddDeviceNotificationRequest> for AmsFrame {
         payload.extend_from_slice(&value.header.to_bytes());
         payload.extend_from_slice(&value.index_group.to_le_bytes());
         payload.extend_from_slice(&value.index_offset.to_le_bytes());
-        payload.extend_from_slice(&value.length.to_le_bytes());
-        payload.extend_from_slice(&value.trans_mode.to_bytes());
-        payload.extend_from_slice(&value.max_delay.to_le_bytes());
-        payload.extend_from_slice(&value.cycle_time.to_le_bytes());
+        payload.extend_from_slice(&value.notif_attr.to_bytes());
         payload.extend_from_slice(&value.reserved);
 
         AmsFrame::new(AmsCommand::AdsCommand, payload)
@@ -252,17 +230,13 @@ impl TryFrom<&AmsFrame> for AdsAddDeviceNotificationRequest {
     fn try_from(value: &AmsFrame) -> Result<Self, Self::Error> {
         let (header, data) = parse_ads_frame(value, AdsCommand::AdsAddDeviceNotification, true)?;
 
-        let (index_group, index_offset, length, trans_mode, max_delay, cycle_time, reserved) =
-            Self::parse_payload(data)?;
+        let (index_group, index_offset, notif_attr, reserved) = Self::parse_payload(data)?;
 
         Ok(Self {
             header,
             index_group,
             index_offset,
-            length,
-            trans_mode,
-            max_delay,
-            cycle_time,
+            notif_attr,
             reserved: reserved.try_into().unwrap(),
         })
     }
@@ -450,10 +424,12 @@ mod tests {
             0xCAFE,
             0xF005,
             0x0001_0203,
-            4,
-            AdsTransMode::ClientOnChange,
-            0,   // max_delay: send it immediately
-            100, // cycle_time: 100ms
+            AdsNotificationAttrib {
+                length: 4,
+                trans_mode: AdsTransMode::ClientOnChange,
+                max_delay: 0,             // send it immediately
+                cycle_time: 10_000 * 100, // 100 ms
+            },
         );
 
         let frame = request.to_frame();
@@ -464,7 +440,7 @@ mod tests {
         assert_eq!(decoded.length(), 4);
         assert_eq!(decoded.trans_mode(), AdsTransMode::ClientOnChange);
         assert_eq!(decoded.max_delay(), 0);
-        assert_eq!(decoded.cycle_time(), 100);
+        assert_eq!(decoded.cycle_time(), 10_000 * 100);
         assert_eq!(decoded.header().invoke_id(), 0xCAFE);
         assert!(decoded.header().state_flags().is_request());
     }
@@ -479,10 +455,12 @@ mod tests {
             1,
             0x4020,
             0x0,
-            4,
-            AdsTransMode::ClientCycle,
-            10,
-            10,
+            AdsNotificationAttrib {
+                length: 4,
+                trans_mode: AdsTransMode::ClientCycle,
+                max_delay: 10_000 * 10,   // 10 ms
+                cycle_time: 10_000 * 100, // 100 ms
+            },
         );
 
         let frame = request.to_frame();
@@ -503,10 +481,12 @@ mod tests {
             1,
             0x1,
             0x0,
-            4,
-            AdsTransMode::None,
-            0,
-            0,
+            AdsNotificationAttrib {
+                length: 4,
+                trans_mode: AdsTransMode::None,
+                max_delay: 0,
+                cycle_time: 0,
+            },
         );
 
         let frame = request.to_frame();
@@ -551,10 +531,12 @@ mod tests {
             invoke_id,
             0xF005,
             0x1234,
-            4,
-            AdsTransMode::ClientOnChange,
-            0,
-            100,
+            AdsNotificationAttrib {
+                length: 4,
+                trans_mode: AdsTransMode::ClientOnChange,
+                max_delay: 0,
+                cycle_time: 10_000 * 100, // 100ms
+            },
         );
 
         let assigned_handle = NotificationHandle::from(42_u32);
@@ -594,10 +576,12 @@ mod tests {
             1,
             0x1,
             0x0,
-            4,
-            AdsTransMode::None,
-            0,
-            0,
+            AdsNotificationAttrib {
+                length: 4,
+                trans_mode: AdsTransMode::None,
+                max_delay: 0,
+                cycle_time: 0,
+            },
         );
         let frame = request.to_frame();
 
