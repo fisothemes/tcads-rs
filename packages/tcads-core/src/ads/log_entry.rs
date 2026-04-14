@@ -106,7 +106,7 @@ impl TryFrom<&[u8]> for LogEntry {
 
         let timestamp = WindowsFileTime::try_from_slice(&data[0..8]).map_err(AdsError::from)?;
         let message_type = LogMessageType::try_from(&data[8..12])?;
-        let sender_port = AmsPort::from_le_bytes([data[12], data[13]]);
+        let sender_port = AmsPort::from_bytes([data[12], data[13]]);
         let sender = AdsString::<16>::from(&data[16..32]).to_string();
 
         let msg_len = u32::from_le_bytes(data[32..36].try_into().unwrap()) as usize;
@@ -158,7 +158,7 @@ impl From<&LogEntry> for Vec<u8> {
 
         buf.extend_from_slice(&value.timestamp.to_bytes());
         buf.extend_from_slice(&value.message_type.to_bytes());
-        buf.extend_from_slice(&value.sender_port.to_le_bytes());
+        buf.extend_from_slice(&value.sender_port.to_bytes());
         buf.extend_from_slice(&[0u8; 2]);
         buf.extend_from_slice(sender_ads.as_bytes());
         buf.extend_from_slice(&msg_len.to_le_bytes());
@@ -196,7 +196,7 @@ mod tests {
         let entry = LogEntry::try_from(test_bytes().as_slice()).unwrap();
         assert_eq!(entry.sender(), "PlcTask");
         assert_eq!(entry.message(), "AAAA(101)");
-        assert_eq!(entry.sender_port(), 350);
+        assert_eq!(entry.sender_port().as_u16(), 350);
         assert!(entry.message_type().is_hint());
         assert!(entry.message_type().is_log());
         assert!(!entry.message_type().is_error());

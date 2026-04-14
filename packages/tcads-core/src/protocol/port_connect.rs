@@ -23,8 +23,10 @@ pub struct PortConnectRequest {
 
 impl PortConnectRequest {
     /// Creates a new Port Connect Request.
-    pub fn new(desired_port: AmsPort) -> Self {
-        Self { desired_port }
+    pub fn new(desired_port: impl Into<AmsPort>) -> Self {
+        Self {
+            desired_port: desired_port.into(),
+        }
     }
 
     /// Attempts to parse an [`AmsFrame`] into a [`PortConnectRequest`].
@@ -53,7 +55,7 @@ impl PortConnectRequest {
 
 impl From<PortConnectRequest> for AmsFrame {
     fn from(value: PortConnectRequest) -> Self {
-        Self::new(AmsCommand::PortConnect, value.desired_port.to_le_bytes())
+        Self::new(AmsCommand::PortConnect, value.desired_port.to_bytes())
     }
 }
 
@@ -85,15 +87,15 @@ impl TryFrom<&AmsFrame> for PortConnectRequest {
 
         let payload = value.payload();
 
-        if payload.len() != ams::AMS_PORT_LEN {
+        if payload.len() != AmsPort::LENGTH {
             return Err(ProtocolError::UnexpectedLength {
-                expected: ams::AMS_PORT_LEN,
+                expected: AmsPort::LENGTH,
                 got: payload.len(),
             });
         }
 
         Ok(Self {
-            desired_port: AmsPort::from_le_bytes(payload.try_into().unwrap()),
+            desired_port: AmsPort::from_bytes([payload[0], payload[1]]),
         })
     }
 }
@@ -213,7 +215,7 @@ mod tests {
         let frame = AmsFrame::new(AmsCommand::PortConnect, 12345u16.to_le_bytes());
 
         let req = PortConnectRequest::try_from(frame).expect("Should parse valid request");
-        assert_eq!(req.desired_port(), 12345);
+        assert_eq!(req.desired_port().as_u16(), 12345);
     }
 
     #[test]

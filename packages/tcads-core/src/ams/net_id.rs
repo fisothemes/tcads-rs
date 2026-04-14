@@ -2,9 +2,6 @@ use super::error::NetIdError;
 use std::fmt;
 use std::str::FromStr;
 
-/// Length of the AMS port (2 bytes)
-pub const AMS_PORT_LEN: usize = 2;
-
 /// A 6-byte identifier for an ADS device (e.g. `172.16.17.10.1.1`).
 ///
 /// # Notes
@@ -69,10 +66,23 @@ impl AmsNetId {
     }
 }
 
-impl From<[u8; AmsNetId::LENGTH]> for AmsNetId {
+impl From<[u8; Self::LENGTH]> for AmsNetId {
     /// Convert an array of 6 bytes into an [`AmsNetId`].
     fn from(value: [u8; AmsNetId::LENGTH]) -> Self {
         Self(value)
+    }
+}
+
+impl From<&[u8; Self::LENGTH]> for AmsNetId {
+    /// Convert a slice of 6 bytes into an [`AmsNetId`].
+    fn from(value: &[u8; Self::LENGTH]) -> Self {
+        Self(*value)
+    }
+}
+
+impl From<(u8, u8, u8, u8, u8, u8)> for AmsNetId {
+    fn from(octs: (u8, u8, u8, u8, u8, u8)) -> Self {
+        Self::new(octs.0, octs.1, octs.2, octs.3, octs.4, octs.5)
     }
 }
 
@@ -129,6 +139,20 @@ impl FromStr for AmsNetId {
 impl From<AmsNetId> for [u8; AmsNetId::LENGTH] {
     fn from(value: AmsNetId) -> Self {
         value.0
+    }
+}
+
+impl From<&AmsNetId> for [u8; AmsNetId::LENGTH] {
+    fn from(value: &AmsNetId) -> Self {
+        value.0
+    }
+}
+
+impl From<AmsNetId> for (u8, u8, u8, u8, u8, u8) {
+    fn from(netid: AmsNetId) -> Self {
+        (
+            netid.0[0], netid.0[1], netid.0[2], netid.0[3], netid.0[4], netid.0[5],
+        )
     }
 }
 

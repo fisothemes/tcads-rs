@@ -1,4 +1,4 @@
-use crate::ams::{self, AmsCommand, AmsPort};
+use crate::ams::{AmsCommand, AmsPort};
 use crate::io::frame::AmsFrame;
 use crate::protocol::ProtocolError;
 
@@ -25,8 +25,8 @@ pub struct PortCloseRequest {
 
 impl PortCloseRequest {
     /// Creates a new Port Close Request.
-    pub fn new(port: AmsPort) -> Self {
-        Self { port }
+    pub fn new(port: impl Into<AmsPort>) -> Self {
+        Self { port: port.into() }
     }
 
     /// Attempts to parse an [`AmsFrame`] into a [`PortCloseRequest`].
@@ -55,7 +55,7 @@ impl PortCloseRequest {
 
 impl From<PortCloseRequest> for AmsFrame {
     fn from(value: PortCloseRequest) -> Self {
-        Self::new(AmsCommand::PortClose, value.port.to_le_bytes())
+        Self::new(AmsCommand::PortClose, value.port.to_bytes())
     }
 }
 
@@ -78,24 +78,24 @@ impl TryFrom<&AmsFrame> for PortCloseRequest {
             });
         }
 
-        if header.length() as usize != ams::AMS_PORT_LEN {
+        if header.length() as usize != AmsPort::LENGTH {
             return Err(ProtocolError::UnexpectedLength {
-                expected: ams::AMS_PORT_LEN,
+                expected: AmsPort::LENGTH,
                 got: header.length() as usize,
             });
         }
 
         let payload = value.payload();
 
-        if payload.len() != ams::AMS_PORT_LEN {
+        if payload.len() != AmsPort::LENGTH {
             return Err(ProtocolError::UnexpectedLength {
-                expected: ams::AMS_PORT_LEN,
+                expected: AmsPort::LENGTH,
                 got: payload.len(),
             });
         }
 
         Ok(Self {
-            port: AmsPort::from_le_bytes(payload.try_into().unwrap()),
+            port: AmsPort::from_bytes([payload[0], payload[1]]),
         })
     }
 }
@@ -117,7 +117,7 @@ mod tests {
         let frame: AmsFrame = PortCloseRequest::new(12345).into();
 
         assert_eq!(frame.header().command(), AmsCommand::PortClose);
-        assert_eq!(frame.header().length() as usize, ams::AMS_PORT_LEN);
+        assert_eq!(frame.header().length() as usize, AmsPort::LENGTH);
         assert_eq!(frame.payload(), &12345u16.to_le_bytes());
     }
 
@@ -126,7 +126,7 @@ mod tests {
         let frame = AmsFrame::new(AmsCommand::PortClose, 30000u16.to_le_bytes());
 
         let req = PortCloseRequest::try_from(frame).expect("Should parse valid request");
-        assert_eq!(req.port(), 30000);
+        assert_eq!(req.port().as_u16(), 30000);
     }
 
     #[test]

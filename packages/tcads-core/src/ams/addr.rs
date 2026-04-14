@@ -2,12 +2,9 @@
 //! An ADS network address consists of an AMS Net ID and an AMS port number.
 
 use super::error::AddrError;
-use super::net_id::AmsNetId;
+use super::{AmsNetId, AmsPort};
 use std::fmt;
 use std::str::FromStr;
-
-/// AMS port number
-pub type AmsPort = u16;
 
 /// An address in the ADS network (AMS Net ID + AMS Port No.).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -20,9 +17,12 @@ impl AmsAddr {
     /// The length of an AMS address in bytes.
     pub const LENGTH: usize = 8;
 
-    /// Creates a new ADS address.
-    pub const fn new(net_id: AmsNetId, port: AmsPort) -> Self {
-        Self { net_id, port }
+    /// Creates a new AMS address.
+    pub fn new(net_id: impl Into<AmsNetId>, port: impl Into<AmsPort>) -> Self {
+        Self {
+            net_id: net_id.into(),
+            port: port.into(),
+        }
     }
 
     /// Returns the AMS Net ID.
@@ -51,8 +51,8 @@ impl AmsAddr {
     }
 }
 
-impl From<(AmsNetId, AmsPort)> for AmsAddr {
-    fn from((net_id, port): (AmsNetId, AmsPort)) -> Self {
+impl<A: Into<AmsNetId>, B: Into<AmsPort>> From<(A, B)> for AmsAddr {
+    fn from((net_id, port): (A, B)) -> Self {
         Self::new(net_id, port)
     }
 }
@@ -68,7 +68,7 @@ impl From<&AmsAddr> for [u8; AmsAddr::LENGTH] {
         let mut buf = [0u8; AmsAddr::LENGTH];
 
         buf[..AmsNetId::LENGTH].copy_from_slice(value.net_id.as_bytes());
-        buf[AmsNetId::LENGTH..].copy_from_slice(&value.port.to_le_bytes());
+        buf[AmsNetId::LENGTH..].copy_from_slice(&value.port.to_bytes());
 
         buf
     }
@@ -94,7 +94,7 @@ impl TryFrom<&[u8]> for AmsAddr {
         }
 
         let net_id = AmsNetId::try_from(&bytes[..6])?;
-        let port = AmsPort::from_le_bytes([bytes[6], bytes[7]]);
+        let port = AmsPort::from_bytes([bytes[6], bytes[7]]);
 
         Ok(Self { net_id, port })
     }
@@ -143,7 +143,7 @@ mod tests {
     fn parse_valid_addr() {
         let addr: AmsAddr = "192.168.137.1.1.1:32818".parse().unwrap();
         assert_eq!(addr.net_id.as_bytes(), &[192, 168, 137, 1, 1, 1]);
-        assert_eq!(addr.port, 32818);
+        assert_eq!(addr.port.as_u16(), 32818);
     }
 
     #[test]
@@ -163,7 +163,7 @@ mod tests {
         let bytes = [192, 168, 137, 1, 1, 1, 0x32, 0x80]; // port 32818 in LE
         let addr = AmsAddr::try_from(&bytes[..]).unwrap();
         assert_eq!(addr.net_id.as_bytes(), &[192, 168, 137, 1, 1, 1]);
-        assert_eq!(addr.port, 32818);
+        assert_eq!(addr.port.as_u16(), 32818);
     }
 
     #[test]
