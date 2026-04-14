@@ -211,7 +211,7 @@ writer.write_frame(&request.into_frame())?;
 ### Subscribing to variable changes
 
 ```rust
-use tcads_core::ads::AdsTransMode;
+use tcads_core::ads::{AdsTransMode, AdsNotificationAttrib};
 use tcads_core::protocol::{
     AdsAddDeviceNotificationRequest,
     AdsDeviceNotification,
@@ -221,10 +221,12 @@ use tcads_core::protocol::{
 let request = AdsAddDeviceNotificationRequest::new(
     target, source, invoke_id,
     0xF005, handle,   // index group + offset (value by handle)
-    4,                // variable size in bytes
-    AdsTransMode::ClientOnChange,
-    0,                // max delay (ms)
-    100,              // cycle time (ms)
+    AdsNotificationAttrib {
+        length: 4, // variable size in bytes
+        trans_mode: AdsTransMode::ServerOnChange, 
+        max_delay: 0, // (100ns steps)
+        cycle_time: 10_000 * 100, // 100 ms (100ns steps)
+    }
 );
 writer.write_frame(&request.into_frame())?;
 
