@@ -4,18 +4,29 @@ use super::error::AdsTransModeError;
 ///
 /// Determines when the server sends a notification to the client.
 #[derive(
-    serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash,
+    serde::Serialize,
+    serde::Deserialize,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Default,
 )]
 pub enum AdsTransMode {
     /// No transmission.
     None,
-    /// Cyclic transmission. The server checks the variable cyclically.
+    /// The client polls the data cyclically (rarely used for actual notifications).
     ClientCycle,
-    /// Transmission on change. The server checks the variable cyclically and sends only if it changed.
+    /// The client polls the data when it changes.
     ClientOnChange,
-    /// Cyclic transmission (Server-driven). (Not commonly used by clients).
+    /// The server (PLC) sends the data cyclically at the defined `cycle_time`.
     ServerCycle,
-    /// Transmission on change (Server-driven). (Not commonly used by clients).
+    /// The server (PLC) sends the data only when it changes, checked at the `cycle_time`.
+    #[default]
     ServerOnChange,
     /// Unknown/Custom mode.
     Unknown(u32),
