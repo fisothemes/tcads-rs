@@ -10,7 +10,8 @@
 //! start/stop the PLC to see system state logs.
 
 use std::time::Duration;
-use tcads::client::devices::blocking::{LogMessageType, Logger};
+use tcads::client::devices::blocking::Logger;
+use tcads::core::LogMessageType;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 

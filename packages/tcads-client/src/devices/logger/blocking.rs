@@ -1,4 +1,4 @@
-use super::{LOGGER_INDEX_GROUP, LOGGER_INDEX_OFFSET, LOGGER_PORT, LogEntry, LogMessageType};
+use super::{LOGGER_INDEX_GROUP, LOGGER_INDEX_OFFSET, LogEntry, LogMessageType};
 use crate::devices::blocking::AdsDevice;
 use crate::notif_guard::blocking::NotificationGuard;
 use std::collections::HashSet;
@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tcads_core::protocol::AdsLoggerWriteRequestOwned;
 use tcads_core::{
-    AdsNotificationAttrib, AdsNotificationSampleOwned, AdsTransMode, AmsAddr, AmsNetId,
+    AdsNotificationAttrib, AdsNotificationSampleOwned, AdsTransMode, AmsAddr, AmsNetId, AmsPort,
     NotificationHandle, WindowsFileTime,
 };
 
@@ -114,7 +114,7 @@ impl Logger {
         Self {
             inner: Arc::new(LoggerInner {
                 device,
-                target: AmsAddr::new(net_id, LOGGER_PORT),
+                target: AmsAddr::new(net_id, AmsPort::LOGGER),
                 handles: Mutex::new(HashSet::new()),
             }),
         }

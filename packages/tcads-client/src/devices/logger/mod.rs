@@ -1,11 +1,7 @@
 pub mod blocking;
 pub mod tokio;
 
-pub(crate) use crate::{IndexGroup, IndexOffset};
-pub use crate::{LogEntry, LogMessageType};
-
-/// ADS port for the TwinCAT system logger.
-pub const LOGGER_PORT: u16 = 100;
+use tcads_core::{IndexGroup, IndexOffset, LogEntry, LogMessageType};
 
 /// Index group for logger notifications.
 pub const LOGGER_INDEX_GROUP: IndexGroup = 1;

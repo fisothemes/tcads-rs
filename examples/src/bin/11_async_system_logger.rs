@@ -9,7 +9,8 @@
 //! it shares a connection and runs concurrent tasks.
 
 use std::time::Duration;
-use tcads::client::devices::tokio::{LogMessageType, Logger};
+use tcads::client::devices::tokio::Logger;
+use tcads::core::LogMessageType;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 

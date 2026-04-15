@@ -8,16 +8,10 @@ pub mod blocking {
         DATATYPE_INFO_BY_NAME_INDEX_GROUP, DATATYPE_UPLOAD_INDEX_GROUP,
         SYMBOL_UPLOAD_INFO_INDEX_GROUP, blocking::DataTypeDevice,
     };
-    pub use super::logger::{
-        LogEntry, LogMessageType,
-        blocking::{LogEntryReceiver, Logger},
-    };
+    pub use super::logger::blocking::{LogEntryReceiver, Logger};
 }
 
 pub mod tokio {
     pub use super::ads_device::tokio::AdsDevice;
-    pub use super::logger::{
-        LogEntry, LogMessageType,
-        tokio::{LogEntryReceiver, Logger},
-    };
+    pub use super::logger::tokio::{LogEntryReceiver, Logger};
 }
