@@ -5,8 +5,8 @@
 //! asynchronous runtime. Notice how the API shape remains identical;
 //! you only need to change the import path and await the futures!
 
-use tcads::client::AmsAddr;
 use tcads::client::devices::tokio::AdsDevice;
+use tcads::core::AmsAddr;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 

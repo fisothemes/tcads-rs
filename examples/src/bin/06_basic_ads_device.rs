@@ -9,8 +9,8 @@
 //! Open `twincat/TcAdsExamples.sln` in TwinCAT XAE,
 //! activate the configuration on your local machine, and put the PLC into RUN mode.
 
-use tcads::client::AmsAddr;
 use tcads::client::devices::blocking::AdsDevice;
+use tcads::core::AmsAddr;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 

@@ -8,8 +8,8 @@
 //! Open `examples/twincat/TcAdsExamples.sln` and put the PLC into RUN mode.
 
 use std::time::Duration;
-use tcads::client::AmsAddr;
 use tcads::client::devices::blocking::{AdsDevice, Logger};
+use tcads::core::AmsAddr;
 
 const GET_SYMHANDLE_BYNAME: u32 = 0xF003;
 const READ_WRITE_SYMVAL_BYHANDLE: u32 = 0xF005;
