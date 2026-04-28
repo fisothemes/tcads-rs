@@ -1,7 +1,7 @@
 pub mod ads_device;
 pub mod data_type;
 pub mod logger;
-pub mod sum_up;
+pub mod sum;
 
 pub mod blocking {
     pub use super::ads_device::blocking::AdsDevice;
