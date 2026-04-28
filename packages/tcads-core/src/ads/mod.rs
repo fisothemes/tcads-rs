@@ -11,7 +11,7 @@ pub mod notification_handle;
 pub mod return_codes;
 pub mod state_flag;
 pub mod string;
-pub mod sum_up;
+pub mod sum;
 pub mod symbol;
 pub mod trans_mode;
 
@@ -32,7 +32,10 @@ pub use notification_handle::NotificationHandle;
 pub use return_codes::AdsReturnCode;
 pub use state_flag::StateFlag;
 pub use string::AdsString;
-pub use sum_up::{SumAddNotificationReq, SumReadReq, SumReadWriteReq, SumWriteReq};
+pub use sum::{
+    SumAddNotificationReq, SumReadRequest, SumReadResponse, SumReadResponseOwned, SumReadView,
+    SumReadWriteReq, SumWriteReq,
+};
 pub use symbol::{
     AdsArrayInfo, AdsAttribute, AdsEnumInfo, AdsFieldInfo, AdsMethodFlags, AdsMethodInfo,
     AdsMethodParamFlags, AdsMethodParamInfo, AdsMethodReturnTypeInfo, AdsRefactorInfo,

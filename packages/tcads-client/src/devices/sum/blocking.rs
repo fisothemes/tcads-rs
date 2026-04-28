@@ -1,10 +1,11 @@
+use super::SUM_READ_EX_INDEX_GROUP;
 use crate::devices::blocking::AdsDevice;
 use std::net::ToSocketAddrs;
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
 use tcads_core::{
     AdsNotificationSampleOwned, AdsReturnCode, AmsAddr, NotificationHandle, SumAddNotificationReq,
-    SumReadReq, SumReadWriteReq, SumWriteReq,
+    SumReadRequest, SumReadResponse, SumReadWriteReq, SumWriteReq,
 };
 
 /// An ADS device client for executing high-performance batch operations (Sum Commands).
@@ -51,12 +52,31 @@ impl SumDevice {
         &self.inner
     }
 
-    pub fn read(
+    pub fn read<'a>(
         &self,
-        _target: AmsAddr,
-        _requests: &[SumReadReq],
-    ) -> crate::Result<Vec<(AdsReturnCode, Vec<u8>)>> {
-        todo!()
+        target: AmsAddr,
+        requests: &'a [SumReadRequest],
+    ) -> crate::Result<SumReadResponse<'a>> {
+        let n = requests.len() as u32;
+
+        if n == 0 {
+            return Ok(SumReadResponse::new(vec![], requests));
+        }
+
+        let mut expected_data_len = 0;
+        let mut buf = Vec::with_capacity(n as usize * SumReadRequest::LENGTH);
+
+        for req in requests {
+            req.write_to(&mut buf);
+            expected_data_len += req.length();
+        }
+
+        let read_len = (n * 8) + expected_data_len;
+        let resp = self
+            .inner
+            .read_write(target, SUM_READ_EX_INDEX_GROUP, n, read_len, buf)?;
+
+        Ok(SumReadResponse::new(resp, requests))
     }
 
     pub fn write(

@@ -7,6 +7,6 @@ use super::error::SumUpError;
 use super::{AdsNotificationAttrib, IndexGroup, IndexOffset};
 
 pub use add_notif::SumAddNotificationReq;
-pub use read::SumReadReq;
+pub use read::{SumReadRequest, SumReadResponse, SumReadResponseOwned, SumReadView};
 pub use read_write::SumReadWriteReq;
 pub use write::SumWriteReq;
