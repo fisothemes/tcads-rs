@@ -2,13 +2,13 @@ use super::{AdsNotificationAttrib, IndexGroup, IndexOffset, SumUpError};
 
 /// A request to subscribe to a variable's changes via a batch Sum Command.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SumAddNotificationReq {
+pub struct SumAddNotificationRequest {
     index_group: IndexGroup,
     index_offset: IndexOffset,
     attributes: AdsNotificationAttrib,
 }
 
-impl SumAddNotificationReq {
+impl SumAddNotificationRequest {
     /// The fixed byte length of this request (4 + 4 + 16 bytes).
     pub const LENGTH: usize = 24;
 
@@ -44,7 +44,7 @@ impl SumAddNotificationReq {
         buf.extend_from_slice(&self.to_bytes());
     }
 
-    /// Reads a [`SumAddNotificationReq`] from a byte buffer.
+    /// Reads a [`SumAddNotificationRequest`] from a byte buffer.
     pub fn from_bytes(bytes: [u8; Self::LENGTH]) -> Self {
         Self {
             index_group: IndexGroup::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
@@ -66,7 +66,7 @@ impl SumAddNotificationReq {
         buf
     }
 
-    /// Parses a slice of bytes into a [`SumAddNotificationReq`].
+    /// Parses a slice of bytes into a [`SumAddNotificationRequest`].
     pub fn try_from_slice(bytes: &[u8]) -> Result<Self, SumUpError> {
         if bytes.len() != Self::LENGTH {
             return Err(SumUpError::UnexpectedLength {
@@ -80,21 +80,21 @@ impl SumAddNotificationReq {
     }
 }
 
-impl From<SumAddNotificationReq> for [u8; SumAddNotificationReq::LENGTH] {
-    fn from(req: SumAddNotificationReq) -> Self {
+impl From<SumAddNotificationRequest> for [u8; SumAddNotificationRequest::LENGTH] {
+    fn from(req: SumAddNotificationRequest) -> Self {
         req.to_bytes()
     }
 }
 
-impl From<[u8; SumAddNotificationReq::LENGTH]> for SumAddNotificationReq {
-    fn from(bytes: [u8; SumAddNotificationReq::LENGTH]) -> Self {
-        SumAddNotificationReq::from_bytes(bytes)
+impl From<[u8; SumAddNotificationRequest::LENGTH]> for SumAddNotificationRequest {
+    fn from(bytes: [u8; SumAddNotificationRequest::LENGTH]) -> Self {
+        SumAddNotificationRequest::from_bytes(bytes)
     }
 }
 
-impl TryFrom<&[u8]> for SumAddNotificationReq {
+impl TryFrom<&[u8]> for SumAddNotificationRequest {
     type Error = SumUpError;
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        SumAddNotificationReq::try_from_slice(bytes)
+        SumAddNotificationRequest::try_from_slice(bytes)
     }
 }

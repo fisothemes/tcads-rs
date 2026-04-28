@@ -5,17 +5,17 @@ use super::{IndexGroup, IndexOffset, SumUpError};
 /// Uses a zero-copy slice reference (`&'a [u8]`) to avoid heap allocations
 /// when sending fast, cyclic data payloads.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct SumWriteReq<'a> {
+pub struct SumWriteRequest<'a> {
     index_group: IndexGroup,
     index_offset: IndexOffset,
     data: &'a [u8],
 }
 
-impl<'a> SumWriteReq<'a> {
+impl<'a> SumWriteRequest<'a> {
     /// The fixed byte length of the header for this request.
     pub const HEADER_LENGTH: usize = 12;
 
-    /// Creates a new instance of [`SumWriteReq`] with the given parameters.
+    /// Creates a new instance of [`SumWriteRequest`] with the given parameters.
     pub fn new(index_group: IndexGroup, index_offset: IndexOffset, data: &'a [u8]) -> Self {
         Self {
             index_group,
@@ -54,7 +54,7 @@ impl<'a> SumWriteReq<'a> {
         buf.extend_from_slice(&self.header_to_bytes());
     }
 
-    /// Parses a slice of bytes into [`SumWriteReq`].
+    /// Parses a slice of bytes into [`SumWriteRequest`].
     pub fn try_from_slice(bytes: &'a [u8]) -> Result<Self, SumUpError> {
         if bytes.len() < Self::HEADER_LENGTH {
             return Err(SumUpError::HeaderTooShort {

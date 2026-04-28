@@ -4,8 +4,9 @@ use std::net::ToSocketAddrs;
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
 use tcads_core::{
-    AdsNotificationSampleOwned, AdsReturnCode, AmsAddr, NotificationHandle, SumAddNotificationReq,
-    SumReadRequest, SumReadResponse, SumReadWriteReq, SumWriteReq,
+    AdsNotificationSampleOwned, AdsReturnCode, AmsAddr, NotificationHandle,
+    SumAddNotificationRequest, SumReadRequest, SumReadResponse, SumReadWriteRequest,
+    SumWriteRequest,
 };
 
 /// An ADS device client for executing high-performance batch operations (Sum Commands).
@@ -82,7 +83,7 @@ impl SumDevice {
     pub fn write(
         &self,
         _target: AmsAddr,
-        _requests: &[SumWriteReq],
+        _requests: &[SumWriteRequest],
     ) -> crate::Result<Vec<AdsReturnCode>> {
         todo!()
     }
@@ -90,7 +91,7 @@ impl SumDevice {
     pub fn read_write(
         &self,
         _target: AmsAddr,
-        _requests: &[SumReadWriteReq],
+        _requests: &[SumReadWriteRequest],
     ) -> crate::Result<Vec<(AdsReturnCode, Vec<u8>)>> {
         todo!()
     }
@@ -98,7 +99,7 @@ impl SumDevice {
     pub fn add_notification(
         &self,
         _target: AmsAddr,
-        _requests: &[SumAddNotificationReq],
+        _requests: &[SumAddNotificationRequest],
     ) -> crate::Result<
         Vec<(
             AdsReturnCode,

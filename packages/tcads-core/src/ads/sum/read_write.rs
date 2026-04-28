@@ -2,14 +2,14 @@ use super::{IndexGroup, IndexOffset, SumUpError};
 
 /// A request to simultaneously write and read a variable in a single PLC cycle.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SumReadWriteReq<'a> {
+pub struct SumReadWriteRequest<'a> {
     index_group: IndexGroup,
     index_offset: IndexOffset,
     read_length: u32,
     write_data: &'a [u8],
 }
 
-impl<'a> SumReadWriteReq<'a> {
+impl<'a> SumReadWriteRequest<'a> {
     /// The fixed byte length of the header for this request.
     pub const HEADER_LENGTH: usize = 16;
 
