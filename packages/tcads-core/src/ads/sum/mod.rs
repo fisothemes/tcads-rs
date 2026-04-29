@@ -8,5 +8,5 @@ use super::{AdsNotificationAttrib, IndexGroup, IndexOffset};
 
 pub use add_notif::SumAddNotificationRequest;
 pub use read::{SumReadRequest, SumReadResponse, SumReadResponseOwned, SumReadView};
-pub use read_write::SumReadWriteRequest;
+pub use read_write::{SumReadWriteRequest, SumReadWriteResponse, SumReadWriteView};
 pub use write::{SumWriteIter, SumWriteRequest, SumWriteResponse};

@@ -144,7 +144,8 @@ pub use ads::{
     AdsTypeInfoIterator, AdsTypeInfoIteratorOwned, DeviceState, Guid, IndexGroup, IndexOffset,
     InvokeId, LogEntry, LogMessageType, NotificationHandle, SumAddNotificationRequest,
     SumReadRequest, SumReadResponse, SumReadResponseOwned, SumReadView, SumReadWriteRequest,
-    SumWriteIter, SumWriteRequest, SumWriteResponse, WindowsFileTime,
+    SumReadWriteResponse, SumReadWriteView, SumWriteIter, SumWriteRequest, SumWriteResponse,
+    WindowsFileTime,
 };
 pub use ams::{AmsAddr, AmsCommand, AmsNetId, AmsPort, AmsTcpHeader, RouterState, RuntimeType};
 pub use io::AmsFrame;

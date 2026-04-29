@@ -1,7 +1,8 @@
 use super::{IndexGroup, IndexOffset, SumUpError};
+use crate::AdsReturnCode;
 
 /// A request to simultaneously write and read a variable in a single PLC cycle.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SumReadWriteRequest<'a> {
     index_group: IndexGroup,
     index_offset: IndexOffset,
@@ -86,6 +87,100 @@ impl<'a> SumReadWriteRequest<'a> {
             index_offset,
             read_length,
             write_data: &bytes[Self::HEADER_LENGTH..Self::HEADER_LENGTH + write_len],
+        })
+    }
+}
+
+/// A zero-copy wrapper for an ADS Sum Read/Write response.
+pub struct SumReadWriteResponse<'a, 'b> {
+    buffer: Vec<u8>,
+    requests: &'a [SumReadWriteRequest<'b>],
+}
+
+impl<'a, 'b> SumReadWriteResponse<'a, 'b> {
+    /// Creates a new [`SumReadWriteResponse`] from a raw buffer and a slice of requests.
+    pub fn new(buffer: Vec<u8>, requests: &'a [SumReadWriteRequest<'b>]) -> Self {
+        Self { buffer, requests }
+    }
+
+    /// Iterates over the batch results, parsing the network buffer lazily
+    /// and yielding zero-copy slices of the valid data.
+    pub fn iter(&self) -> impl Iterator<Item = (AdsReturnCode, &[u8])> + '_ {
+        self.as_view().into_iter()
+    }
+
+    /// Returns a purely borrowed view of the response.
+    pub fn as_view(&self) -> SumReadWriteView<'_, 'b> {
+        SumReadWriteView::new(&self.buffer, self.requests)
+    }
+
+    /// Returns the slice of requests that were part of this response.
+    pub fn requests(&self) -> &'a [SumReadWriteRequest<'b>] {
+        self.requests
+    }
+
+    /// Returns a reference to the raw underlying network buffer.
+    pub fn buffer(&self) -> &[u8] {
+        &self.buffer
+    }
+
+    /// Consumes the response and returns the raw underlying network buffer.   
+    pub fn into_vec(self) -> Vec<u8> {
+        self.buffer
+    }
+
+    /// Consumes the response and returns the raw underlying network buffer and the requests.
+    pub fn into_parts(self) -> (Vec<u8>, &'a [SumReadWriteRequest<'b>]) {
+        (self.buffer, self.requests)
+    }
+}
+
+/// A borrowed view of an ADS Sum Read/Write response.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SumReadWriteView<'a, 'b> {
+    buffer: &'a [u8],
+    requests: &'a [SumReadWriteRequest<'b>],
+}
+
+impl<'a, 'b> SumReadWriteView<'a, 'b> {
+    /// Creates a new [`SumReadWriteView`] from a raw buffer and a slice of requests.
+    pub fn new(buffer: &'a [u8], requests: &'a [SumReadWriteRequest<'b>]) -> Self {
+        Self { buffer, requests }
+    }
+
+    /// Takes the view by value and lazily parses the network buffer,
+    /// yielding the error code and a zero-copy slice of the read data.
+    pub fn into_iter(self) -> impl Iterator<Item = (AdsReturnCode, &'a [u8])> {
+        let n = self.requests.len();
+        let mut current_idx = 0;
+
+        let mut data_offset = n * 4;
+
+        let buffer = self.buffer;
+        let requests = self.requests;
+
+        std::iter::from_fn(move || {
+            if current_idx >= n {
+                return None;
+            }
+
+            let req = &requests[current_idx];
+            let chunk_len = req.read_length() as usize;
+
+            let err_offset = current_idx * 4;
+            let err_code = AdsReturnCode::from_bytes([
+                buffer[err_offset],
+                buffer[err_offset + 1],
+                buffer[err_offset + 2],
+                buffer[err_offset + 3],
+            ]);
+
+            let chunk = &buffer[data_offset..data_offset + chunk_len];
+
+            data_offset += chunk_len;
+            current_idx += 1;
+
+            Some((err_code, chunk))
         })
     }
 }
