@@ -48,6 +48,16 @@ impl<'a> SumReadWriteRequest<'a> {
         self.write_data
     }
 
+    /// Consumes the request and returns a fully owned request.
+    pub fn into_owned(self) -> SumReadWriteRequestOwned {
+        SumReadWriteRequestOwned::new(
+            self.index_group,
+            self.index_offset,
+            self.read_length,
+            self.write_data,
+        )
+    }
+
     /// Serializes the 16-byte header (IndexGroup, IndexOffset, ReadLength, WriteLength).
     pub fn header_to_bytes(&self) -> [u8; 16] {
         let mut buf = [0; Self::HEADER_LENGTH];
@@ -58,10 +68,13 @@ impl<'a> SumReadWriteRequest<'a> {
         buf
     }
 
+    /// Serializes the 16-byte header (IndexGroup, IndexOffset, ReadLength, WriteLength)
+    /// to a byte buffer.
     pub fn write_header_to(&self, buf: &mut Vec<u8>) {
         buf.extend_from_slice(&self.header_to_bytes());
     }
 
+    /// Parses a slice and tries to deserialize it as a Sum Read/Write request.
     pub fn try_from_slice(bytes: &'a [u8]) -> Result<Self, SumUpError> {
         if bytes.len() < Self::HEADER_LENGTH {
             return Err(SumUpError::HeaderTooShort {
@@ -88,6 +101,62 @@ impl<'a> SumReadWriteRequest<'a> {
             read_length,
             write_data: &bytes[Self::HEADER_LENGTH..Self::HEADER_LENGTH + write_len],
         })
+    }
+}
+
+/// A fully owned request to simultaneously write and read a variable.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SumReadWriteRequestOwned {
+    index_group: IndexGroup,
+    index_offset: IndexOffset,
+    read_length: u32,
+    write_data: Vec<u8>,
+}
+
+impl SumReadWriteRequestOwned {
+    /// Creates a new [`SumReadWriteRequestOwned`] with the given parameters.
+    pub fn new(
+        index_group: IndexGroup,
+        index_offset: IndexOffset,
+        read_length: u32,
+        write_data: impl Into<Vec<u8>>,
+    ) -> Self {
+        Self {
+            index_group,
+            index_offset,
+            read_length,
+            write_data: write_data.into(),
+        }
+    }
+
+    /// The Index Group of the target variable.
+    pub fn index_group(&self) -> IndexGroup {
+        self.index_group
+    }
+
+    /// The Index Offset of the target variable.
+    pub fn index_offset(&self) -> IndexOffset {
+        self.index_offset
+    }
+
+    /// The expected maximum length of the data to read back.
+    pub fn read_length(&self) -> u32 {
+        self.read_length
+    }
+
+    /// The raw byte data to write.
+    pub fn write_data(&self) -> &[u8] {
+        &self.write_data
+    }
+
+    /// Returns a purely borrowed view of the request.
+    pub fn as_view(&self) -> SumReadWriteRequest<'_> {
+        SumReadWriteRequest {
+            index_group: self.index_group,
+            index_offset: self.index_offset,
+            read_length: self.read_length,
+            write_data: &self.write_data,
+        }
     }
 }
 
@@ -131,6 +200,42 @@ impl<'a, 'b> SumReadWriteResponse<'a, 'b> {
 
     /// Consumes the response and returns the raw underlying network buffer and the requests.
     pub fn into_parts(self) -> (Vec<u8>, &'a [SumReadWriteRequest<'b>]) {
+        (self.buffer, self.requests)
+    }
+
+    /// Converts this partially borrowed response into a fully owned response.
+    pub fn into_owned(self) -> SumReadWriteResponseOwned {
+        let requests_owned = self
+            .requests
+            .iter()
+            .map(|req| req.clone().into_owned())
+            .collect();
+        SumReadWriteResponseOwned::new(self.buffer, requests_owned)
+    }
+}
+
+/// A zero-copy wrapper for an ADS Sum Read/Write response that fully owns its buffer and requests.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SumReadWriteResponseOwned {
+    buffer: Vec<u8>,
+    requests: Vec<SumReadWriteRequestOwned>,
+}
+
+impl SumReadWriteResponseOwned {
+    /// Creates a new [`SumReadWriteResponseOwned`] from a raw buffer and a slice of requests.
+    pub fn new(buffer: Vec<u8>, requests: Vec<SumReadWriteRequestOwned>) -> Self {
+        Self { buffer, requests }
+    }
+
+    pub fn requests(&self) -> &[SumReadWriteRequestOwned] {
+        &self.requests
+    }
+
+    pub fn buffer(&self) -> &[u8] {
+        &self.buffer
+    }
+
+    pub fn into_parts(self) -> (Vec<u8>, Vec<SumReadWriteRequestOwned>) {
         (self.buffer, self.requests)
     }
 }
