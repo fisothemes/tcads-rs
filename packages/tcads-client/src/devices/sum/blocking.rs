@@ -1,12 +1,12 @@
-use super::SUM_READ_EX_INDEX_GROUP;
-use crate::devices::blocking::{AdsDevice, SUM_WRITE_INDEX_GROUP};
+use super::{SUM_READ_EX_INDEX_GROUP, SUM_READ_WRITE_INDEX_GROUP, SUM_WRITE_INDEX_GROUP};
+use crate::devices::blocking::AdsDevice;
 use std::net::ToSocketAddrs;
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
 use tcads_core::{
     AdsError, AdsNotificationSampleOwned, AdsReturnCode, AmsAddr, IndexOffset, NotificationHandle,
     SumAddNotificationRequest, SumReadRequest, SumReadResponse, SumReadWriteRequest,
-    SumWriteRequest, SumWriteResponse,
+    SumReadWriteResponse, SumWriteRequest, SumWriteResponse,
 };
 
 /// An ADS device client for executing high-performance batch operations (Sum Commands).
@@ -115,12 +115,50 @@ impl SumDevice {
         Ok(SumWriteResponse::new(resp).map_err(AdsError::from)?)
     }
 
-    pub fn read_write(
+    pub fn read_write<'a, 'b>(
         &self,
-        _target: AmsAddr,
-        _requests: &[SumReadWriteRequest],
-    ) -> crate::Result<Vec<(AdsReturnCode, Vec<u8>)>> {
-        todo!()
+        target: AmsAddr,
+        requests: &'a [SumReadWriteRequest<'b>],
+    ) -> crate::Result<SumReadWriteResponse<'a, 'b>> {
+        let n = requests.len();
+        if n == 0 {
+            return Ok(SumReadWriteResponse::new(vec![], requests));
+        }
+
+        let total_header_len = n * SumReadWriteRequest::HEADER_LENGTH;
+        let mut expected_read_data_len = 0;
+        let mut total_write_data_len = 0;
+
+        for req in requests {
+            expected_read_data_len += req.read_length() as usize;
+            total_write_data_len += req.write_data().len();
+        }
+
+        let mut buf = Vec::with_capacity(total_header_len + total_write_data_len);
+        buf.resize(total_header_len, 0);
+
+        for (i, req) in requests.iter().enumerate() {
+            let header = &mut buf[i * SumReadWriteRequest::HEADER_LENGTH
+                ..(i + 1) * SumReadWriteRequest::HEADER_LENGTH];
+            header.copy_from_slice(&req.header_to_bytes());
+            buf.extend_from_slice(req.write_data());
+        }
+
+        let read_len = (n * 4) + expected_read_data_len;
+
+        let resp = self.inner.read_write(
+            target,
+            SUM_READ_WRITE_INDEX_GROUP,
+            n as IndexOffset,
+            read_len as u32,
+            buf,
+        )?;
+
+        if resp.len() < n * 4 {
+            return Err(crate::Error::InvalidPayload);
+        }
+
+        Ok(SumReadWriteResponse::new(resp, requests))
     }
 
     pub fn add_notification(
