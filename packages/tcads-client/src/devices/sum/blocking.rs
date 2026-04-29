@@ -1,12 +1,12 @@
 use super::SUM_READ_EX_INDEX_GROUP;
-use crate::devices::blocking::AdsDevice;
+use crate::devices::blocking::{AdsDevice, SUM_WRITE_INDEX_GROUP};
 use std::net::ToSocketAddrs;
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
 use tcads_core::{
-    AdsNotificationSampleOwned, AdsReturnCode, AmsAddr, NotificationHandle,
+    AdsError, AdsNotificationSampleOwned, AdsReturnCode, AmsAddr, IndexOffset, NotificationHandle,
     SumAddNotificationRequest, SumReadRequest, SumReadResponse, SumReadWriteRequest,
-    SumWriteRequest,
+    SumWriteRequest, SumWriteResponse,
 };
 
 /// An ADS device client for executing high-performance batch operations (Sum Commands).
@@ -82,10 +82,37 @@ impl SumDevice {
 
     pub fn write(
         &self,
-        _target: AmsAddr,
-        _requests: &[SumWriteRequest],
-    ) -> crate::Result<Vec<AdsReturnCode>> {
-        todo!()
+        target: AmsAddr,
+        requests: &[SumWriteRequest],
+    ) -> crate::Result<SumWriteResponse> {
+        let n = requests.len();
+        if n == 0 {
+            return Ok(SumWriteResponse::empty());
+        }
+
+        let total_header_len = n * SumWriteRequest::HEADER_LENGTH;
+        let total_data_len: usize = requests.iter().map(|r| r.data().len()).sum();
+
+        let mut buf = Vec::with_capacity(total_header_len + total_data_len);
+
+        buf.resize(total_header_len, 0);
+
+        for (i, req) in requests.iter().enumerate() {
+            let header = &mut buf
+                [i * SumWriteRequest::HEADER_LENGTH..(i + 1) * SumWriteRequest::HEADER_LENGTH];
+            header.copy_from_slice(&req.header_to_bytes());
+            buf.extend_from_slice(req.data());
+        }
+
+        let resp = self.inner.read_write(
+            target,
+            SUM_WRITE_INDEX_GROUP,
+            n as IndexOffset,
+            (n * AdsReturnCode::LENGTH) as u32,
+            buf,
+        )?;
+
+        Ok(SumWriteResponse::new(resp).map_err(AdsError::from)?)
     }
 
     pub fn read_write(
