@@ -35,7 +35,7 @@ pub use string::AdsString;
 pub use sum::{
     SumAddNotificationRequest, SumReadRequest, SumReadResponse, SumReadResponseOwned, SumReadView,
     SumReadWriteRequest, SumReadWriteRequestOwned, SumReadWriteResponse, SumReadWriteResponseOwned,
-    SumReadWriteView, SumWriteIter, SumWriteRequest, SumWriteResponse,
+    SumReadWriteView, SumReadWriteViewOwned, SumWriteIter, SumWriteRequest, SumWriteResponse,
 };
 pub use symbol::{
     AdsArrayInfo, AdsAttribute, AdsEnumInfo, AdsFieldInfo, AdsMethodFlags, AdsMethodInfo,

@@ -10,6 +10,6 @@ pub use add_notif::SumAddNotificationRequest;
 pub use read::{SumReadRequest, SumReadResponse, SumReadResponseOwned, SumReadView};
 pub use read_write::{
     SumReadWriteRequest, SumReadWriteRequestOwned, SumReadWriteResponse, SumReadWriteResponseOwned,
-    SumReadWriteView,
+    SumReadWriteView, SumReadWriteViewOwned,
 };
 pub use write::{SumWriteIter, SumWriteRequest, SumWriteResponse};

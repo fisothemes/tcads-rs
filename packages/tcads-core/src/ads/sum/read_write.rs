@@ -150,7 +150,7 @@ impl SumReadWriteRequestOwned {
     }
 
     /// Returns a purely borrowed view of the request.
-    pub fn as_view(&self) -> SumReadWriteRequest<'_> {
+    pub fn as_borrowed(&self) -> SumReadWriteRequest<'_> {
         SumReadWriteRequest {
             index_group: self.index_group,
             index_offset: self.index_offset,
@@ -227,14 +227,28 @@ impl SumReadWriteResponseOwned {
         Self { buffer, requests }
     }
 
+    /// Iterates over the batch results, parsing the network buffer lazily
+    /// and yielding zero-copy slices of the valid data.
+    pub fn iter(&self) -> impl Iterator<Item = (AdsReturnCode, &[u8])> + '_ {
+        self.as_view().into_iter()
+    }
+
+    /// Returns a purely borrowed view of the response.
+    pub fn as_view(&self) -> SumReadWriteViewOwned<'_> {
+        SumReadWriteViewOwned::new(&self.buffer, &self.requests)
+    }
+
+    /// Returns the slice of the request that are part of the response.
     pub fn requests(&self) -> &[SumReadWriteRequestOwned] {
         &self.requests
     }
 
+    /// Returns a reference to the underlying network buffer.
     pub fn buffer(&self) -> &[u8] {
         &self.buffer
     }
 
+    /// Consumes the response and returns the raw underlying network buffer and the requests.
     pub fn into_parts(self) -> (Vec<u8>, Vec<SumReadWriteRequestOwned>) {
         (self.buffer, self.requests)
     }
@@ -250,6 +264,56 @@ pub struct SumReadWriteView<'a, 'b> {
 impl<'a, 'b> SumReadWriteView<'a, 'b> {
     /// Creates a new [`SumReadWriteView`] from a raw buffer and a slice of requests.
     pub fn new(buffer: &'a [u8], requests: &'a [SumReadWriteRequest<'b>]) -> Self {
+        Self { buffer, requests }
+    }
+
+    /// Takes the view by value and lazily parses the network buffer,
+    /// yielding the error code and a zero-copy slice of the read data.
+    pub fn into_iter(self) -> impl Iterator<Item = (AdsReturnCode, &'a [u8])> {
+        let n = self.requests.len();
+        let mut current_idx = 0;
+
+        let mut data_offset = n * 4;
+
+        let buffer = self.buffer;
+        let requests = self.requests;
+
+        std::iter::from_fn(move || {
+            if current_idx >= n {
+                return None;
+            }
+
+            let req = &requests[current_idx];
+            let chunk_len = req.read_length() as usize;
+
+            let err_offset = current_idx * 4;
+            let err_code = AdsReturnCode::from_bytes([
+                buffer[err_offset],
+                buffer[err_offset + 1],
+                buffer[err_offset + 2],
+                buffer[err_offset + 3],
+            ]);
+
+            let chunk = &buffer[data_offset..data_offset + chunk_len];
+
+            data_offset += chunk_len;
+            current_idx += 1;
+
+            Some((err_code, chunk))
+        })
+    }
+}
+
+/// A borrowed view of an ADS Sum Read/Write owned response.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SumReadWriteViewOwned<'a> {
+    buffer: &'a [u8],
+    requests: &'a [SumReadWriteRequestOwned],
+}
+
+impl<'a> SumReadWriteViewOwned<'a> {
+    /// Creates a new [`SumReadWriteViewOwned`] from a raw buffer and a slice of requests.
+    pub fn new(buffer: &'a [u8], requests: &'a [SumReadWriteRequestOwned]) -> Self {
         Self { buffer, requests }
     }
 
