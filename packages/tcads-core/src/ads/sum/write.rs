@@ -162,10 +162,32 @@ impl<'a> IntoIterator for &'a SumWriteResponse {
     }
 }
 
-/// An immutable iterator over a `SumWriteResponse`.
+/// An immutable iterator over a [`SumWriteResponse`].
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct SumWriteIter<'a> {
     response: &'a SumWriteResponse,
     cursor: usize,
+}
+
+impl<'a> SumWriteIter<'a> {
+    /// Creates a new [`SumWriteIter`] from a [`SumWriteResponse`].
+    pub fn new(response: &'a SumWriteResponse) -> Self {
+        Self {
+            response,
+            cursor: 0,
+        }
+    }
+
+    /// Sets the cursor position.
+    pub fn with_cursor(mut self, cursor: usize) -> Self {
+        self.cursor = cursor;
+        self
+    }
+
+    /// Returns the current cursor position.
+    pub fn cursor(&self) -> usize {
+        self.cursor
+    }
 }
 
 impl<'a> Iterator for SumWriteIter<'a> {
