@@ -1,4 +1,4 @@
-use super::{IndexGroup, IndexOffset, SumUpError};
+use super::{IndexGroup, IndexOffset, SumError};
 
 /// A request to read a variable as part of a batch Sum Command.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -62,9 +62,9 @@ impl SumReadRequest {
     }
 
     /// Parses a slice of bytes into a [`SumReadRequest`].
-    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, SumUpError> {
+    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, SumError> {
         if bytes.len() != Self::LENGTH {
-            return Err(SumUpError::UnexpectedLength {
+            return Err(SumError::UnexpectedLength {
                 expected: Self::LENGTH,
                 got: bytes.len(),
             });
@@ -88,7 +88,7 @@ impl From<[u8; SumReadRequest::LENGTH]> for SumReadRequest {
 }
 
 impl TryFrom<&[u8]> for SumReadRequest {
-    type Error = SumUpError;
+    type Error = SumError;
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         SumReadRequest::try_from_slice(bytes)
     }

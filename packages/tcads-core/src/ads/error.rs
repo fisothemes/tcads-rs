@@ -51,7 +51,7 @@ pub enum AdsError {
     #[error("Invalid GUID: {0}")]
     InvalidGuid(#[from] GuidParseError),
     #[error("Invalid SumUp command: {0}")]
-    InvalidSumUpCommand(#[from] SumUpError),
+    InvalidSumUpCommand(#[from] SumError),
     /// Invalid ADS data length format or content (not header or return code).
     #[error("Unexpected data length: expected {expected} bytes, got {got} bytes")]
     UnexpectedDataLength { expected: usize, got: usize },
@@ -188,7 +188,7 @@ pub enum GuidParseError {
 
 /// Error returned when parsing a SumUp command fails.
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
-pub enum SumUpError {
+pub enum SumError {
     #[error("Payload too short: expected at least {expected} bytes, got {got}")]
     TooShort { expected: usize, got: usize },
     #[error("Invalid header: expected {expected} bytes, got {got}")]

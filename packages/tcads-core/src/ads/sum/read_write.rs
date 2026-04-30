@@ -1,4 +1,4 @@
-use super::{IndexGroup, IndexOffset, SumUpError};
+use super::{IndexGroup, IndexOffset, SumError};
 use crate::AdsReturnCode;
 
 /// A request to simultaneously write and read a variable in a single PLC cycle.
@@ -75,9 +75,9 @@ impl<'a> SumReadWriteRequest<'a> {
     }
 
     /// Parses a slice and tries to deserialize it as a Sum Read/Write request.
-    pub fn try_from_slice(bytes: &'a [u8]) -> Result<Self, SumUpError> {
+    pub fn try_from_slice(bytes: &'a [u8]) -> Result<Self, SumError> {
         if bytes.len() < Self::HEADER_LENGTH {
-            return Err(SumUpError::HeaderTooShort {
+            return Err(SumError::HeaderTooShort {
                 expected: Self::HEADER_LENGTH,
                 got: bytes.len(),
             });
@@ -89,7 +89,7 @@ impl<'a> SumReadWriteRequest<'a> {
         let write_len = u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]) as usize;
 
         if bytes.len() < Self::HEADER_LENGTH + write_len {
-            return Err(SumUpError::TooShort {
+            return Err(SumError::TooShort {
                 expected: Self::HEADER_LENGTH + write_len,
                 got: bytes.len(),
             });

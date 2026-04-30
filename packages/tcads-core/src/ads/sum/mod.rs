@@ -3,7 +3,7 @@ pub mod read;
 pub mod read_write;
 pub mod write;
 
-use super::error::SumUpError;
+use super::error::SumError;
 use super::{AdsNotificationAttrib, IndexGroup, IndexOffset};
 
 pub use add_notif::SumAddNotificationRequest;

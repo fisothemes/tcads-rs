@@ -1,4 +1,4 @@
-use super::{AdsNotificationAttrib, IndexGroup, IndexOffset, SumUpError};
+use super::{AdsNotificationAttrib, IndexGroup, IndexOffset, SumError};
 
 /// A request to subscribe to a variable's changes via a batch Sum Command.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,9 +67,9 @@ impl SumAddNotificationRequest {
     }
 
     /// Parses a slice of bytes into a [`SumAddNotificationRequest`].
-    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, SumUpError> {
+    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, SumError> {
         if bytes.len() != Self::LENGTH {
-            return Err(SumUpError::UnexpectedLength {
+            return Err(SumError::UnexpectedLength {
                 expected: Self::LENGTH,
                 got: bytes.len(),
             });
@@ -93,7 +93,7 @@ impl From<[u8; SumAddNotificationRequest::LENGTH]> for SumAddNotificationRequest
 }
 
 impl TryFrom<&[u8]> for SumAddNotificationRequest {
-    type Error = SumUpError;
+    type Error = SumError;
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         SumAddNotificationRequest::try_from_slice(bytes)
     }

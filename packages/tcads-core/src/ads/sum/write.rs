@@ -1,4 +1,4 @@
-use super::{IndexGroup, IndexOffset, SumUpError};
+use super::{IndexGroup, IndexOffset, SumError};
 use crate::AdsReturnCode;
 use std::fmt;
 
@@ -57,9 +57,9 @@ impl<'a> SumWriteRequest<'a> {
     }
 
     /// Parses a slice of bytes into [`SumWriteRequest`].
-    pub fn try_from_slice(bytes: &'a [u8]) -> Result<Self, SumUpError> {
+    pub fn try_from_slice(bytes: &'a [u8]) -> Result<Self, SumError> {
         if bytes.len() < Self::HEADER_LENGTH {
-            return Err(SumUpError::HeaderTooShort {
+            return Err(SumError::HeaderTooShort {
                 expected: Self::HEADER_LENGTH,
                 got: bytes.len(),
             });
@@ -70,7 +70,7 @@ impl<'a> SumWriteRequest<'a> {
         let data_len = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]) as usize;
 
         if bytes.len() < Self::HEADER_LENGTH + data_len {
-            return Err(SumUpError::PayloadTooShort {
+            return Err(SumError::PayloadTooShort {
                 expected: Self::HEADER_LENGTH + data_len,
                 got: bytes.len(),
             });
@@ -93,11 +93,11 @@ pub struct SumWriteResponse {
 impl SumWriteResponse {
     /// Creates a new [`SumWriteResponse`] from a raw buffer.
     /// Returns [`Err`] if the buffer is not a multiple of [`AdsReturnCode::LENGTH`].
-    pub fn new(buf: impl Into<Vec<u8>>) -> Result<Self, SumUpError> {
+    pub fn new(buf: impl Into<Vec<u8>>) -> Result<Self, SumError> {
         let buffer = buf.into();
 
         if buffer.len() % AdsReturnCode::LENGTH != 0 {
-            return Err(SumUpError::UnexpectedLength {
+            return Err(SumError::UnexpectedLength {
                 expected: buffer.len()
                     + (AdsReturnCode::LENGTH - (buffer.len() % AdsReturnCode::LENGTH)),
                 got: buffer.len(),
