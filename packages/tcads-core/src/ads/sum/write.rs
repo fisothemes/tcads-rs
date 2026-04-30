@@ -96,7 +96,7 @@ impl SumWriteResponse {
     pub fn new(buf: impl Into<Vec<u8>>) -> Result<Self, SumError> {
         let buffer = buf.into();
 
-        if buffer.len() % AdsReturnCode::LENGTH != 0 {
+        if !buffer.len().is_multiple_of(AdsReturnCode::LENGTH) {
             return Err(SumError::UnexpectedLength {
                 expected: buffer.len()
                     + (AdsReturnCode::LENGTH - (buffer.len() % AdsReturnCode::LENGTH)),
