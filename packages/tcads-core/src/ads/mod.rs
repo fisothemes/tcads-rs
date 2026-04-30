@@ -33,9 +33,10 @@ pub use return_codes::AdsReturnCode;
 pub use state_flag::StateFlag;
 pub use string::AdsString;
 pub use sum::{
-    SumAddNotificationRequest, SumReadRequest, SumReadResponse, SumReadResponseOwned, SumReadView,
-    SumReadWriteRequest, SumReadWriteRequestOwned, SumReadWriteResponse, SumReadWriteResponseOwned,
-    SumReadWriteView, SumReadWriteViewOwned, SumWriteIter, SumWriteRequest, SumWriteResponse,
+    SumAddNotificationRequest, SumDeleteNotificationIter, SumDeleteNotificationResponse,
+    SumReadRequest, SumReadResponse, SumReadResponseOwned, SumReadView, SumReadWriteRequest,
+    SumReadWriteRequestOwned, SumReadWriteResponse, SumReadWriteResponseOwned, SumReadWriteView,
+    SumReadWriteViewOwned, SumWriteIter, SumWriteRequest, SumWriteResponse,
 };
 pub use symbol::{
     AdsArrayInfo, AdsAttribute, AdsEnumInfo, AdsFieldInfo, AdsMethodFlags, AdsMethodInfo,
