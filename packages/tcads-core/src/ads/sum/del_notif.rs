@@ -46,18 +46,27 @@ impl SumDeleteNotificationResponse {
     }
 
     /// Returns the return code at the given index.
-    pub fn get(&self, index: usize) -> Option<AdsReturnCode> {
+    pub fn get(&self, index: usize) -> Option<Result<(), AdsReturnCode>> {
         if index >= self.len() {
             return None;
         }
 
         let offset = index * AdsReturnCode::LENGTH;
-        let code = u32::from_le_bytes(self.buffer[offset..offset + 4].try_into().unwrap());
-        Some(AdsReturnCode::from(code))
+        let code = u32::from_le_bytes([
+            self.buffer[offset],
+            self.buffer[offset + 1],
+            self.buffer[offset + 2],
+            self.buffer[offset + 3],
+        ]);
+
+        match AdsReturnCode::from(code) {
+            AdsReturnCode::Ok => Some(Ok(())),
+            err => Some(Err(err)),
+        }
     }
 
     /// Returns an iterator over the return codes.
-    pub fn iter(&self) -> SumDeleteNotificationIter<'_> {
+    pub fn iter(&self) -> impl Iterator<Item = Result<(), AdsReturnCode>> + '_ {
         SumDeleteNotificationIter {
             response: self,
             cursor: 0,
@@ -72,11 +81,14 @@ impl fmt::Debug for SumDeleteNotificationResponse {
 }
 
 impl<'a> IntoIterator for &'a SumDeleteNotificationResponse {
-    type Item = AdsReturnCode;
+    type Item = Result<(), AdsReturnCode>;
     type IntoIter = SumDeleteNotificationIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.iter()
+        SumDeleteNotificationIter {
+            response: self,
+            cursor: 0,
+        }
     }
 }
 
@@ -109,7 +121,7 @@ impl<'a> SumDeleteNotificationIter<'a> {
 }
 
 impl<'a> Iterator for SumDeleteNotificationIter<'a> {
-    type Item = AdsReturnCode;
+    type Item = Result<(), AdsReturnCode>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let value = self.response.get(self.cursor);

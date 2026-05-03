@@ -114,7 +114,7 @@ impl<'a> SumReadResponse<'a> {
 
     /// Iterates over the batch results, parsing the network buffer lazily
     /// and yielding zero-copy slices of the valid data.
-    pub fn iter(&self) -> impl Iterator<Item = (AdsReturnCode, &[u8])> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = Result<&[u8], AdsReturnCode>> + '_ {
         self.as_view().into_iter()
     }
 
@@ -166,7 +166,7 @@ impl SumReadResponseOwned {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (AdsReturnCode, &[u8])> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = Result<&[u8], AdsReturnCode>> + '_ {
         self.as_view().into_iter()
     }
 
@@ -205,7 +205,7 @@ impl<'a> SumReadView<'a> {
     }
 
     /// Takes the view by value and returns an iterator yielding zero-copy slices.
-    pub fn into_iter(self) -> impl Iterator<Item = (AdsReturnCode, &'a [u8])> {
+    pub fn into_iter(self) -> impl Iterator<Item = Result<&'a [u8], AdsReturnCode>> {
         let n = self.requests.len();
         let mut current_idx = 0;
         let mut data_offset = n * 8;
@@ -236,7 +236,10 @@ impl<'a> SumReadView<'a> {
             data_offset += expected_len;
             current_idx += 1;
 
-            Some((AdsReturnCode::from(err_code), chunk))
+            match AdsReturnCode::from(err_code) {
+                AdsReturnCode::Ok => Some(Ok(chunk)),
+                err => Some(Err(err)),
+            }
         })
     }
 }

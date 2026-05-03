@@ -5,8 +5,8 @@ use std::sync::mpsc::Receiver;
 use std::time::Duration;
 use tcads_core::{
     AdsError, AdsNotificationSampleOwned, AdsReturnCode, AmsAddr, IndexOffset, NotificationHandle,
-    SumAddNotificationRequest, SumReadRequest, SumReadResponse, SumReadWriteRequest,
-    SumReadWriteResponse, SumWriteRequest, SumWriteResponse,
+    SumAddNotificationRequest, SumDeleteNotificationResponse, SumReadRequest, SumReadResponse,
+    SumReadWriteRequest, SumReadWriteResponse, SumWriteRequest, SumWriteResponse,
 };
 
 /// An ADS device client for executing high-performance batch operations (Sum Commands).
@@ -179,7 +179,7 @@ impl SumDevice {
         &self,
         _target: AmsAddr,
         _handles: &[NotificationHandle],
-    ) -> crate::Result<Vec<AdsReturnCode>> {
+    ) -> crate::Result<SumDeleteNotificationResponse> {
         todo!()
     }
 }

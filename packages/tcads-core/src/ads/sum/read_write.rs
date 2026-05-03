@@ -174,7 +174,7 @@ impl<'a, 'b> SumReadWriteResponse<'a, 'b> {
 
     /// Iterates over the batch results, parsing the network buffer lazily
     /// and yielding zero-copy slices of the valid data.
-    pub fn iter(&self) -> impl Iterator<Item = (AdsReturnCode, &[u8])> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = Result<&[u8], AdsReturnCode>> + '_ {
         self.as_view().into_iter()
     }
 
@@ -229,7 +229,7 @@ impl SumReadWriteResponseOwned {
 
     /// Iterates over the batch results, parsing the network buffer lazily
     /// and yielding zero-copy slices of the valid data.
-    pub fn iter(&self) -> impl Iterator<Item = (AdsReturnCode, &[u8])> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = Result<&[u8], AdsReturnCode>> + '_ {
         self.as_view().into_iter()
     }
 
@@ -269,7 +269,7 @@ impl<'a, 'b> SumReadWriteView<'a, 'b> {
 
     /// Takes the view by value and lazily parses the network buffer,
     /// yielding the error code and a zero-copy slice of the read data.
-    pub fn into_iter(self) -> impl Iterator<Item = (AdsReturnCode, &'a [u8])> {
+    pub fn into_iter(self) -> impl Iterator<Item = Result<&'a [u8], AdsReturnCode>> {
         let n = self.requests.len();
         let mut current_idx = 0;
 
@@ -299,7 +299,10 @@ impl<'a, 'b> SumReadWriteView<'a, 'b> {
             data_offset += chunk_len;
             current_idx += 1;
 
-            Some((err_code, chunk))
+            match err_code {
+                AdsReturnCode::Ok => Some(Ok(chunk)),
+                _ => Some(Err(err_code)),
+            }
         })
     }
 }
@@ -319,7 +322,7 @@ impl<'a> SumReadWriteViewOwned<'a> {
 
     /// Takes the view by value and lazily parses the network buffer,
     /// yielding the error code and a zero-copy slice of the read data.
-    pub fn into_iter(self) -> impl Iterator<Item = (AdsReturnCode, &'a [u8])> {
+    pub fn into_iter(self) -> impl Iterator<Item = Result<&'a [u8], AdsReturnCode>> {
         let n = self.requests.len();
         let mut current_idx = 0;
 
@@ -349,7 +352,10 @@ impl<'a> SumReadWriteViewOwned<'a> {
             data_offset += chunk_len;
             current_idx += 1;
 
-            Some((err_code, chunk))
+            match err_code {
+                AdsReturnCode::Ok => Some(Ok(chunk)),
+                _ => Some(Err(err_code)),
+            }
         })
     }
 }
