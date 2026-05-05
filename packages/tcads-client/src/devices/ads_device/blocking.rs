@@ -596,6 +596,25 @@ impl AdsDevice {
         self.inner.ams_requests.dispatch(key, frame)
     }
 
+    /// Returns a reference to the shared internal state and dispatchers of the ADS device.
+    ///
+    /// This method acts as an escape hatch for power users and library authors
+    /// who need to build custom device abstractions (such as high-performance batch wrappers
+    /// or custom protocol extensions) that share the same underlying TCP connection.
+    ///
+    /// By accessing [`AdsDeviceInner`], you can interact directly with the
+    /// network request queues, notification routing tables, and the `InvokeId`
+    /// generator without being constrained by the high-level request/response API.
+    ///
+    /// # Thread Safety
+    ///
+    /// All fields within [`AdsDeviceInner`] are heavily protected by atomic operations
+    /// and thread-safe primitives (`Arc`, `RwLock`, channels). It is entirely safe
+    /// to access and mutate the inner routing state concurrently across multiple threads.
+    pub fn inner(&self) -> &AdsDeviceInner {
+        &self.inner
+    }
+
     fn port_connect(&self) -> crate::Result<AmsAddr> {
         let frame = PortConnectRequest::default().into_frame();
         let rx = self

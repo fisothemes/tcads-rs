@@ -1,4 +1,7 @@
-use super::{SUM_READ_EX_INDEX_GROUP, SUM_READ_WRITE_INDEX_GROUP, SUM_WRITE_INDEX_GROUP};
+use super::{
+    SUM_DELETE_NOTIFICATION_INDEX_GROUP, SUM_READ_EX_INDEX_GROUP, SUM_READ_WRITE_INDEX_GROUP,
+    SUM_WRITE_INDEX_GROUP,
+};
 use crate::devices::blocking::AdsDevice;
 use std::net::ToSocketAddrs;
 use std::sync::mpsc::Receiver;
@@ -177,9 +180,36 @@ impl SumDevice {
 
     pub fn delete_notification(
         &self,
-        _target: AmsAddr,
-        _handles: &[NotificationHandle],
+        target: AmsAddr,
+        handles: &[NotificationHandle],
     ) -> crate::Result<SumDeleteNotificationResponse> {
-        todo!()
+        let n = handles.len();
+        if n == 0 {
+            return Ok(SumDeleteNotificationResponse::empty());
+        }
+
+        let mut buf = Vec::with_capacity(n * 4);
+        for handle in handles {
+            buf.extend_from_slice(&handle.to_bytes());
+        }
+
+        let resp_bytes = self.inner.read_write(
+            target,
+            SUM_DELETE_NOTIFICATION_INDEX_GROUP,
+            n as u32,
+            (n * 4) as u32,
+            buf,
+        )?;
+
+        let resp = SumDeleteNotificationResponse::new(resp_bytes)
+            .map_err(|e| crate::Error::from(AdsError::from(e)))?;
+
+        for (i, result) in resp.iter().enumerate() {
+            if result.is_ok() {
+                let _ = self.inner.inner().ads_notifs.remove(handles[i]);
+            }
+        }
+
+        Ok(resp)
     }
 }
