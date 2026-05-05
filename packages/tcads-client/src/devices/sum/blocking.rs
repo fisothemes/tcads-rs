@@ -169,11 +169,7 @@ impl SumDevice {
         _target: AmsAddr,
         _requests: &[SumAddNotificationRequest],
     ) -> crate::Result<
-        Vec<(
-            AdsReturnCode,
-            Receiver<AdsNotificationSampleOwned>,
-            NotificationHandle,
-        )>,
+        Vec<Result<(NotificationHandle, Receiver<AdsNotificationSampleOwned>), AdsReturnCode>>,
     > {
         todo!()
     }
