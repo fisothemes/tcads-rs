@@ -1,4 +1,6 @@
 use super::{AdsNotificationAttrib, IndexGroup, IndexOffset, SumError};
+use crate::{AdsReturnCode, NotificationHandle};
+use std::fmt;
 
 /// A request to subscribe to a variable's changes via a batch Sum Command.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -12,6 +14,7 @@ impl SumAddNotificationRequest {
     /// The fixed byte length of this request (4 + 4 + 16 bytes).
     pub const LENGTH: usize = 24;
 
+    /// Creates a new instance of a [`SumAddNotificationRequest`].
     pub fn new(
         index_group: IndexGroup,
         index_offset: IndexOffset,
@@ -96,5 +99,118 @@ impl TryFrom<&[u8]> for SumAddNotificationRequest {
     type Error = SumError;
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         SumAddNotificationRequest::try_from_slice(bytes)
+    }
+}
+
+/// A zero-copy, lazy-evaluating wrapper for an ADS Sum Add Notification response.
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct SumAddNotificationResponse {
+    buffer: Vec<u8>,
+}
+
+impl SumAddNotificationResponse {
+    /// 4 bytes for AdsReturnCode + 4 bytes for NotificationHandle
+    pub const ITEM_LENGTH: usize = 8;
+
+    /// Creates a new [`SumAddNotificationResponse`] from a raw buffer.
+    /// Returns [`Err`] if the buffer is not a multiple of [`Self::ITEM_LENGTH`].
+    pub fn new(buf: impl Into<Vec<u8>>) -> Result<Self, SumError> {
+        let buffer = buf.into();
+
+        if !buffer.len().is_multiple_of(Self::ITEM_LENGTH) {
+            return Err(SumError::UnexpectedLength {
+                expected: buffer.len() + (Self::ITEM_LENGTH - (buffer.len() % Self::ITEM_LENGTH)),
+                got: buffer.len(),
+            });
+        }
+
+        Ok(Self { buffer })
+    }
+
+    /// Creates a new [`SumAddNotificationResponse`] with no data.
+    pub fn empty() -> Self {
+        Self { buffer: Vec::new() }
+    }
+
+    /// Returns a reference to the raw underlying network buffer.
+    pub fn buffer(&self) -> &[u8] {
+        &self.buffer
+    }
+
+    /// Returns the number of return codes in the response.
+    pub fn len(&self) -> usize {
+        self.buffer.len() / Self::ITEM_LENGTH
+    }
+
+    /// Returns `true` if the response is empty.
+    pub fn is_empty(&self) -> bool {
+        self.buffer.is_empty()
+    }
+
+    /// Returns the return code at the given index.
+    pub fn get(&self, index: usize) -> Option<Result<NotificationHandle, AdsReturnCode>> {
+        if index >= self.len() {
+            return None;
+        }
+
+        let offset = index * Self::ITEM_LENGTH;
+        let code = u32::from_le_bytes([
+            self.buffer[offset],
+            self.buffer[offset + 1],
+            self.buffer[offset + 2],
+            self.buffer[offset + 3],
+        ]);
+
+        let handle_val = u32::from_le_bytes([
+            self.buffer[offset + 4],
+            self.buffer[offset + 5],
+            self.buffer[offset + 6],
+            self.buffer[offset + 7],
+        ]);
+
+        match AdsReturnCode::from(code) {
+            AdsReturnCode::Ok => Some(Ok(NotificationHandle::from(handle_val))),
+            err => Some(Err(err)),
+        }
+    }
+
+    pub fn iter(&self) -> SumAddNotificationIter<'_> {
+        SumAddNotificationIter {
+            response: self,
+            cursor: 0,
+        }
+    }
+}
+
+impl fmt::Debug for SumAddNotificationResponse {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.iter()).finish()
+    }
+}
+
+impl<'a> IntoIterator for &'a SumAddNotificationResponse {
+    type Item = Result<NotificationHandle, AdsReturnCode>;
+    type IntoIter = SumAddNotificationIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct SumAddNotificationIter<'a> {
+    response: &'a SumAddNotificationResponse,
+    cursor: usize,
+}
+
+impl<'a> Iterator for SumAddNotificationIter<'a> {
+    type Item = Result<NotificationHandle, AdsReturnCode>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let value = self.response.get(self.cursor);
+        if value.is_some() {
+            self.cursor += 1;
+        }
+        value
     }
 }
