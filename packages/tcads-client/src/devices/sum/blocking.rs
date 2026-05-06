@@ -6,6 +6,7 @@ use crate::devices::blocking::AdsDevice;
 use std::net::ToSocketAddrs;
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
+use tcads_core::ads::sum::add_notif::SumAddNotificationResponse;
 use tcads_core::{
     AdsError, AdsNotificationSampleOwned, AdsReturnCode, AmsAddr, IndexOffset, NotificationHandle,
     SumAddNotificationRequest, SumDeleteNotificationResponse, SumReadRequest, SumReadResponse,
@@ -147,7 +148,7 @@ impl SumDevice {
             buf.extend_from_slice(req.write_data());
         }
 
-        let read_len = (n * 4) + expected_read_data_len;
+        let read_len = (n * 8) + expected_read_data_len;
 
         let resp = self.inner.read_write(
             target,
@@ -157,7 +158,7 @@ impl SumDevice {
             buf,
         )?;
 
-        if resp.len() < n * 4 {
+        if resp.len() < n * 8 {
             return Err(crate::Error::InvalidPayload);
         }
 
@@ -166,12 +167,78 @@ impl SumDevice {
 
     pub fn add_notification(
         &self,
-        _target: AmsAddr,
-        _requests: &[SumAddNotificationRequest],
+        target: AmsAddr,
+        requests: &[SumAddNotificationRequest],
     ) -> crate::Result<
         Vec<Result<(NotificationHandle, Receiver<AdsNotificationSampleOwned>), AdsReturnCode>>,
     > {
-        todo!()
+        let n = requests.len();
+        if n == 0 {
+            return Ok(vec![]);
+        }
+
+        let invoke_id = self.inner.next_invoke_id();
+
+        let receivers = self
+            .inner
+            .inner()
+            .ads_notifs
+            .pre_register_batch(invoke_id, n)?;
+
+        let mut write_buf = Vec::with_capacity(n * SumAddNotificationRequest::LENGTH);
+        for req in requests {
+            req.write_to(&mut write_buf);
+        }
+
+        let expected_read_len = (n * 8) as u32;
+        let frame = tcads_core::protocol::AdsReadWriteRequestOwned::new(
+            target,
+            self.inner.source()?,
+            invoke_id,
+            super::SUM_ADD_NOTIFICATION_INDEX_GROUP,
+            n as u32,
+            expected_read_len,
+            write_buf,
+        )
+        .into_frame();
+
+        let rx = self.inner.inner().ams_requests.dispatch(
+            crate::tasks::blocking::AmsRequestDispatchKey::AdsCommand(invoke_id),
+            frame,
+        )?;
+
+        let response_frame = match self.inner.inner().timeout {
+            Some(duration) => rx
+                .recv_timeout(duration)
+                .map_err(|_| crate::Error::Timeout)?,
+            None => rx.recv().map_err(|_| crate::Error::Disconnected)?,
+        };
+
+        let read_write_resp =
+            tcads_core::protocol::AdsReadWriteResponse::try_from_frame(&response_frame)?;
+
+        if read_write_resp.result() != AdsReturnCode::Ok {
+            return Err(crate::Error::from(read_write_resp.result()));
+        }
+
+        let response = SumAddNotificationResponse::new(read_write_resp.data())
+            .map_err(|e| crate::Error::from(AdsError::from(e)))?;
+
+        let parsed_results: Vec<Result<NotificationHandle, AdsReturnCode>> =
+            response.iter().collect();
+
+        self.inner
+            .inner()
+            .ads_notifs
+            .promote_batch(invoke_id, &parsed_results)?;
+
+        let final_output = receivers
+            .into_iter()
+            .zip(parsed_results.into_iter())
+            .map(|(rx, res)| res.map(|handle| (handle, rx)))
+            .collect();
+
+        Ok(final_output)
     }
 
     pub fn delete_notification(

@@ -273,20 +273,16 @@ impl<'a, 'b> SumReadWriteView<'a, 'b> {
         let n = self.requests.len();
         let mut current_idx = 0;
 
-        let mut data_offset = n * 4;
+        let mut data_offset = n * 8;
 
         let buffer = self.buffer;
-        let requests = self.requests;
 
         std::iter::from_fn(move || {
             if current_idx >= n {
                 return None;
             }
 
-            let req = &requests[current_idx];
-            let chunk_len = req.read_length() as usize;
-
-            let err_offset = current_idx * 4;
+            let err_offset = current_idx * 8;
             let err_code = AdsReturnCode::from_bytes([
                 buffer[err_offset],
                 buffer[err_offset + 1],
@@ -294,9 +290,16 @@ impl<'a, 'b> SumReadWriteView<'a, 'b> {
                 buffer[err_offset + 3],
             ]);
 
-            let chunk = &buffer[data_offset..data_offset + chunk_len];
+            let returned_len = u32::from_le_bytes([
+                buffer[err_offset + 4],
+                buffer[err_offset + 5],
+                buffer[err_offset + 6],
+                buffer[err_offset + 7],
+            ]) as usize;
 
-            data_offset += chunk_len;
+            let chunk = &buffer[data_offset..data_offset + returned_len];
+
+            data_offset += returned_len;
             current_idx += 1;
 
             match err_code {
@@ -326,20 +329,16 @@ impl<'a> SumReadWriteViewOwned<'a> {
         let n = self.requests.len();
         let mut current_idx = 0;
 
-        let mut data_offset = n * 4;
+        let mut data_offset = n * 8;
 
         let buffer = self.buffer;
-        let requests = self.requests;
 
         std::iter::from_fn(move || {
             if current_idx >= n {
                 return None;
             }
 
-            let req = &requests[current_idx];
-            let chunk_len = req.read_length() as usize;
-
-            let err_offset = current_idx * 4;
+            let err_offset = current_idx * 8;
             let err_code = AdsReturnCode::from_bytes([
                 buffer[err_offset],
                 buffer[err_offset + 1],
@@ -347,9 +346,16 @@ impl<'a> SumReadWriteViewOwned<'a> {
                 buffer[err_offset + 3],
             ]);
 
-            let chunk = &buffer[data_offset..data_offset + chunk_len];
+            let returned_len = u32::from_le_bytes([
+                buffer[err_offset + 4],
+                buffer[err_offset + 5],
+                buffer[err_offset + 6],
+                buffer[err_offset + 7],
+            ]) as usize;
 
-            data_offset += chunk_len;
+            let chunk = &buffer[data_offset..data_offset + returned_len];
+
+            data_offset += returned_len;
             current_idx += 1;
 
             match err_code {
