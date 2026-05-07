@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Mutex, mpsc};
-use tcads_core::InvokeId;
-use tcads_core::ads::NotificationHandle;
-use tcads_core::protocol::AdsNotificationSampleOwned;
+use tcads_core::{AdsNotificationSampleOwned, AdsReturnCode, InvokeId, NotificationHandle};
 
 /// Manages ADS device notification subscriptions.
 ///
@@ -23,6 +21,8 @@ use tcads_core::protocol::AdsNotificationSampleOwned;
 pub struct AdsNotificationDispatcher {
     /// Temporary storage keyed by invoke ID, waiting for handle assignment from the PLC.
     pending: Mutex<HashMap<InvokeId, Sender<AdsNotificationSampleOwned>>>,
+    /// Temporary storage for batch operations, where one invoke ID yields multiple handles.
+    pending_batches: Mutex<HashMap<InvokeId, Vec<Sender<AdsNotificationSampleOwned>>>>,
     /// Permanent storage keyed by notification handle once assigned by the PLC.
     subscriptions: Mutex<HashMap<NotificationHandle, Sender<AdsNotificationSampleOwned>>>,
 }
@@ -32,6 +32,7 @@ impl AdsNotificationDispatcher {
     pub fn new() -> Self {
         Self {
             pending: Mutex::new(HashMap::new()),
+            pending_batches: Mutex::new(HashMap::new()),
             subscriptions: Mutex::new(HashMap::new()),
         }
     }
@@ -52,6 +53,33 @@ impl AdsNotificationDispatcher {
         Ok(rx)
     }
 
+    /// Registers a batch of subscriptions under a single temporary [`InvokeId`] key.
+    ///
+    /// Must be called before dispatching the add notification request to the PLC,
+    /// since the PLC may send an initial sample before the response is received.
+    ///
+    /// Used by Sum Commands where a single network round-trip subscribes to multiple variables.
+    ///
+    /// Returns a collection of [`Receiver`]s that will yield incoming
+    /// [`AdsNotificationSample`](AdsNotificationSampleOwned)s for this subscription.
+    pub fn pre_register_batch(
+        &self,
+        invoke_id: InvokeId,
+        count: usize,
+    ) -> crate::Result<Vec<Receiver<AdsNotificationSampleOwned>>> {
+        let mut receivers = Vec::with_capacity(count);
+        let mut senders = Vec::with_capacity(count);
+
+        for _ in 0..count {
+            let (tx, rx) = mpsc::channel();
+            senders.push(tx);
+            receivers.push(rx);
+        }
+
+        self.pending_batches.lock()?.insert(invoke_id, senders);
+        Ok(receivers)
+    }
+
     /// Promotes a pre-registered subscription from its temporary [`InvokeId`] key
     /// to the permanent [`NotificationHandle`] assigned by the PLC.
     ///
@@ -65,6 +93,36 @@ impl AdsNotificationDispatcher {
         match sender {
             Some(tx) => {
                 self.subscriptions.lock()?.insert(handle, tx);
+                Ok(true)
+            }
+            None => Ok(false),
+        }
+    }
+
+    /// Promotes a pre-registered batch of subscriptions.
+    ///
+    /// The `results` array must exactly match the order and length of the batch
+    /// requested in `pre_register_batch`. Senders corresponding to `Ok` results
+    /// are promoted to active subscriptions. Senders corresponding to `Err` results
+    /// are dropped, safely closing the channel for the user.
+    pub fn promote_batch(
+        &self,
+        invoke_id: InvokeId,
+        results: &[Result<NotificationHandle, AdsReturnCode>],
+    ) -> crate::Result<bool> {
+        let pending_senders = self.pending_batches.lock()?.remove(&invoke_id);
+
+        match pending_senders {
+            Some(senders) => {
+                let mut subs = self.subscriptions.lock()?;
+
+                for (sender, result) in senders.into_iter().zip(results.iter()) {
+                    // Only insert successful registrations into the active routing table
+                    if let Ok(handle) = result {
+                        subs.insert(*handle, sender);
+                    }
+                    // If it's an Err, `sender` falls out of scope and is dropped.
+                }
                 Ok(true)
             }
             None => Ok(false),
@@ -108,6 +166,7 @@ impl AdsNotificationDispatcher {
     /// Clears all pending and active subscriptions.
     pub fn clear(&self) -> crate::Result<()> {
         self.pending.lock()?.clear();
+        self.pending_batches.lock()?.clear();
         self.subscriptions.lock()?.clear();
         Ok(())
     }

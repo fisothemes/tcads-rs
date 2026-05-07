@@ -142,7 +142,11 @@ pub use ads::{
     AdsSymbolUploadFlags, AdsSymbolUploadInfo, AdsSymbolUploadInfoV1, AdsSymbolUploadInfoV2,
     AdsSymbolUploadInfoV3, AdsTransMode, AdsTypeCategory, AdsTypeFlags, AdsTypeId, AdsTypeInfo,
     AdsTypeInfoIterator, AdsTypeInfoIteratorOwned, DeviceState, Guid, IndexGroup, IndexOffset,
-    InvokeId, LogEntry, LogMessageType, NotificationHandle, WindowsFileTime,
+    InvokeId, LogEntry, LogMessageType, NotificationHandle, SumAddNotificationRequest,
+    SumDeleteNotificationIter, SumDeleteNotificationResponse, SumReadRequest, SumReadResponse,
+    SumReadResponseOwned, SumReadView, SumReadWriteRequest, SumReadWriteRequestOwned,
+    SumReadWriteResponse, SumReadWriteResponseOwned, SumReadWriteView, SumReadWriteViewOwned,
+    SumWriteIter, SumWriteRequest, SumWriteResponse, WindowsFileTime,
 };
 pub use ams::{AmsAddr, AmsCommand, AmsNetId, AmsPort, AmsTcpHeader, RouterState, RuntimeType};
 pub use io::AmsFrame;
