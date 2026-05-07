@@ -12,7 +12,7 @@ pub struct SumAddNotificationRequest {
 
 impl SumAddNotificationRequest {
     /// The fixed byte length of this request (4 + 4 + 16 bytes).
-    pub const LENGTH: usize = 24;
+    pub const LENGTH: usize = 40;
 
     /// Creates a new instance of a [`SumAddNotificationRequest`].
     pub fn new(
