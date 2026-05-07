@@ -233,7 +233,7 @@ impl<'a> SumReadView<'a> {
             let safe_len = valid_len.min(expected_len);
             let chunk = &buffer[data_offset..data_offset + safe_len];
 
-            data_offset += expected_len;
+            data_offset += safe_len;
             current_idx += 1;
 
             match AdsReturnCode::from(err_code) {
