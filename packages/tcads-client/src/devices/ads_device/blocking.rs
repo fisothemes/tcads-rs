@@ -616,6 +616,9 @@ impl AdsDevice {
     }
 
     /// Generates the next invoke ID used for an ADS request.
+    ///
+    /// This method acts as an escape hatch for power users and library authors
+    /// who need to build custom device abstractions
     pub fn next_invoke_id(&self) -> InvokeId {
         self.inner.invoke_id.fetch_add(1, Ordering::Relaxed)
     }

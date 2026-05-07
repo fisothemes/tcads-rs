@@ -13,21 +13,32 @@ use tcads_core::{
     SumReadWriteRequest, SumReadWriteResponse, SumWriteRequest, SumWriteResponse,
 };
 
-/// An ADS device client for executing high-performance batch operations (Sum Commands).
+/// An ADS device client for executing batch operations (Sum Commands).
 ///
-/// Sum Commands allow you to read, write, or subscribe to hundreds of variables
-/// in a single network round-trip, significantly reducing latency overhead.
+/// Sum Commands allow you to handle multiple ADS reads, writes, or subscriptions
+/// in a single network round-trip. This significantly reduces network latency and
+/// protocol overhead compared to sending individual requests.
+///
+/// Under the hood, `SumDevice` shares the same thread-safe, multiplexed TCP connection
+/// as its underlying [`AdsDevice`], but routes traffic through optimized zero-allocation
+/// batch parsers.
 #[derive(Clone)]
 pub struct SumDevice {
     inner: AdsDevice,
 }
 
 impl SumDevice {
+    /// Connects to the local TwinCAT router using the default port.
+    ///
+    /// This is a convenience wrapper around [`AdsDevice::connect`].
     pub fn connect(timeout: impl Into<Option<Duration>>) -> crate::Result<Self> {
         let device = AdsDevice::connect(timeout)?;
         Ok(Self::new(device))
     }
 
+    /// Connects to a specific TwinCAT router address.
+    ///
+    /// This is a convenience wrapper around [`AdsDevice::connect_to`]
     pub fn connect_to(
         addr: impl ToSocketAddrs,
         timeout: impl Into<Option<Duration>>,
@@ -36,6 +47,9 @@ impl SumDevice {
         Ok(Self::new(device))
     }
 
+    /// Connects to a remote TwinCAT router, explicitly defining the local source `AmsAddr`.
+    ///
+    /// This is a convenience wrapper around [`AdsDevice::connect_remote`].
     pub fn connect_remote(
         addr: impl ToSocketAddrs,
         source: AmsAddr,
@@ -45,18 +59,29 @@ impl SumDevice {
         Ok(Self::new(device))
     }
 
+    /// Wraps an existing, connected [`AdsDevice`] with batch-processing capabilities.
     pub fn new(device: AdsDevice) -> Self {
         Self { inner: device }
     }
 
+    /// Gracefully closes the underlying TCP connection and tears down the background routing threads.
     pub fn shutdown(&self) -> crate::Result<()> {
         self.inner.shutdown()
     }
 
+    /// Returns a reference to the underlying standard [`AdsDevice`].
+    ///
+    /// Use this if you need to interleave standard 1-to-1 polling commands alongside
+    /// your batch operations.
     pub fn get_ref(&self) -> &AdsDevice {
         &self.inner
     }
 
+    /// Sends multiple Reads ADS requests to the PLC in a single network transaction.
+    ///
+    /// Returns a [`SumReadResponse`] which lazily parses the network buffer. Iterating over
+    /// the response yields a `Result<&[u8], AdsReturnCode>` for each requested variable,
+    /// guaranteeing zero-copy data extraction and safe alignment even if individual variables fail.
     pub fn read<'a>(
         &self,
         target: AmsAddr,
@@ -84,6 +109,10 @@ impl SumDevice {
         Ok(SumReadResponse::new(resp, requests))
     }
 
+    /// Sends multiple Write ADS requests to the PLC in a single network transaction.
+    ///
+    /// Iterating over the returned [`SumWriteResponse`] yields a `Result<(), AdsReturnCode>`
+    /// for each variable, indicating whether the PLC successfully accepted the write payload.
     pub fn write(
         &self,
         target: AmsAddr,
@@ -119,6 +148,10 @@ impl SumDevice {
         Ok(SumWriteResponse::new(resp).map_err(AdsError::from)?)
     }
 
+    /// Send an ADS read-write request to the PLC in a single network transaction.
+    ///
+    /// This is most commonly used to dynamically resolve multiple symbol names into
+    /// handle integers using Index Group `0xF003`.
     pub fn read_write<'a, 'b>(
         &self,
         target: AmsAddr,
@@ -165,6 +198,17 @@ impl SumDevice {
         Ok(SumReadWriteResponse::new(resp, requests))
     }
 
+    /// Registers a batch of variable notifications with the PLC simultaneously.
+    ///
+    /// This method is highly optimized for concurrency. It synchronizes directly with the
+    /// background network thread to guarantee that no data samples are lost, even if the PLC
+    /// begins streaming data before the response is fully processed.
+    ///
+    /// # Returns
+    ///
+    /// A vector containing a `Result` for every request.
+    /// * **Success:** Yields the assigned `NotificationHandle` and a dedicated `Receiver` channel for that specific variable's data stream.
+    /// * **Failure:** Yields an `AdsReturnCode`. The internal channel is automatically dropped, preventing memory leaks.
     pub fn add_notification(
         &self,
         target: AmsAddr,
@@ -241,6 +285,11 @@ impl SumDevice {
         Ok(final_output)
     }
 
+    /// Deletes a batch of variable notifications from the PLC simultaneously.
+    ///
+    /// This method safely synchronizes with the background network thread. If the PLC
+    /// successfully deletes a handle, the local routing channel is immediately closed,
+    /// allowing any listening threads to safely terminate.
     pub fn delete_notification(
         &self,
         target: AmsAddr,
