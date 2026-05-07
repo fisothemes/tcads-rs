@@ -214,3 +214,50 @@ impl<'a> Iterator for SumAddNotificationIter<'a> {
         value
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::AdsTransMode;
+
+    #[test]
+    fn test_add_notif_request_padding() {
+        let req = SumAddNotificationRequest::new(
+            0xF005,
+            1234,
+            AdsNotificationAttrib::new(4, AdsTransMode::ServerCycle, 0, 100_0000),
+        );
+
+        let bytes = req.to_bytes();
+
+        // CRITICAL: Must be exactly 40 bytes to prevent DeviceInvalidSize
+        assert_eq!(bytes.len(), 40);
+        assert_eq!(SumAddNotificationRequest::LENGTH, 40);
+
+        // Verify the 16 bytes of reserved padding at the end are all zeros
+        for &byte in &bytes[24..40] {
+            assert_eq!(byte, 0, "Reserved padding bytes must be 0");
+        }
+    }
+
+    #[test]
+    fn test_add_notif_response_parsing() {
+        // 8 bytes per item: [Error Code (4)] + [Handle (4)]
+        let buffer = vec![
+            // Item 1: NoError (0), Handle (42)
+            0x00, 0x00, 0x00, 0x00, 0x2A, 0x00, 0x00, 0x00,
+            // Item 2: AdsErrDeviceSymbolNotFound (1808 = 0x0710), Handle (0)
+            0x10, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+
+        let resp = SumAddNotificationResponse::new(buffer).unwrap();
+        let mut iter = resp.iter();
+
+        assert_eq!(iter.next(), Some(Ok(NotificationHandle::from(42))));
+        assert_eq!(
+            iter.next(),
+            Some(Err(AdsReturnCode::AdsErrDeviceSymbolNotFound))
+        );
+        assert_eq!(iter.next(), None);
+    }
+}

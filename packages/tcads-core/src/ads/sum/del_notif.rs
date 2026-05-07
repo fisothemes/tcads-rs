@@ -129,3 +129,28 @@ impl<'a> Iterator for SumDeleteNotificationIter<'a> {
         value
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_del_notif_response_parsing() {
+        // 4 bytes per item: [Error Code (4)]
+        let buffer = vec![
+            // Item 1: NoError (0)
+            0x00, 0x00, 0x00, 0x00, // Item 2: AdsErrDeviceInvalidOffset (1703 = 0x703)
+            0x03, 0x07, 0x00, 0x00,
+        ];
+
+        let resp = SumDeleteNotificationResponse::new(buffer).unwrap();
+        let mut iter = resp.iter();
+
+        assert_eq!(iter.next(), Some(Ok(())));
+        assert_eq!(
+            iter.next(),
+            Some(Err(AdsReturnCode::AdsErrDeviceInvalidOffset))
+        );
+        assert_eq!(iter.next(), None);
+    }
+}

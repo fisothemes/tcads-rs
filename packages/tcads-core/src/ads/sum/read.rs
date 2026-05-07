@@ -243,3 +243,42 @@ impl<'a> SumReadView<'a> {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_read_request_layout() {
+        let req = SumReadRequest::new(0x4020, 0, 4);
+        assert_eq!(req.to_bytes().len(), 12);
+        assert_eq!(SumReadRequest::LENGTH, 12);
+    }
+
+    #[test]
+    fn test_read_response_misalignment_prevention() {
+        let mut buffer = Vec::new();
+        // Item 1 Header: Failed (Error 1795), Returned Length: 0
+        buffer.extend_from_slice(&[0x03, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        // Item 2 Header: Success (0), Returned Length: 4
+        buffer.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00]);
+
+        // Data payload (Only 4 bytes total because Item 1 returned 0 bytes)
+        buffer.extend_from_slice(&[0xAA, 0xBB, 0xCC, 0xDD]);
+
+        let reqs = vec![
+            SumReadRequest::new(0x4020, 0, 4),
+            SumReadRequest::new(0x4020, 4, 4),
+        ];
+
+        let response = SumReadResponse::new(buffer, &reqs);
+        let mut iter = response.iter();
+
+        assert_eq!(
+            iter.next(),
+            Some(Err(AdsReturnCode::AdsErrDeviceInvalidOffset))
+        );
+        assert_eq!(iter.next(), Some(Ok([0xAA, 0xBB, 0xCC, 0xDD].as_slice())));
+        assert_eq!(iter.next(), None);
+    }
+}

@@ -206,3 +206,43 @@ impl<'a> Iterator for SumWriteIter<'a> {
         value
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::AdsReturnCode;
+
+    #[test]
+    fn test_write_request_header() {
+        let data: &[u8] = &[0x01, 0x02, 0x03];
+        let req = SumWriteRequest::new(0x4020, 0, data);
+
+        let header = req.header_to_bytes();
+        assert_eq!(header.len(), 12);
+        assert_eq!(SumWriteRequest::HEADER_LENGTH, 12);
+
+        // Verify data length is encoded correctly at the end of the header
+        let encoded_data_len = u32::from_le_bytes(header[8..12].try_into().unwrap());
+        assert_eq!(encoded_data_len as usize, data.len());
+    }
+
+    #[test]
+    fn test_write_response_parsing() {
+        // 4 bytes per item: [Error Code (4)]
+        let buffer = vec![
+            // Item 1: NoError (0)
+            0x00, 0x00, 0x00, 0x00, // Item 2: AdsErrDeviceInvalidSize (1797 = 0x0705)
+            0x05, 0x07, 0x00, 0x00,
+        ];
+
+        let resp = SumWriteResponse::new(buffer).unwrap();
+        let mut iter = resp.iter();
+
+        assert_eq!(iter.next(), Some(Ok(())));
+        assert_eq!(
+            iter.next(),
+            Some(Err(AdsReturnCode::AdsErrDeviceInvalidSize))
+        );
+        assert_eq!(iter.next(), None);
+    }
+}

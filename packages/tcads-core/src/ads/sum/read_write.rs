@@ -365,3 +365,51 @@ impl<'a> SumReadWriteViewOwned<'a> {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::AdsReturnCode;
+
+    #[test]
+    fn test_read_write_request_header() {
+        let data: &[u8] = b"MAIN.bTest\0";
+        let req = SumReadWriteRequest::new(0xF003, 0, 4, data);
+
+        let header = req.header_to_bytes();
+        assert_eq!(header.len(), 16);
+        assert_eq!(SumReadWriteRequest::HEADER_LENGTH, 16);
+
+        // Verify write length was encoded correctly in the last 4 bytes of the header
+        let encoded_write_len = u32::from_le_bytes(header[12..16].try_into().unwrap());
+        assert_eq!(encoded_write_len as usize, data.len());
+    }
+
+    #[test]
+    fn test_read_write_response_misalignment_prevention() {
+        let mut buffer = Vec::new();
+        // Item 1 Header: AdsErrDeviceSymbolNotFound (1808 = 0x0710), Returned Length: 0
+        buffer.extend_from_slice(&[0x10, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        // Item 2 Header: Success (0), Returned Length: 4
+        buffer.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00]);
+
+        // Data block
+        let handle_bytes = [137, 0, 0, 84];
+        buffer.extend_from_slice(&handle_bytes);
+
+        let reqs = vec![
+            SumReadWriteRequest::new(0xF003, 0, 4, b"BAD\0"),
+            SumReadWriteRequest::new(0xF003, 0, 4, b"GOOD\0"),
+        ];
+
+        let response = SumReadWriteResponse::new(buffer, &reqs);
+        let mut iter = response.iter();
+
+        assert_eq!(
+            iter.next(),
+            Some(Err(AdsReturnCode::AdsErrDeviceSymbolNotFound))
+        );
+        assert_eq!(iter.next(), Some(Ok(handle_bytes.as_slice())));
+        assert_eq!(iter.next(), None);
+    }
+}
