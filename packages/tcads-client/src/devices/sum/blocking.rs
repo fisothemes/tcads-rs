@@ -1,6 +1,6 @@
 use super::{
-    SUM_DELETE_NOTIFICATION_INDEX_GROUP, SUM_READ_EX_INDEX_GROUP, SUM_READ_WRITE_INDEX_GROUP,
-    SUM_WRITE_INDEX_GROUP,
+    SUM_ADD_NOTIFICATION_INDEX_GROUP, SUM_DELETE_NOTIFICATION_INDEX_GROUP, SUM_READ_EX_INDEX_GROUP,
+    SUM_READ_WRITE_INDEX_GROUP, SUM_WRITE_INDEX_GROUP,
 };
 use crate::devices::blocking::AdsDevice;
 use std::net::ToSocketAddrs;
@@ -239,7 +239,7 @@ impl SumDevice {
             target,
             self.inner.source()?,
             invoke_id,
-            super::SUM_ADD_NOTIFICATION_INDEX_GROUP,
+            SUM_ADD_NOTIFICATION_INDEX_GROUP,
             n as u32,
             expected_read_len,
             write_buf,
