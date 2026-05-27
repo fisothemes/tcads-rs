@@ -7,7 +7,9 @@ pub mod write;
 use super::error::SumError;
 use super::{AdsNotificationAttrib, IndexGroup, IndexOffset};
 
-pub use add_notif::SumAddNotificationRequest;
+pub use add_notif::{
+    SumAddNotificationIter, SumAddNotificationRequest, SumAddNotificationResponse,
+};
 pub use del_notif::{SumDeleteNotificationIter, SumDeleteNotificationResponse};
 pub use read::{SumReadRequest, SumReadResponse, SumReadResponseOwned, SumReadView};
 pub use read_write::{
