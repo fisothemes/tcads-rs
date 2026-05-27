@@ -6,11 +6,11 @@ use crate::devices::blocking::AdsDevice;
 use std::net::ToSocketAddrs;
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
-use tcads_core::ads::sum::add_notif::SumAddNotificationResponse;
 use tcads_core::{
     AdsError, AdsNotificationSampleOwned, AdsReturnCode, AmsAddr, IndexOffset, NotificationHandle,
-    SumAddNotificationRequest, SumDeleteNotificationResponse, SumReadRequest, SumReadResponse,
-    SumReadWriteRequest, SumReadWriteResponse, SumWriteRequest, SumWriteResponse,
+    SumAddNotificationRequest, SumAddNotificationResponse, SumDeleteNotificationResponse,
+    SumReadRequest, SumReadResponse, SumReadWriteRequest, SumReadWriteResponse, SumWriteRequest,
+    SumWriteResponse,
 };
 
 /// An ADS device client for executing batch operations (Sum Commands).
