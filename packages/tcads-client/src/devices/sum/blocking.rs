@@ -3,6 +3,7 @@ use super::{
     SUM_READ_WRITE_INDEX_GROUP, SUM_WRITE_INDEX_GROUP,
 };
 use crate::devices::blocking::AdsDevice;
+use crate::tasks::blocking::AmsRequestDispatchKey;
 use std::net::ToSocketAddrs;
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
@@ -246,10 +247,11 @@ impl SumDevice {
         )
         .into_frame();
 
-        let rx = self.inner.inner().ams_requests.dispatch(
-            crate::tasks::blocking::AmsRequestDispatchKey::AdsCommand(invoke_id),
-            frame,
-        )?;
+        let rx = self
+            .inner
+            .inner()
+            .ams_requests
+            .dispatch(AmsRequestDispatchKey::AdsCommand(invoke_id), frame)?;
 
         let response_frame = match self.inner.inner().timeout {
             Some(duration) => rx
