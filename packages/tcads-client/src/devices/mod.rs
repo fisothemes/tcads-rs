@@ -25,4 +25,10 @@ pub mod tokio {
         SYMBOL_UPLOAD_INFO_INDEX_GROUP, tokio::DataTypeDevice,
     };
     pub use super::logger::tokio::{LogEntryReceiver, Logger};
+    pub use super::sum::tokio::SumDevice;
+    pub use super::sum::{
+        SUM_ADD_NOTIFICATION_INDEX_GROUP, SUM_DELETE_NOTIFICATION_INDEX_GROUP,
+        SUM_READ_EX_2_INDEX_GROUP, SUM_READ_EX_INDEX_GROUP, SUM_READ_INDEX_GROUP,
+        SUM_READ_WRITE_INDEX_GROUP, SUM_WRITE_INDEX_GROUP,
+    };
 }
