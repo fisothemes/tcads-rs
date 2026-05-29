@@ -21,7 +21,9 @@ pub use device_version::AdsDeviceVersion;
 pub use error::{
     AdsCommandError, AdsDeviceVersionError, AdsError, AdsHeaderError, AdsNotificationAttribError,
     AdsNotificationHandleError, AdsReturnCodeError, AdsStateError, AdsStringError,
-    AdsTransModeError, LogEntryError, LogMessageTypeError, StateFlagError, WindowsFileTimeError,
+    AdsSymbolInfoError, AdsSymbolUploadInfoError, AdsTransModeError, AdsTypeInfoError,
+    GuidParseError, LogEntryError, LogMessageTypeError, StateFlagError, SumError,
+    WindowsFileTimeError,
 };
 pub use filetime::WindowsFileTime;
 pub use header::AdsHeader;

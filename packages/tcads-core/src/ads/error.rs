@@ -47,6 +47,9 @@ pub enum AdsError {
     /// Invalid ADS type info format or content.
     #[error("Invalid ADS type info: {0}")]
     InvalidAdsTypeInfo(#[from] AdsTypeInfoError),
+    /// Invalid ADS symbol info format or content.
+    #[error("Invalid ADS symbol info: {0}")]
+    InvalidAdsSymbolInfo(#[from] AdsSymbolInfoError),
     /// Invalid ADS data type format or content.
     #[error("Invalid GUID: {0}")]
     InvalidGuid(#[from] GuidParseError),
@@ -173,6 +176,21 @@ pub enum AdsTypeInfoError {
     EntryLengthMismatch { expected: usize, got: usize },
     #[error("Invalid UTF-8 in field '{field}'")]
     InvalidUtf8 { field: &'static str },
+    #[error("Invalid GUID: {0}")]
+    InvalidGuid(#[from] GuidParseError),
+}
+
+/// Error returned when parsing an [`AdsSymbolInfo`](super::AdsSymbolInfo) entry fails.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum AdsSymbolInfoError {
+    #[error("Unexpected length: expected {expected} bytes, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
+    #[error("Buffer too short. Expected at least {expected} bytes, got {got}")]
+    TooShort { expected: usize, got: usize },
+    #[error(
+        "Entry length mismatch. Header specified {expected} bytes, but only {got} were available"
+    )]
+    EntryLengthMismatch { expected: usize, got: usize },
     #[error("Invalid GUID: {0}")]
     InvalidGuid(#[from] GuidParseError),
 }
