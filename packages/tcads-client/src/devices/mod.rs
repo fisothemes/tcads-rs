@@ -2,6 +2,7 @@ pub mod ads_device;
 pub mod data_type;
 pub mod logger;
 pub mod sum;
+pub mod symbol_info;
 
 pub mod blocking {
     pub use super::ads_device::blocking::AdsDevice;
@@ -15,6 +16,10 @@ pub mod blocking {
         SUM_ADD_NOTIFICATION_INDEX_GROUP, SUM_DELETE_NOTIFICATION_INDEX_GROUP,
         SUM_READ_EX_2_INDEX_GROUP, SUM_READ_EX_INDEX_GROUP, SUM_READ_INDEX_GROUP,
         SUM_READ_WRITE_INDEX_GROUP, SUM_WRITE_INDEX_GROUP,
+    };
+    pub use super::symbol_info::{
+        SYMBOL_INFO_BY_NAME_EX_INDEX_GROUP, SYMBOL_INFO_UPLOAD_INDEX_GROUP,
+        blocking::SymbolInfoDevice,
     };
 }
 
@@ -30,5 +35,8 @@ pub mod tokio {
         SUM_ADD_NOTIFICATION_INDEX_GROUP, SUM_DELETE_NOTIFICATION_INDEX_GROUP,
         SUM_READ_EX_2_INDEX_GROUP, SUM_READ_EX_INDEX_GROUP, SUM_READ_INDEX_GROUP,
         SUM_READ_WRITE_INDEX_GROUP, SUM_WRITE_INDEX_GROUP,
+    };
+    pub use super::symbol_info::{
+        SYMBOL_INFO_BY_NAME_EX_INDEX_GROUP, SYMBOL_INFO_UPLOAD_INDEX_GROUP,
     };
 }
