@@ -11,7 +11,8 @@ bitflags! {
     /// |--------|------|---------|------------------|
     /// | 0      | 2    | `flags` | Bitmask (LE u16) |
     #[derive(
-        serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
+        serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord,
+        Hash, Default,
     )]
     #[repr(transparent)]
     pub struct AdsSymbolFlags: u16 {
@@ -194,7 +195,8 @@ bitflags! {
     /// |--------|------|---------|------------------|
     /// | 0      | 4    | `flags` | Bitmask (LE u32) |
     #[derive(
-        serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
+        serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord,
+        Hash, Default,
     )]
     #[repr(transparent)]
     pub struct AdsSymbol2Flags: u32 {

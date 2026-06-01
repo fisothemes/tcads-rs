@@ -44,9 +44,10 @@ pub use sum::{
 pub use symbol::{
     AdsArrayInfo, AdsAttribute, AdsEnumInfo, AdsFieldInfo, AdsMethodFlags, AdsMethodInfo,
     AdsMethodParamFlags, AdsMethodParamInfo, AdsMethodReturnTypeInfo, AdsRefactorInfo,
-    AdsSymbol2Flags, AdsSymbolFlags, AdsSymbolUploadFlags, AdsSymbolUploadInfo,
-    AdsSymbolUploadInfoV1, AdsSymbolUploadInfoV2, AdsSymbolUploadInfoV3, AdsTypeCategory,
-    AdsTypeFlags, AdsTypeId, AdsTypeInfo, AdsTypeInfoIterator, AdsTypeInfoIteratorOwned, Guid,
+    AdsSymbol2Flags, AdsSymbolFlags, AdsSymbolInfo, AdsSymbolInfoIterator,
+    AdsSymbolInfoIteratorOwned, AdsSymbolUploadFlags, AdsSymbolUploadInfo, AdsSymbolUploadInfoV1,
+    AdsSymbolUploadInfoV2, AdsSymbolUploadInfoV3, AdsTypeCategory, AdsTypeFlags, AdsTypeId,
+    AdsTypeInfo, AdsTypeInfoIterator, AdsTypeInfoIteratorOwned, Guid,
 };
 pub use trans_mode::AdsTransMode;
 

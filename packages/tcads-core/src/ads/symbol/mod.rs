@@ -6,6 +6,7 @@ pub mod guid;
 pub mod method_info;
 pub mod refactor_info;
 pub mod symbol_flags;
+pub mod symbol_info;
 pub mod type_category;
 pub mod type_flags;
 pub mod type_id;
@@ -24,6 +25,7 @@ pub use method_info::{
 };
 pub use refactor_info::AdsRefactorInfo;
 pub use symbol_flags::{AdsSymbol2Flags, AdsSymbolFlags};
+pub use symbol_info::{AdsSymbolInfo, AdsSymbolInfoIterator, AdsSymbolInfoIteratorOwned};
 pub use type_category::AdsTypeCategory;
 pub use type_flags::AdsTypeFlags;
 pub use type_id::AdsTypeId;
