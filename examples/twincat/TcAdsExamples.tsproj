@@ -9,8 +9,8 @@
 			</Tasks>
 		</System>
 		<Plc>
-			<Project GUID="{A30889D2-7BD9-4264-BDCD-37B03F63F7C4}" Name="TcAdsExamplesPlcRt" PrjFilePath="TcAdsExamplesPlcRt\TcAdsExamplesPlcRt.plcproj" TmcFilePath="TcAdsExamplesPlcRt\TcAdsExamplesPlcRt.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="TcAdsExamplesPlcRt\TcAdsExamplesPlcRt.tmc" TmcHash="{33A0786C-81E7-8F03-5544-C7AA94000418}">
+			<Project GUID="{A30889D2-7BD9-4264-BDCD-37B03F63F7C4}" Name="TcAdsExamplesPlcRt" PrjFilePath="TcAdsExamplesPlcRt\TcAdsExamplesPlcRt.plcproj" TmcFilePath="TcAdsExamplesPlcRt\TcAdsExamplesPlcRt.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" CopyTmcToTarget="true" SymbolicMapping="true">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="TcAdsExamplesPlcRt\TcAdsExamplesPlcRt.tmc" TmcHash="{C059A2AB-3240-90D4-BF96-A021A74F1672}">
 					<Name>TcAdsExamplesPlcRt Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Contexts>
