@@ -37,6 +37,6 @@ pub mod tokio {
         SUM_READ_WRITE_INDEX_GROUP, SUM_WRITE_INDEX_GROUP,
     };
     pub use super::symbol_info::{
-        SYMBOL_INFO_BY_NAME_EX_INDEX_GROUP, SYMBOL_INFO_UPLOAD_INDEX_GROUP,
+        SYMBOL_INFO_BY_NAME_EX_INDEX_GROUP, SYMBOL_INFO_UPLOAD_INDEX_GROUP, tokio::SymbolInfoDevice,
     };
 }
