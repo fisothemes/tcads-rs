@@ -25,13 +25,26 @@ impl AmsAddr {
         }
     }
 
+    /// Creates a new AMS address.
+    pub const fn new_const(net_id: AmsNetId, port: AmsPort) -> Self {
+        Self { net_id, port }
+    }
+
+    /// Creates a new AMS address representing the local machine (e.g. `127.0.0.1.1.1:851`).
+    pub fn from_local(port: impl Into<AmsPort>) -> Self {
+        Self {
+            net_id: AmsNetId::local(),
+            port: port.into(),
+        }
+    }
+
     /// Returns the AMS Net ID.
-    pub fn net_id(&self) -> AmsNetId {
+    pub const fn net_id(&self) -> AmsNetId {
         self.net_id
     }
 
     /// Returns the AMS port number.
-    pub fn port(&self) -> AmsPort {
+    pub const fn port(&self) -> AmsPort {
         self.port
     }
 

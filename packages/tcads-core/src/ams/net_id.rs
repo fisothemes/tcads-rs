@@ -20,6 +20,11 @@ impl AmsNetId {
         Self([oct1, oct2, oct3, oct4, oct5, oct6])
     }
 
+    /// Creates a new AmsNetId representing the local machine (`127.0.0.1.1.1`)
+    pub const fn local() -> Self {
+        Self([127, 0, 0, 1, 1, 1])
+    }
+
     /// Converts the current instance into a byte slice.
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
