@@ -10,7 +10,7 @@
 //! activate the configuration on your local machine, and put the PLC into RUN mode.
 
 use std::time::Duration;
-use tcads::client::devices::blocking::DataTypeDevice;
+use tcads::client::devices::blocking::TypeInfoDevice;
 use tcads::core::AdsTypeCategory;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -18,7 +18,7 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 fn main() -> Result<()> {
     println!("Connecting to the PLC runtime...");
     // 1. Establish a connection a PLC runtime (Port 851 and local AMS router)
-    let device = DataTypeDevice::connect(851, Duration::from_secs(5))?;
+    let device = TypeInfoDevice::connect(851, Duration::from_secs(5))?;
 
     // 2. Retrieve Architectural Metadata
     // We need the platform pointer size (4 or 8 bytes) to accurately
@@ -37,7 +37,7 @@ fn main() -> Result<()> {
     // 3. Targeted Type Lookup
     // Demonstrates fetching the blueprint of a specific type by its name.
     let lookup_type_name = "ST_LibVersion";
-    if let Ok(dt_info) = device.get_data_type_info(lookup_type_name) {
+    if let Ok(dt_info) = device.get_type_info(lookup_type_name) {
         println!("Targeted Lookup [{lookup_type_name}]:");
         println!("  Size:    {} bytes", dt_info.size());
         println!("  Fields:  {}", dt_info.field_infos().len());
@@ -54,7 +54,7 @@ fn main() -> Result<()> {
     println!("{:-<20}-+-{:-<35}-+-{:-<6}-+-{:-<6}", "", "", "", "");
 
     device
-        .get_all_data_type_info()?
+        .get_all_type_infos()?
         .filter_map(|res| res.ok()) // Skip any corrupted entries
         .filter(|info| !(AdsTypeCategory::is_primitive(info) | AdsTypeCategory::is_alias(info))) // Skip all primitives and aliases
         .for_each(|info| {

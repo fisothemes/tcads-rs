@@ -1,15 +1,11 @@
 pub mod ads_device;
-pub mod data_type;
 pub mod logger;
 pub mod sum;
 pub mod symbol_info;
+pub mod type_info;
 
 pub mod blocking {
     pub use super::ads_device::blocking::AdsDevice;
-    pub use super::data_type::{
-        DATATYPE_INFO_BY_NAME_INDEX_GROUP, DATATYPE_UPLOAD_INDEX_GROUP,
-        SYMBOL_UPLOAD_INFO_INDEX_GROUP, blocking::DataTypeDevice,
-    };
     pub use super::logger::blocking::{LogEntryReceiver, Logger};
     pub use super::sum::blocking::SumDevice;
     pub use super::sum::{
@@ -21,14 +17,14 @@ pub mod blocking {
         SYMBOL_INFO_BY_NAME_EX_INDEX_GROUP, SYMBOL_INFO_UPLOAD_INDEX_GROUP,
         blocking::SymbolInfoDevice,
     };
+    pub use super::type_info::{
+        DATATYPE_INFO_BY_NAME_INDEX_GROUP, DATATYPE_UPLOAD_INDEX_GROUP,
+        SYMBOL_UPLOAD_INFO_INDEX_GROUP, blocking::TypeInfoDevice,
+    };
 }
 
 pub mod tokio {
     pub use super::ads_device::tokio::AdsDevice;
-    pub use super::data_type::{
-        DATATYPE_INFO_BY_NAME_INDEX_GROUP, DATATYPE_UPLOAD_INDEX_GROUP,
-        SYMBOL_UPLOAD_INFO_INDEX_GROUP, tokio::DataTypeDevice,
-    };
     pub use super::logger::tokio::{LogEntryReceiver, Logger};
     pub use super::sum::tokio::SumDevice;
     pub use super::sum::{
@@ -38,5 +34,9 @@ pub mod tokio {
     };
     pub use super::symbol_info::{
         SYMBOL_INFO_BY_NAME_EX_INDEX_GROUP, SYMBOL_INFO_UPLOAD_INDEX_GROUP, tokio::SymbolInfoDevice,
+    };
+    pub use super::type_info::{
+        DATATYPE_INFO_BY_NAME_INDEX_GROUP, DATATYPE_UPLOAD_INDEX_GROUP,
+        SYMBOL_UPLOAD_INFO_INDEX_GROUP, tokio::TypeDevice,
     };
 }
