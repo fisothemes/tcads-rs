@@ -4,11 +4,9 @@ pub enum AmsError {
     /// Invalid AMS/TCP header
     #[error("Invalid AMS/TCP header: {0}")]
     InvalidAmsTcpHeader(#[from] AmsTcpHeaderError),
-
     /// Invalid AmsAddr format or content
     #[error("Invalid AMS address: {0}")]
     InvalidAddr(#[from] AddrError),
-
     /// Invalid NetId format or content
     #[error("Invalid Net ID: {0}")]
     InvalidNetId(#[from] NetIdError),

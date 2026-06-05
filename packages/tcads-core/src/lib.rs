@@ -150,6 +150,8 @@ pub use ads::{
     SumReadWriteResponse, SumReadWriteResponseOwned, SumReadWriteView, SumReadWriteViewOwned,
     SumWriteIter, SumWriteRequest, SumWriteResponse, WindowsFileTime,
 };
-pub use ams::{AmsAddr, AmsCommand, AmsNetId, AmsPort, AmsTcpHeader, RouterState, RuntimeType};
+pub use ams::{
+    AmsAddr, AmsCommand, AmsError, AmsNetId, AmsPort, AmsTcpHeader, RouterState, RuntimeType,
+};
 pub use io::AmsFrame;
-pub use protocol::AdsNotificationSampleOwned;
+pub use protocol::{AdsNotificationSampleOwned, ProtocolError};
