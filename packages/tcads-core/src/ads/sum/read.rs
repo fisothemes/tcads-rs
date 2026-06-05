@@ -205,6 +205,7 @@ impl<'a> SumReadView<'a> {
     }
 
     /// Takes the view by value and returns an iterator yielding zero-copy slices.
+    #[allow(clippy::should_implement_trait)]
     pub fn into_iter(self) -> impl Iterator<Item = Result<&'a [u8], AdsReturnCode>> {
         let n = self.requests.len();
         let mut current_idx = 0;

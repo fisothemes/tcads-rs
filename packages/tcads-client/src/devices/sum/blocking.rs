@@ -210,6 +210,7 @@ impl SumDevice {
     /// A vector containing a `Result` for every request.
     /// * **Success:** Yields the assigned `NotificationHandle` and a dedicated `Receiver` channel for that specific variable's data stream.
     /// * **Failure:** Yields an `AdsReturnCode`. The internal channel is automatically dropped, preventing memory leaks.
+    #[allow(clippy::type_complexity)]
     pub fn add_notification(
         &self,
         target: AmsAddr,
@@ -280,7 +281,7 @@ impl SumDevice {
 
         let final_output = receivers
             .into_iter()
-            .zip(parsed_results.into_iter())
+            .zip(parsed_results)
             .map(|(rx, res)| res.map(|handle| (handle, rx)))
             .collect();
 

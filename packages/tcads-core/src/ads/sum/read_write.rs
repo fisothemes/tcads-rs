@@ -269,6 +269,7 @@ impl<'a, 'b> SumReadWriteView<'a, 'b> {
 
     /// Takes the view by value and lazily parses the network buffer,
     /// yielding the error code and a zero-copy slice of the read data.
+    #[allow(clippy::should_implement_trait)]
     pub fn into_iter(self) -> impl Iterator<Item = Result<&'a [u8], AdsReturnCode>> {
         let n = self.requests.len();
         let mut current_idx = 0;
@@ -325,6 +326,7 @@ impl<'a> SumReadWriteViewOwned<'a> {
 
     /// Takes the view by value and lazily parses the network buffer,
     /// yielding the error code and a zero-copy slice of the read data.
+    #[allow(clippy::should_implement_trait)]
     pub fn into_iter(self) -> impl Iterator<Item = Result<&'a [u8], AdsReturnCode>> {
         let n = self.requests.len();
         let mut current_idx = 0;

@@ -193,13 +193,13 @@ impl AdsSymbolInfo {
             extended_flags = Some(ext);
             pos += 4;
 
-            if ext.has_refactor_info() && pos < entry_length {
-                if let Ok((infos, consumed)) =
+            if ext.has_refactor_info()
+                && pos < entry_length
+                && let Ok((infos, consumed)) =
                     AdsRefactorInfo::parse_chain(&entry[pos..entry_length])
-                {
-                    refactor_infos = infos;
-                    pos += consumed;
-                }
+            {
+                refactor_infos = infos;
+                pos += consumed;
             }
         }
 
@@ -289,7 +289,7 @@ impl<'a> Iterator for AdsSymbolInfoIterator<'a> {
     type Item = Result<AdsSymbolInfo, AdsSymbolInfoError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        utils::parse_next_entry(&self.data, &mut self.cursor)
+        utils::parse_next_entry(self.data, &mut self.cursor)
     }
 }
 
