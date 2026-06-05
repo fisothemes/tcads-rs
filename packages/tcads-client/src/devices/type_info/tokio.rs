@@ -129,7 +129,7 @@ impl TypeDevice {
     /// happens synchronously and lazily as you consume the returned iterator.
     pub async fn get_all_type_infos(
         &self,
-    ) -> crate::Result<impl Iterator<Item = Result<AdsTypeInfo, AdsTypeInfoError>>> {
+    ) -> crate::Result<impl Iterator<Item = crate::Result<AdsTypeInfo>>> {
         let size = self
             .get_upload_info()
             .await?
@@ -141,7 +141,8 @@ impl TypeDevice {
             .read(self.target, DATATYPE_UPLOAD_INDEX_GROUP, 0, size)
             .await?;
 
-        Ok(AdsTypeInfoIteratorOwned::new(raw_blob))
+        Ok(AdsTypeInfoIteratorOwned::new(raw_blob)
+            .map(|res| res.map_err(|e| crate::Error::from(AdsError::from(e)))))
     }
 
     /// Fetches and caches the symbol upload metadata from the PLC.

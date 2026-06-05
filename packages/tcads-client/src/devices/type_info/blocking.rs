@@ -6,7 +6,7 @@ use std::net::ToSocketAddrs;
 use std::time::Duration;
 use tcads_core::{
     AdsError, AdsSymbolUploadInfo, AdsSymbolUploadInfoV3, AdsTypeInfo, AdsTypeInfoIteratorOwned,
-    AmsAddr, AmsPort, SumReadWriteRequest, SumReadWriteRequestOwned,
+    AmsAddr, AmsPort, SumReadWriteRequest,
 };
 
 /// An ADS device client for fetching data type info from a PLC runtime.
