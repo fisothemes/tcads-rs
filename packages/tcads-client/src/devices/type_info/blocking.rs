@@ -1,13 +1,12 @@
 use super::{
     DATATYPE_INFO_BY_NAME_INDEX_GROUP, DATATYPE_UPLOAD_INDEX_GROUP, SYMBOL_UPLOAD_INFO_INDEX_GROUP,
 };
-use crate::devices::blocking::AdsDevice;
+use crate::devices::blocking::{AdsDevice, SumDevice};
 use std::net::ToSocketAddrs;
 use std::time::Duration;
-use tcads_core::ads::error::AdsTypeInfoError;
 use tcads_core::{
     AdsError, AdsSymbolUploadInfo, AdsSymbolUploadInfoV3, AdsTypeInfo, AdsTypeInfoIteratorOwned,
-    AmsAddr, AmsPort,
+    AmsAddr, AmsPort, SumReadWriteRequest, SumReadWriteRequestOwned,
 };
 
 /// An ADS device client for fetching data type info from a PLC runtime.
@@ -94,7 +93,7 @@ impl TypeInfoDevice {
         &self.device
     }
 
-    /// Fetches the data type information for a specific symbol name.
+    /// Fetches the TwinCAT type information for a specific type by name.
     pub fn get_type_info(&self, name: impl AsRef<str>) -> crate::Result<AdsTypeInfo> {
         let name = name.as_ref();
         let length_bytes =
@@ -118,13 +117,47 @@ impl TypeInfoDevice {
         Ok(AdsTypeInfo::try_from(bytes.as_ref()).map_err(AdsError::from)?)
     }
 
-    /// Fetches all data types from the PLC and returns a lazy iterator.
+    pub fn get_multi_type_infos<S: AsRef<str>>(
+        &self,
+        names: &[S],
+    ) -> crate::Result<impl Iterator<Item = crate::Result<AdsTypeInfo>>> {
+        let sum_device = SumDevice::new(self.device.clone());
+        let expected_read_len = 65_536;
+
+        let reqs: Vec<_> = names
+            .iter()
+            .map(|name| {
+                SumReadWriteRequest::new(
+                    DATATYPE_INFO_BY_NAME_INDEX_GROUP,
+                    0,
+                    expected_read_len,
+                    name.as_ref().as_bytes(),
+                )
+            })
+            .collect();
+
+        let resp = sum_device.read_write(self.target, &reqs)?;
+
+        let iter =
+            resp.iter()
+                .map(|res| match res {
+                    Ok(bytes) => AdsTypeInfo::try_from(bytes)
+                        .map_err(|e| crate::Error::from(AdsError::from(e))),
+                    Err(e) => Err(crate::Error::from(e)),
+                })
+                .collect::<Vec<_>>()
+                .into_iter();
+
+        Ok(iter)
+    }
+
+    /// Fetches all TwinCAT type information from the PLC and returns a lazy iterator.
     ///
     /// The network request is made immediately, but the parsing happens lazily
     /// as you consume the iterator.
     pub fn get_all_type_infos(
         &self,
-    ) -> crate::Result<impl Iterator<Item = Result<AdsTypeInfo, AdsTypeInfoError>>> {
+    ) -> crate::Result<impl Iterator<Item = crate::Result<AdsTypeInfo>>> {
         // There is no data type blob size for V1, so we just use a huge number.
         // This is safe because we know the size of the upload info is 8 bytes
         // and the data type blob size is 4 bytes
@@ -137,7 +170,8 @@ impl TypeInfoDevice {
             .device
             .read(self.target, DATATYPE_UPLOAD_INDEX_GROUP, 0, size)?;
 
-        Ok(AdsTypeInfoIteratorOwned::new(raw_blob))
+        Ok(AdsTypeInfoIteratorOwned::new(raw_blob)
+            .map(|res| res.map_err(|e| crate::Error::from(AdsError::from(e)))))
     }
 
     /// Fetches and caches the symbol upload metadata from the PLC.
