@@ -1,6 +1,7 @@
 use std::io;
 use std::sync::mpsc::{RecvError, RecvTimeoutError, SendError};
 use std::sync::{Arc, PoisonError};
+use tcads_core::ads::{AdsSymbolInfoError, AdsTypeInfoError};
 use tcads_core::ams::{AddrError, NetIdError};
 use tcads_core::{AdsError, AdsReturnCode, AmsError, ProtocolError};
 use tokio::sync::mpsc::error::SendError as TokioSendError;
@@ -21,6 +22,10 @@ pub enum Error {
     NetIdError(#[from] NetIdError),
     #[error(transparent)]
     AmsAddrError(#[from] AddrError),
+    #[error(transparent)]
+    AdsTypeInfoError(#[from] AdsTypeInfoError),
+    #[error(transparent)]
+    AdsSymbolInfoError(#[from] AdsSymbolInfoError),
     #[error("Disconnected")]
     Disconnected,
     #[error("Timed out")]
