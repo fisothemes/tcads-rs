@@ -13,7 +13,7 @@ pub use add_notif::{
 pub use del_notif::{SumDeleteNotificationIter, SumDeleteNotificationResponse};
 pub use read::{SumReadRequest, SumReadResponse, SumReadResponseOwned, SumReadView};
 pub use read_write::{
-    SumReadWriteRequest, SumReadWriteRequestOwned, SumReadWriteResponse, SumReadWriteResponseOwned,
-    SumReadWriteView, SumReadWriteViewOwned,
+    SumReadWriteRequest, SumReadWriteRequestOwned, SumReadWriteResponse, SumReadWriteResponseIter,
+    SumReadWriteResponseOwned,
 };
 pub use write::{SumWriteIter, SumWriteRequest, SumWriteResponse};

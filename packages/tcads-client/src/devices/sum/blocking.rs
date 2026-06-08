@@ -10,8 +10,8 @@ use std::time::Duration;
 use tcads_core::{
     AdsError, AdsNotificationSampleOwned, AdsReturnCode, AmsAddr, IndexOffset, NotificationHandle,
     SumAddNotificationRequest, SumAddNotificationResponse, SumDeleteNotificationResponse,
-    SumReadRequest, SumReadResponse, SumReadWriteRequest, SumReadWriteResponse, SumWriteRequest,
-    SumWriteResponse,
+    SumReadRequest, SumReadResponse, SumReadWriteRequest, SumReadWriteResponseOwned,
+    SumWriteRequest, SumWriteResponse,
 };
 
 /// An ADS device client for executing batch operations (Sum Commands).
@@ -153,14 +153,14 @@ impl SumDevice {
     ///
     /// This is most commonly used to dynamically resolve multiple symbol names into
     /// handle integers using Index Group `0xF003`.
-    pub fn read_write<'a, 'b>(
+    pub fn read_write(
         &self,
         target: AmsAddr,
-        requests: &'a [SumReadWriteRequest<'b>],
-    ) -> crate::Result<SumReadWriteResponse<'a, 'b>> {
+        requests: &[SumReadWriteRequest<'_>],
+    ) -> crate::Result<SumReadWriteResponseOwned> {
         let n = requests.len();
         if n == 0 {
-            return Ok(SumReadWriteResponse::new(vec![], requests));
+            return Ok(SumReadWriteResponseOwned::new(vec![], requests));
         }
 
         let total_header_len = n * SumReadWriteRequest::HEADER_LENGTH;
@@ -196,7 +196,7 @@ impl SumDevice {
             return Err(crate::Error::InvalidPayload);
         }
 
-        Ok(SumReadWriteResponse::new(resp, requests))
+        Ok(SumReadWriteResponseOwned::new(resp, requests))
     }
 
     /// Registers a batch of variable notifications with the PLC simultaneously.

@@ -96,59 +96,48 @@ impl TypeInfoDevice {
     /// Fetches the TwinCAT type information for a specific type by name.
     pub fn get_type_info(&self, name: impl AsRef<str>) -> crate::Result<AdsTypeInfo> {
         let name = name.as_ref();
-        let length_bytes =
-            self.device
-                .read_write(self.target, DATATYPE_INFO_BY_NAME_INDEX_GROUP, 0, 4, name)?;
-
-        let entry_length = u32::from_le_bytes(
-            length_bytes
-                .try_into()
-                .map_err(|_| crate::Error::InvalidPayload)?,
-        );
 
         let bytes = self.device.read_write(
             self.target,
             DATATYPE_INFO_BY_NAME_INDEX_GROUP,
             0,
-            entry_length,
+            1_048_576, // assumed max size of a single entry, router will return the actual size
             name,
         )?;
 
-        Ok(AdsTypeInfo::try_from(bytes.as_ref()).map_err(AdsError::from)?)
+        Ok(AdsTypeInfo::try_from(bytes.as_ref())?)
     }
 
+    /// Fetches multiple TwinCAT data type information by name.
     pub fn get_multi_type_infos<S: AsRef<str>>(
         &self,
-        names: &[S],
+        names: impl AsRef<[S]>,
     ) -> crate::Result<impl Iterator<Item = crate::Result<AdsTypeInfo>>> {
         let sum_device = SumDevice::new(self.device.clone());
-        let expected_read_len = 65_536;
 
         let reqs: Vec<_> = names
+            .as_ref()
             .iter()
             .map(|name| {
                 SumReadWriteRequest::new(
                     DATATYPE_INFO_BY_NAME_INDEX_GROUP,
                     0,
-                    expected_read_len,
+                    1_048_576, // assumed max size of a single entry, router will return the actual size
                     name.as_ref().as_bytes(),
                 )
             })
             .collect();
 
-        let resp = sum_device.read_write(self.target, &reqs)?;
+        let results: Vec<crate::Result<AdsTypeInfo>> = sum_device
+            .read_write(self.target, &reqs)?
+            .iter()
+            .map(|res| match res {
+                Ok(chunk) => AdsTypeInfo::try_from(chunk).map_err(crate::Error::from),
+                Err(err) => Err(crate::Error::from(err)),
+            })
+            .collect();
 
-        let iter =
-            resp.iter()
-                .map(|res| match res {
-                    Ok(bytes) => AdsTypeInfo::try_from(bytes)
-                        .map_err(|e| crate::Error::from(AdsError::from(e))),
-                    Err(e) => Err(crate::Error::from(e)),
-                })
-                .collect::<Vec<_>>()
-                .into_iter();
-
-        Ok(iter)
+        Ok(results.into_iter())
     }
 
     /// Fetches all TwinCAT type information from the PLC and returns a lazy iterator.
@@ -164,14 +153,13 @@ impl TypeInfoDevice {
         let size = self
             .get_upload_info()?
             .data_type_blob_size()
-            .unwrap_or(1_048_576);
+            .unwrap_or(1_048_576 * 4);
 
         let raw_blob = self
             .device
             .read(self.target, DATATYPE_UPLOAD_INDEX_GROUP, 0, size)?;
 
-        Ok(AdsTypeInfoIteratorOwned::new(raw_blob)
-            .map(|res| res.map_err(|e| crate::Error::from(AdsError::from(e)))))
+        Ok(AdsTypeInfoIteratorOwned::new(raw_blob).map(|res| res.map_err(crate::Error::from)))
     }
 
     /// Fetches and caches the symbol upload metadata from the PLC.

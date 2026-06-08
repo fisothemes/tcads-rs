@@ -38,8 +38,8 @@ pub use sum::{
     SumAddNotificationIter, SumAddNotificationRequest, SumAddNotificationResponse,
     SumDeleteNotificationIter, SumDeleteNotificationResponse, SumReadRequest, SumReadResponse,
     SumReadResponseOwned, SumReadView, SumReadWriteRequest, SumReadWriteRequestOwned,
-    SumReadWriteResponse, SumReadWriteResponseOwned, SumReadWriteView, SumReadWriteViewOwned,
-    SumWriteIter, SumWriteRequest, SumWriteResponse,
+    SumReadWriteResponse, SumReadWriteResponseIter, SumReadWriteResponseOwned, SumWriteIter,
+    SumWriteRequest, SumWriteResponse,
 };
 pub use symbol::{
     AdsArrayInfo, AdsAttribute, AdsEnumInfo, AdsFieldInfo, AdsMethodFlags, AdsMethodInfo,

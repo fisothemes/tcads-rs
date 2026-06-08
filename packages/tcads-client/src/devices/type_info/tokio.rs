@@ -1,13 +1,12 @@
 use super::{
     DATATYPE_INFO_BY_NAME_INDEX_GROUP, DATATYPE_UPLOAD_INDEX_GROUP, SYMBOL_UPLOAD_INFO_INDEX_GROUP,
 };
-use crate::devices::tokio::AdsDevice;
+use crate::devices::tokio::{AdsDevice, SumDevice};
 use std::net::ToSocketAddrs;
 use std::time::Duration;
-use tcads_core::ads::error::AdsTypeInfoError;
 use tcads_core::{
     AdsError, AdsSymbolUploadInfo, AdsSymbolUploadInfoV3, AdsTypeInfo, AdsTypeInfoIteratorOwned,
-    AmsAddr, AmsPort,
+    AmsAddr, AmsPort, SumReadWriteRequest,
 };
 
 /// An async (Tokio) ADS device client for fetching data type info from a PLC runtime.
@@ -120,7 +119,40 @@ impl TypeDevice {
             )
             .await?;
 
-        Ok(AdsTypeInfo::try_from(bytes.as_ref()).map_err(AdsError::from)?)
+        Ok(AdsTypeInfo::try_from(bytes.as_ref())?)
+    }
+
+    /// Fetches multiple TwinCAT data type information by name.
+    pub async fn get_multi_type_infos<S: AsRef<str>>(
+        &self,
+        names: impl AsRef<[S]>,
+    ) -> crate::Result<impl Iterator<Item = crate::Result<AdsTypeInfo>>> {
+        let sum_device = SumDevice::new(self.device.clone());
+
+        let reqs: Vec<_> = names
+            .as_ref()
+            .iter()
+            .map(|name| {
+                SumReadWriteRequest::new(
+                    DATATYPE_INFO_BY_NAME_INDEX_GROUP,
+                    0,
+                    1_048_576, // assumed max size of a single entry, router will return the actual size
+                    name.as_ref().as_bytes(),
+                )
+            })
+            .collect();
+
+        let results: Vec<crate::Result<AdsTypeInfo>> = sum_device
+            .read_write(self.target, &reqs)
+            .await?
+            .iter()
+            .map(|res| match res {
+                Ok(chunk) => AdsTypeInfo::try_from(chunk).map_err(crate::Error::from),
+                Err(err) => Err(crate::Error::from(err)),
+            })
+            .collect();
+
+        Ok(results.into_iter())
     }
 
     /// Fetches all data types from the PLC and returns a lazy iterator.
@@ -141,8 +173,7 @@ impl TypeDevice {
             .read(self.target, DATATYPE_UPLOAD_INDEX_GROUP, 0, size)
             .await?;
 
-        Ok(AdsTypeInfoIteratorOwned::new(raw_blob)
-            .map(|res| res.map_err(|e| crate::Error::from(AdsError::from(e)))))
+        Ok(AdsTypeInfoIteratorOwned::new(raw_blob).map(|res| res.map_err(crate::Error::from)))
     }
 
     /// Fetches and caches the symbol upload metadata from the PLC.
