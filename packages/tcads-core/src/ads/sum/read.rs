@@ -1,4 +1,5 @@
 use super::{IndexGroup, IndexOffset, SumError};
+use crate::AdsReturnCode;
 
 /// A request to read a variable as part of a batch Sum Command.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -38,9 +39,7 @@ impl SumReadRequest {
 
     /// Writes this request to a byte buffer.
     pub fn write_to(&self, buf: &mut Vec<u8>) {
-        buf.extend_from_slice(&self.index_group.to_le_bytes());
-        buf.extend_from_slice(&self.index_offset.to_le_bytes());
-        buf.extend_from_slice(&self.length.to_le_bytes());
+        buf.extend_from_slice(&self.to_bytes());
     }
 
     /// Reads a [`SumReadRequest`] from a byte buffer.
@@ -94,38 +93,26 @@ impl TryFrom<&[u8]> for SumReadRequest {
     }
 }
 
-use crate::AdsReturnCode;
-
-/// A zero-copy, lazy-evaluating wrapper for an ADS Sum Read response.
+/// A zero-copy wrapper for an ADS Sum Read response.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SumReadResponse<'a> {
-    buffer: Vec<u8>,
-    requests: &'a [SumReadRequest],
+    buffer: &'a [u8],
+    request_count: usize,
 }
 
 impl<'a> SumReadResponse<'a> {
     /// Creates a new [`SumReadResponse`] from a raw buffer and a slice of requests.
-    pub fn new(buf: impl Into<Vec<u8>>, requests: &'a [SumReadRequest]) -> Self {
+    pub fn new(buffer: &'a [u8], requests: &'a [SumReadRequest]) -> Self {
         Self {
-            buffer: buf.into(),
-            requests,
+            buffer,
+            request_count: requests.len(),
         }
     }
 
     /// Iterates over the batch results, parsing the network buffer lazily
     /// and yielding zero-copy slices of the valid data.
-    pub fn iter(&self) -> impl Iterator<Item = Result<&[u8], AdsReturnCode>> + '_ {
-        self.as_view().into_iter()
-    }
-
-    /// Returns a purely borrowed view of the response.
-    pub fn as_view(&self) -> SumReadView<'_> {
-        SumReadView::new(&self.buffer, self.requests)
-    }
-
-    /// Returns the slice of requests that were part of this response.
-    pub fn requests(&self) -> &[SumReadRequest] {
-        self.requests
+    pub fn iter(&self) -> impl Iterator<Item = Result<&'a [u8], AdsReturnCode>> {
+        SumReadResponseIter::new(self.buffer, self.request_count)
     }
 
     /// Returns a reference to the raw underlying network buffer.
@@ -133,20 +120,41 @@ impl<'a> SumReadResponse<'a> {
         &self.buffer
     }
 
+    /// Returns the number of requests that were part of this response.
+    pub fn request_count(&self) -> usize {
+        self.request_count
+    }
+
     /// Converts this partially borrowed response into a fully owned response
     /// by cloning the request slice.
     pub fn into_owned(self) -> SumReadResponseOwned {
-        SumReadResponseOwned::new(self.buffer, self.requests)
+        SumReadResponseOwned {
+            buffer: self.buffer.into(),
+            request_count: self.request_count,
+        }
     }
 
     /// Consumes the response and returns the raw underlying network buffer.
     pub fn into_vec(self) -> Vec<u8> {
-        self.buffer
+        self.buffer.into()
     }
+}
 
-    /// Consumes the response and returns the raw underlying network buffer and the requests.
-    pub fn into_parts(self) -> (Vec<u8>, &'a [SumReadRequest]) {
-        (self.buffer, self.requests)
+impl<'a> From<SumReadResponse<'a>> for Vec<u8> {
+    fn from(response: SumReadResponse<'a>) -> Self {
+        response.into_vec()
+    }
+}
+
+impl<'a> From<&'a SumReadResponseOwned> for SumReadResponse<'a> {
+    fn from(response: &'a SumReadResponseOwned) -> Self {
+        response.as_borrowed()
+    }
+}
+
+impl<'a> From<SumReadResponse<'a>> for SumReadResponseOwned {
+    fn from(response: SumReadResponse<'a>) -> Self {
+        response.into_owned()
     }
 }
 
@@ -155,29 +163,22 @@ impl<'a> SumReadResponse<'a> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SumReadResponseOwned {
     buffer: Vec<u8>,
-    requests: Vec<SumReadRequest>,
+    request_count: usize,
 }
 
 impl SumReadResponseOwned {
-    pub fn new(buf: impl Into<Vec<u8>>, requests: impl Into<Vec<SumReadRequest>>) -> Self {
+    /// Creates a new [`SumReadResponseOwned`] from a raw buffer and a slice of requests.
+    pub fn new(buffer: Vec<u8>, requests: &[SumReadRequest]) -> Self {
         Self {
-            buffer: buf.into(),
-            requests: requests.into(),
+            buffer,
+            request_count: requests.len(),
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = Result<&[u8], AdsReturnCode>> + '_ {
-        self.as_view().into_iter()
-    }
-
-    /// Returns a purely borrowed view of the response.
-    pub fn as_view(&self) -> SumReadView<'_> {
-        SumReadView::new(&self.buffer, &self.requests)
-    }
-
-    /// Returns the slice of requests that were part of this response.
-    pub fn requests(&self) -> &[SumReadRequest] {
-        &self.requests
+    /// Iterates over the batch results, parsing the network buffer lazily
+    /// and yielding zero-copy slices of the valid data.
+    pub fn iter(&self) -> impl Iterator<Item = Result<&[u8], AdsReturnCode>> {
+        SumReadResponseIter::new(&self.buffer, self.request_count)
     }
 
     /// Returns a reference to the raw underlying network buffer.
@@ -185,63 +186,91 @@ impl SumReadResponseOwned {
         &self.buffer
     }
 
-    /// Consumes the response and returns the raw underlying network buffer and the requests.
-    pub fn into_parts(self) -> (Vec<u8>, Vec<SumReadRequest>) {
-        (self.buffer, self.requests)
+    /// Returns the number of requests that were part of this response.
+    pub fn request_count(&self) -> usize {
+        self.request_count
+    }
+
+    /// Consumes the response and returns the raw underlying network buffer.
+    pub fn into_vec(self) -> Vec<u8> {
+        self.buffer
+    }
+
+    /// Returns a borrowed view of the response.
+    pub fn as_borrowed(&self) -> SumReadResponse<'_> {
+        SumReadResponse {
+            buffer: &self.buffer,
+            request_count: self.request_count,
+        }
     }
 }
 
-/// A purely borrowed view of an ADS Sum Read response.
+impl From<SumReadResponseOwned> for Vec<u8> {
+    fn from(response: SumReadResponseOwned) -> Self {
+        response.into_vec()
+    }
+}
+
+impl<'a> IntoIterator for &'a SumReadResponseOwned {
+    type Item = Result<&'a [u8], AdsReturnCode>;
+    type IntoIter = SumReadResponseIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        SumReadResponseIter::new(&self.buffer, self.request_count)
+    }
+}
+
+/// An iterator over the results of an ADS Sum Read response.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct SumReadView<'a> {
+pub struct SumReadResponseIter<'a> {
     buffer: &'a [u8],
-    requests: &'a [SumReadRequest],
+    request_count: usize,
+    data_offset: usize,
+    current_idx: usize,
 }
 
-impl<'a> SumReadView<'a> {
-    /// Creates a new [`SumReadView`] from a raw buffer and a slice of requests.
-    pub fn new(buffer: &'a [u8], requests: &'a [SumReadRequest]) -> Self {
-        Self { buffer, requests }
+impl<'a> SumReadResponseIter<'a> {
+    /// Creates a new [`SumReadResponseIter`] from a raw buffer and a request count.
+    pub fn new(buffer: &'a [u8], request_count: usize) -> Self {
+        Self {
+            buffer,
+            request_count,
+            data_offset: request_count * 8,
+            current_idx: 0,
+        }
     }
+}
 
-    /// Takes the view by value and returns an iterator yielding zero-copy slices.
-    #[allow(clippy::should_implement_trait)]
-    pub fn into_iter(self) -> impl Iterator<Item = Result<&'a [u8], AdsReturnCode>> {
-        let n = self.requests.len();
-        let mut current_idx = 0;
-        let mut data_offset = n * 8;
+impl<'a> Iterator for SumReadResponseIter<'a> {
+    type Item = Result<&'a [u8], AdsReturnCode>;
 
-        let buffer = self.buffer;
-        let requests = self.requests;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current_idx >= self.request_count {
+            return None;
+        }
 
-        std::iter::from_fn(move || {
-            if current_idx >= n {
-                return None;
-            }
+        let header = self.current_idx * 8;
+        let err_code = AdsReturnCode::from_bytes([
+            self.buffer[header],
+            self.buffer[header + 1],
+            self.buffer[header + 2],
+            self.buffer[header + 3],
+        ]);
+        let returned_len = u32::from_le_bytes([
+            self.buffer[header + 4],
+            self.buffer[header + 5],
+            self.buffer[header + 6],
+            self.buffer[header + 7],
+        ]) as usize;
 
-            let req = &requests[current_idx];
-            let expected_len = req.length() as usize;
-            let header_offset = current_idx * 8;
+        let chunk = &self.buffer[self.data_offset..self.data_offset + returned_len];
+        self.data_offset += returned_len;
+        self.current_idx += 1;
 
-            let err_code =
-                u32::from_le_bytes(buffer[header_offset..header_offset + 4].try_into().unwrap());
-            let valid_len = u32::from_le_bytes(
-                buffer[header_offset + 4..header_offset + 8]
-                    .try_into()
-                    .unwrap(),
-            ) as usize;
-
-            let safe_len = valid_len.min(expected_len);
-            let chunk = &buffer[data_offset..data_offset + safe_len];
-
-            data_offset += safe_len;
-            current_idx += 1;
-
-            match AdsReturnCode::from(err_code) {
-                AdsReturnCode::Ok => Some(Ok(chunk)),
-                err => Some(Err(err)),
-            }
-        })
+        match err_code {
+            AdsReturnCode::Ok => Some(Ok(chunk)),
+            _ => Some(Err(err_code)),
+        }
     }
 }
 
@@ -272,7 +301,7 @@ mod tests {
             SumReadRequest::new(0x4020, 4, 4),
         ];
 
-        let response = SumReadResponse::new(buffer, &reqs);
+        let response = SumReadResponse::new(&buffer, &reqs);
         let mut iter = response.iter();
 
         assert_eq!(

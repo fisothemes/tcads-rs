@@ -10,7 +10,7 @@ use std::time::Duration;
 use tcads_core::{
     AdsError, AdsNotificationSampleOwned, AdsReturnCode, AmsAddr, IndexOffset, NotificationHandle,
     SumAddNotificationRequest, SumAddNotificationResponse, SumDeleteNotificationResponse,
-    SumReadRequest, SumReadResponse, SumReadWriteRequest, SumReadWriteResponseOwned,
+    SumReadRequest, SumReadResponseOwned, SumReadWriteRequest, SumReadWriteResponseOwned,
     SumWriteRequest, SumWriteResponse,
 };
 
@@ -83,15 +83,15 @@ impl SumDevice {
     /// Returns a [`SumReadResponse`] which lazily parses the network buffer. Iterating over
     /// the response yields a `Result<&[u8], AdsReturnCode>` for each requested variable,
     /// guaranteeing zero-copy data extraction and safe alignment even if individual variables fail.
-    pub fn read<'a>(
+    pub fn read(
         &self,
         target: AmsAddr,
-        requests: &'a [SumReadRequest],
-    ) -> crate::Result<SumReadResponse<'a>> {
+        requests: &[SumReadRequest],
+    ) -> crate::Result<SumReadResponseOwned> {
         let n = requests.len() as u32;
 
         if n == 0 {
-            return Ok(SumReadResponse::new(vec![], requests));
+            return Ok(SumReadResponseOwned::new(vec![], requests));
         }
 
         let mut expected_data_len = 0;
@@ -107,7 +107,7 @@ impl SumDevice {
             .inner
             .read_write(target, SUM_READ_EX_INDEX_GROUP, n, read_len, buf)?;
 
-        Ok(SumReadResponse::new(resp, requests))
+        Ok(SumReadResponseOwned::new(resp, requests))
     }
 
     /// Sends multiple Write ADS requests to the PLC in a single network transaction.

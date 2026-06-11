@@ -37,7 +37,7 @@ pub use string::AdsString;
 pub use sum::{
     SumAddNotificationIter, SumAddNotificationRequest, SumAddNotificationResponse,
     SumDeleteNotificationIter, SumDeleteNotificationResponse, SumReadRequest, SumReadResponse,
-    SumReadResponseOwned, SumReadView, SumReadWriteRequest, SumReadWriteRequestOwned,
+    SumReadResponseIter, SumReadResponseOwned, SumReadWriteRequest, SumReadWriteRequestOwned,
     SumReadWriteResponse, SumReadWriteResponseIter, SumReadWriteResponseOwned, SumWriteIter,
     SumWriteRequest, SumWriteResponse,
 };

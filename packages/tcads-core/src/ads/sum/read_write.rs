@@ -187,14 +187,14 @@ impl<'a> SumReadWriteResponse<'a> {
         self.buffer
     }
 
+    /// Returns the number of requests that were part of this response.
+    pub fn request_count(&self) -> usize {
+        self.request_count
+    }
+
     /// Consumes the response and returns the raw underlying network buffer.
     pub fn into_vec(self) -> Vec<u8> {
         self.buffer.into()
-    }
-
-    /// Returns the number of requests in the batch.
-    pub fn request_count(&self) -> usize {
-        self.request_count
     }
 
     /// Consumes the response and returns a fully owned response.
@@ -246,17 +246,17 @@ impl SumReadWriteResponseOwned {
         &self.buffer
     }
 
+    /// Returns the number of requests that were part of this response.
+    pub fn request_count(&self) -> usize {
+        self.request_count
+    }
+
     /// Consumes the response and returns the raw underlying network buffer.
     pub fn into_vec(self) -> Vec<u8> {
         self.buffer
     }
 
-    /// Returns the number of requests in the batch.
-    pub fn request_count(&self) -> usize {
-        self.request_count
-    }
-
-    /// Returns a purely borrowed view of the response.
+    /// Returns a borrowed view of the response.
     pub fn as_borrowed(&self) -> SumReadWriteResponse<'_> {
         SumReadWriteResponse {
             buffer: &self.buffer,
@@ -286,7 +286,7 @@ impl<'a> IntoIterator for &'a SumReadWriteResponseOwned {
     }
 }
 
-/// A borrowed view of an ADS Sum Read/Write response.
+/// An iterator over the results of a Sum Read-Write response.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SumReadWriteResponseIter<'a> {
     buffer: &'a [u8],
@@ -296,6 +296,7 @@ pub struct SumReadWriteResponseIter<'a> {
 }
 
 impl<'a> SumReadWriteResponseIter<'a> {
+    /// Creates a new [`SumReadWriteResponseIter`] from a raw buffer and a request count.
     pub fn new(buffer: &'a [u8], request_count: usize) -> Self {
         Self {
             buffer,
