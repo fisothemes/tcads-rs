@@ -52,7 +52,7 @@ fn main() -> Result<()> {
     println!("{:-<45}-+-{:-<20}-+-{:-<6}", "", "", "");
 
     device
-        .get_all_symbol_info()?
+        .get_all_symbol_infos()?
         .filter_map(|res| res.ok()) // Skip any corrupted entries
         .for_each(|sym| {
             println!(

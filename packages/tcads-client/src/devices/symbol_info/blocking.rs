@@ -2,13 +2,12 @@ use super::{
     SYMBOL_INFO_BY_NAME_EX_INDEX_GROUP, SYMBOL_INFO_UPLOAD_INDEX_GROUP,
     SYMBOL_UPLOAD_INFO_INDEX_GROUP,
 };
-use crate::devices::blocking::AdsDevice;
+use crate::devices::blocking::{AdsDevice, SumDevice};
 use std::net::ToSocketAddrs;
 use std::time::Duration;
-use tcads_core::ads::AdsSymbolInfoError;
 use tcads_core::{
     AdsError, AdsSymbolInfo, AdsSymbolInfoIteratorOwned, AdsSymbolUploadInfo,
-    AdsSymbolUploadInfoV3, AmsAddr, AmsPort,
+    AdsSymbolUploadInfoV3, AmsAddr, AmsPort, SumReadWriteRequest,
 };
 
 /// An ADS device client for accessing TwinCAT Symbol Information.
@@ -119,13 +118,44 @@ impl SymbolInfoDevice {
         Ok(AdsSymbolInfo::try_from(bytes.as_ref()).map_err(AdsError::from)?)
     }
 
+    /// Fetches multiple TwinCAT symbol information by their instance paths.
+    pub fn get_multi_symbol_infos<S: AsRef<str>>(
+        &self,
+        names: impl AsRef<[S]>,
+    ) -> crate::Result<impl Iterator<Item = crate::Result<AdsSymbolInfo>>> {
+        let sum_device = SumDevice::new(self.device.clone());
+
+        let reqs: Vec<_> = names
+            .as_ref()
+            .iter()
+            .map(|name| {
+                SumReadWriteRequest::new(
+                    SYMBOL_INFO_BY_NAME_EX_INDEX_GROUP,
+                    0,
+                    1_048_576,
+                    name.as_ref().as_bytes(),
+                )
+            })
+            .collect();
+
+        let results: Vec<crate::Result<AdsSymbolInfo>> = sum_device
+            .read_write(self.target, &reqs)?
+            .iter()
+            .map(|res| match res {
+                Ok(chunk) => AdsSymbolInfo::try_from(chunk).map_err(crate::Error::from),
+                Err(err) => Err(crate::Error::from(err)),
+            })
+            .collect();
+
+        Ok(results.into_iter())
+    }
+
     /// Downloads the entire Symbol dictionary from the PLC in a single transaction.
     ///
-    /// This returns an [`AdsSymbolInfoIteratorOwned`], which lazily parses the heap-allocated
-    /// memory blob. Use this if you need to build a complete map of every variable on the PLC.
-    pub fn get_all_symbol_info(
+    /// This returns an iterator for lazily parsing the heap-allocated memory blob.
+    pub fn get_all_symbol_infos(
         &self,
-    ) -> crate::Result<impl Iterator<Item = Result<AdsSymbolInfo, AdsSymbolInfoError>>> {
+    ) -> crate::Result<impl Iterator<Item = crate::Result<AdsSymbolInfo>>> {
         let info = self.get_upload_info()?;
 
         let blob_size = info.symbol_blob_size();
@@ -134,7 +164,7 @@ impl SymbolInfoDevice {
             self.device
                 .read(self.target, SYMBOL_INFO_UPLOAD_INDEX_GROUP, 0, blob_size)?;
 
-        Ok(AdsSymbolInfoIteratorOwned::new(raw_blob))
+        Ok(AdsSymbolInfoIteratorOwned::new(raw_blob).map(|res| res.map_err(crate::Error::from)))
     }
 
     /// Fetches the metadata describing the symbol and data type blobs on the runtime.
