@@ -108,8 +108,8 @@ impl AdsReadRequest {
             })?;
         }
 
-        let index_group = IndexGroup::from_le_bytes(payload[0..4].try_into().unwrap());
-        let index_offset = IndexOffset::from_le_bytes(payload[4..8].try_into().unwrap());
+        let index_group = IndexGroup::from_bytes(payload[0..4].try_into().unwrap());
+        let index_offset = IndexOffset::from_bytes(payload[4..8].try_into().unwrap());
         let length = u32::from_le_bytes(payload[8..12].try_into().unwrap());
 
         Ok((index_group, index_offset, length))
@@ -121,8 +121,8 @@ impl From<&AdsReadRequest> for AmsFrame {
         let mut payload = Vec::with_capacity(AdsHeader::LENGTH + AdsReadRequest::PAYLOAD_SIZE);
 
         payload.extend_from_slice(&value.header.to_bytes());
-        payload.extend_from_slice(&value.index_group.to_le_bytes());
-        payload.extend_from_slice(&value.index_offset.to_le_bytes());
+        payload.extend_from_slice(&value.index_group.to_bytes());
+        payload.extend_from_slice(&value.index_offset.to_bytes());
         payload.extend_from_slice(&value.length.to_le_bytes());
 
         AmsFrame::new(AmsCommand::AdsCommand, payload)
@@ -419,12 +419,12 @@ mod tests {
     fn test_read_request_roundtrip() {
         let (target, source) = make_addrs();
 
-        let request = AdsReadRequest::new(target, source, 42, 0x4020, 0x0000, 4);
+        let request = AdsReadRequest::new(target, source, 42, 0x4020.into(), 0x0000.into(), 4);
         let frame = request.to_frame();
         let decoded = AdsReadRequest::try_from(&frame).expect("Should deserialize");
 
-        assert_eq!(decoded.index_group(), 0x4020);
-        assert_eq!(decoded.index_offset(), 0x0000);
+        assert_eq!(decoded.index_group(), 0x4020.into());
+        assert_eq!(decoded.index_offset(), 0x0000.into());
         assert_eq!(decoded.length(), 4);
         assert_eq!(decoded.header().invoke_id(), 42);
         assert!(decoded.header().state_flags().is_request());

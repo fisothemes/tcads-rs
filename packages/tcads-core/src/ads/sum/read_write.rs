@@ -14,7 +14,7 @@ impl<'a> SumReadWriteRequest<'a> {
     /// The fixed byte length of the header for this request.
     pub const HEADER_LENGTH: usize = 16;
 
-    pub fn new(
+    pub const fn new(
         index_group: IndexGroup,
         index_offset: IndexOffset,
         read_length: u32,
@@ -29,22 +29,22 @@ impl<'a> SumReadWriteRequest<'a> {
     }
 
     /// The Index Group of the target variable.
-    pub fn index_group(&self) -> IndexGroup {
+    pub const fn index_group(&self) -> IndexGroup {
         self.index_group
     }
 
     /// The Index Offset of the target variable.
-    pub fn index_offset(&self) -> IndexOffset {
+    pub const fn index_offset(&self) -> IndexOffset {
         self.index_offset
     }
 
     /// The expected maximum length of the data to read back.
-    pub fn read_length(&self) -> u32 {
+    pub const fn read_length(&self) -> u32 {
         self.read_length
     }
 
     /// The raw byte data to write.
-    pub fn write_data(&self) -> &'a [u8] {
+    pub const fn write_data(&self) -> &'a [u8] {
         self.write_data
     }
 
@@ -61,8 +61,8 @@ impl<'a> SumReadWriteRequest<'a> {
     /// Serializes the 16-byte header (IndexGroup, IndexOffset, ReadLength, WriteLength).
     pub fn header_to_bytes(&self) -> [u8; 16] {
         let mut buf = [0; Self::HEADER_LENGTH];
-        buf[0..4].copy_from_slice(&self.index_group.to_le_bytes());
-        buf[4..8].copy_from_slice(&self.index_offset.to_le_bytes());
+        buf[0..4].copy_from_slice(&self.index_group.to_bytes());
+        buf[4..8].copy_from_slice(&self.index_offset.to_bytes());
         buf[8..12].copy_from_slice(&self.read_length.to_le_bytes());
         buf[12..16].copy_from_slice(&(self.write_data.len() as u32).to_le_bytes());
         buf
@@ -83,8 +83,8 @@ impl<'a> SumReadWriteRequest<'a> {
             });
         }
 
-        let index_group = IndexGroup::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
-        let index_offset = IndexOffset::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
+        let index_group = IndexGroup::from_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+        let index_offset = IndexOffset::from_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
         let read_length = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]);
         let write_len = u32::from_le_bytes([bytes[12], bytes[13], bytes[14], bytes[15]]) as usize;
 
@@ -228,7 +228,7 @@ pub struct SumReadWriteResponseOwned {
 
 impl SumReadWriteResponseOwned {
     /// Creates a new [`SumReadWriteResponseOwned`] from a raw buffer and a slice of requests.
-    pub fn new(buffer: Vec<u8>, requests: &[SumReadWriteRequest<'_>]) -> Self {
+    pub const fn new(buffer: Vec<u8>, requests: &[SumReadWriteRequest<'_>]) -> Self {
         Self {
             buffer,
             request_count: requests.len(),
@@ -368,7 +368,7 @@ mod tests {
     #[test]
     fn test_read_write_request_header() {
         let data: &[u8] = b"MAIN.bTest\0";
-        let req = SumReadWriteRequest::new(0xF003, 0, 4, data);
+        let req = SumReadWriteRequest::new(0xF003.into(), 0.into(), 4, data);
 
         let header = req.header_to_bytes();
         assert_eq!(header.len(), 16);
@@ -392,8 +392,8 @@ mod tests {
         buffer.extend_from_slice(&handle_bytes);
 
         let reqs = vec![
-            SumReadWriteRequest::new(0xF003, 0, 4, b"BAD\0"),
-            SumReadWriteRequest::new(0xF003, 0, 4, b"GOOD\0"),
+            SumReadWriteRequest::new(0xF003.into(), 0.into(), 4, b"BAD\0"),
+            SumReadWriteRequest::new(0xF003.into(), 0.into(), 4, b"GOOD\0"),
         ];
 
         let response = SumReadWriteResponse::new(&buffer, &reqs);

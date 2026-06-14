@@ -1,13 +1,9 @@
-use super::{
-    SYMBOL_INFO_BY_NAME_EX_INDEX_GROUP, SYMBOL_INFO_UPLOAD_INDEX_GROUP,
-    SYMBOL_UPLOAD_INFO_INDEX_GROUP,
-};
 use crate::devices::tokio::{AdsDevice, SumDevice};
 use std::net::ToSocketAddrs;
 use std::time::Duration;
 use tcads_core::{
     AdsError, AdsSymbolInfo, AdsSymbolInfoIteratorOwned, AdsSymbolUploadInfo,
-    AdsSymbolUploadInfoV3, AmsAddr, AmsPort, SumReadWriteRequest,
+    AdsSymbolUploadInfoV3, AmsAddr, AmsPort, IndexGroup, IndexOffset, SumReadWriteRequest,
 };
 
 /// An asynchronous ADS device client for accessing TwinCAT Symbol Information.
@@ -96,31 +92,18 @@ impl SymbolInfoDevice {
 
     // Fetches the metadata for a specific Symbol by its instance path (e.g. `"MAIN.nCount"`).
     pub async fn get_symbol_info(&self, name: impl AsRef<str>) -> crate::Result<AdsSymbolInfo> {
-        let name = name.as_ref();
-
-        let entry_len_bytes = self
-            .device
-            .read_write(self.target, SYMBOL_INFO_BY_NAME_EX_INDEX_GROUP, 0, 4, name)
-            .await?;
-
-        let entry_length = u32::from_le_bytes(
-            entry_len_bytes
-                .try_into()
-                .map_err(|_| crate::Error::InvalidPayload)?,
-        );
-
         let bytes = self
             .device
             .read_write(
                 self.target,
-                SYMBOL_INFO_BY_NAME_EX_INDEX_GROUP,
-                0,
-                entry_length,
-                name,
+                IndexGroup::SYMBOL_INFO_BY_NAME_EX,
+                IndexOffset::ZERO,
+                1_048_576,
+                name.as_ref(),
             )
             .await?;
 
-        Ok(AdsSymbolInfo::try_from(bytes.as_ref()).map_err(AdsError::from)?)
+        Ok(AdsSymbolInfo::try_from(bytes.as_ref())?)
     }
 
     /// Fetches multiple TwinCAT symbol information by their instance paths.
@@ -135,8 +118,8 @@ impl SymbolInfoDevice {
             .iter()
             .map(|name| {
                 SumReadWriteRequest::new(
-                    SYMBOL_INFO_BY_NAME_EX_INDEX_GROUP,
-                    0,
+                    IndexGroup::SYMBOL_INFO_BY_NAME_EX,
+                    IndexOffset::ZERO,
                     1_048_576,
                     name.as_ref().as_bytes(),
                 )
@@ -168,7 +151,12 @@ impl SymbolInfoDevice {
 
         let raw_blob = self
             .device
-            .read(self.target, SYMBOL_INFO_UPLOAD_INDEX_GROUP, 0, blob_size)
+            .read(
+                self.target,
+                IndexGroup::SYMBOL_UPLOAD,
+                IndexOffset::ZERO,
+                blob_size,
+            )
             .await?;
 
         Ok(AdsSymbolInfoIteratorOwned::new(raw_blob).map(|res| res.map_err(crate::Error::from)))
@@ -180,8 +168,8 @@ impl SymbolInfoDevice {
             .device
             .read(
                 self.target,
-                SYMBOL_UPLOAD_INFO_INDEX_GROUP,
-                0,
+                IndexGroup::SYMBOL_UPLOAD_INFO2,
+                IndexOffset::ZERO,
                 AdsSymbolUploadInfoV3::LENGTH as u32,
             )
             .await?;

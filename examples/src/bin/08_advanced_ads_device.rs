@@ -14,15 +14,11 @@ use std::thread;
 use std::time::Duration;
 use tcads::client::devices::blocking::AdsDevice;
 use tcads::core::{
-    AdsNotificationAttrib, AdsNotificationSampleOwned, AdsTransMode, AmsAddr, NotificationHandle,
+    AdsNotificationAttrib, AdsNotificationSampleOwned, AdsTransMode, AmsAddr, IndexGroup,
+    IndexOffset, NotificationHandle,
 };
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
-
-// Standard TwinCAT Index Groups for Symbol interaction
-const GET_SYMHANDLE_BYNAME: u32 = 0xF003;
-const READ_WRITE_SYMVAL_BYHANDLE: u32 = 0xF005;
-const RELEASE_SYMHANDLE: u32 = 0xF006;
 
 fn main() -> Result<()> {
     println!("Connecting to the local router...");
@@ -67,7 +63,7 @@ fn main() -> Result<()> {
             device_clone
                 .write(
                     plc_target,
-                    READ_WRITE_SYMVAL_BYHANDLE,
+                    IndexGroup::SYMBOL_VALUE_BY_HANDLE,
                     inc_handle,
                     [true as u8],
                 )
@@ -80,7 +76,7 @@ fn main() -> Result<()> {
             device_clone
                 .write(
                     plc_target,
-                    READ_WRITE_SYMVAL_BYHANDLE,
+                    IndexGroup::SYMBOL_VALUE_BY_HANDLE,
                     dec_handle,
                     [true as u8],
                 )
@@ -104,17 +100,28 @@ fn main() -> Result<()> {
 }
 
 /// Helper function to fetch a symbol handle by name.
-fn get_handle(device: &AdsDevice, target: AmsAddr, symbol_name: &str) -> Result<u32> {
+fn get_handle(device: &AdsDevice, target: AmsAddr, symbol_name: &str) -> Result<IndexOffset> {
     let mut name_bytes = symbol_name.as_bytes().to_vec();
     name_bytes.push(0); // Null-terminate the string for good measure
 
-    let handle_bytes = device.read_write(target, GET_SYMHANDLE_BYNAME, 0, 4, name_bytes)?;
-    Ok(u32::from_le_bytes(handle_bytes.try_into().unwrap()))
+    let handle_bytes = device.read_write(
+        target,
+        IndexGroup::SYMBOL_HANDLE_BY_NAME,
+        IndexOffset::ZERO,
+        4,
+        name_bytes,
+    )?;
+    Ok(IndexOffset::from_bytes(handle_bytes.try_into().unwrap()))
 }
 
 /// Helper function to release a symbol handle.
-fn release_handle(device: &AdsDevice, target: AmsAddr, handle: u32) -> Result<()> {
-    device.write(target, RELEASE_SYMHANDLE, 0, handle.to_le_bytes())?;
+fn release_handle(device: &AdsDevice, target: AmsAddr, handle: IndexOffset) -> Result<()> {
+    device.write(
+        target,
+        IndexGroup::SYMBOL_RELEASE_HANDLE,
+        IndexOffset::ZERO,
+        handle.to_bytes(),
+    )?;
     Ok(())
 }
 
@@ -122,11 +129,11 @@ fn release_handle(device: &AdsDevice, target: AmsAddr, handle: u32) -> Result<()
 fn add_notification<T: Sized>(
     device: &AdsDevice,
     target: AmsAddr,
-    handle: u32,
+    handle: IndexOffset,
 ) -> Result<(Receiver<AdsNotificationSampleOwned>, NotificationHandle)> {
     Ok(device.add_notification(
         target,
-        READ_WRITE_SYMVAL_BYHANDLE,
+        IndexGroup::SYMBOL_VALUE_BY_HANDLE,
         handle,
         AdsNotificationAttrib {
             length: size_of::<T>() as u32,

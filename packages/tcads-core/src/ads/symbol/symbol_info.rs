@@ -53,11 +53,11 @@ impl AdsSymbolInfo {
     pub const MIN_LENGTH: usize = 30;
 
     /// The Index Group of the memory area where this symbol is located.
-    pub fn index_group(&self) -> u32 {
+    pub fn index_group(&self) -> IndexGroup {
         self.index_group
     }
     /// The byte offset within the Index Group where this symbol starts.
-    pub fn index_offset(&self) -> u32 {
+    pub fn index_offset(&self) -> IndexOffset {
         self.index_offset
     }
     /// The byte size of this symbol's data (0 if it is a bit value).
@@ -123,8 +123,8 @@ impl AdsSymbolInfo {
 
         let entry = &data[..entry_length];
 
-        let index_group = IndexGroup::from_le_bytes([entry[4], entry[5], entry[6], entry[7]]);
-        let index_offset = IndexOffset::from_le_bytes([entry[8], entry[9], entry[10], entry[11]]);
+        let index_group = IndexGroup::from_bytes([entry[4], entry[5], entry[6], entry[7]]);
+        let index_offset = IndexOffset::from_bytes([entry[8], entry[9], entry[10], entry[11]]);
         let size = u32::from_le_bytes([entry[12], entry[13], entry[14], entry[15]]);
         let data_type_id = AdsTypeId::from([entry[16], entry[17], entry[18], entry[19]]);
         let flags = AdsSymbolFlags::from_bytes([entry[20], entry[21]]);

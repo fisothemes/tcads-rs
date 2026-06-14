@@ -15,7 +15,7 @@ impl SumAddNotificationRequest {
     pub const LENGTH: usize = 40;
 
     /// Creates a new instance of a [`SumAddNotificationRequest`].
-    pub fn new(
+    pub const fn new(
         index_group: IndexGroup,
         index_offset: IndexOffset,
         attributes: AdsNotificationAttrib,
@@ -28,17 +28,17 @@ impl SumAddNotificationRequest {
     }
 
     /// The Index Group of the target variable.
-    pub fn index_group(&self) -> IndexGroup {
+    pub const fn index_group(&self) -> IndexGroup {
         self.index_group
     }
 
     /// The Index Offset of the target variable.
-    pub fn index_offset(&self) -> IndexOffset {
+    pub const fn index_offset(&self) -> IndexOffset {
         self.index_offset
     }
 
     /// The transmission mode and cycle times for the notification.
-    pub fn attributes(&self) -> &AdsNotificationAttrib {
+    pub const fn attributes(&self) -> &AdsNotificationAttrib {
         &self.attributes
     }
 
@@ -50,8 +50,8 @@ impl SumAddNotificationRequest {
     /// Reads a [`SumAddNotificationRequest`] from a byte buffer.
     pub fn from_bytes(bytes: [u8; Self::LENGTH]) -> Self {
         Self {
-            index_group: IndexGroup::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
-            index_offset: IndexOffset::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
+            index_group: IndexGroup::from_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            index_offset: IndexOffset::from_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
             attributes: AdsNotificationAttrib::from_bytes([
                 bytes[8], bytes[9], bytes[10], bytes[11], bytes[12], bytes[13], bytes[14],
                 bytes[15], bytes[16], bytes[17], bytes[18], bytes[19], bytes[20], bytes[21],
@@ -63,8 +63,8 @@ impl SumAddNotificationRequest {
     /// Converts this request to a byte buffer.
     pub fn to_bytes(&self) -> [u8; Self::LENGTH] {
         let mut buf = [0; Self::LENGTH];
-        buf[0..4].copy_from_slice(&self.index_group.to_le_bytes());
-        buf[4..8].copy_from_slice(&self.index_offset.to_le_bytes());
+        buf[0..4].copy_from_slice(&self.index_group.to_bytes());
+        buf[4..8].copy_from_slice(&self.index_offset.to_bytes());
         buf[8..24].copy_from_slice(&self.attributes.to_bytes());
         buf
     }
@@ -223,8 +223,8 @@ mod tests {
     #[test]
     fn test_add_notif_request_padding() {
         let req = SumAddNotificationRequest::new(
-            0xF005,
-            1234,
+            0xF005.into(),
+            1234.into(),
             AdsNotificationAttrib::new(4, AdsTransMode::ServerCycle, 0, 100_0000),
         );
 

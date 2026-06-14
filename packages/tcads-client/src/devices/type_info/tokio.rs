@@ -1,12 +1,9 @@
-use super::{
-    DATATYPE_INFO_BY_NAME_INDEX_GROUP, DATATYPE_UPLOAD_INDEX_GROUP, SYMBOL_UPLOAD_INFO_INDEX_GROUP,
-};
 use crate::devices::tokio::{AdsDevice, SumDevice};
 use std::net::ToSocketAddrs;
 use std::time::Duration;
 use tcads_core::{
     AdsError, AdsSymbolUploadInfo, AdsSymbolUploadInfoV3, AdsTypeInfo, AdsTypeInfoIteratorOwned,
-    AmsAddr, AmsPort, SumReadWriteRequest,
+    AmsAddr, AmsPort, IndexGroup, IndexOffset, SumReadWriteRequest,
 };
 
 /// An async (Tokio) ADS device client for fetching data type info from a PLC runtime.
@@ -95,27 +92,14 @@ impl TypeDevice {
 
     /// Fetches the data type information for a specific symbol name.
     pub async fn get_type_info(&self, name: impl AsRef<str>) -> crate::Result<AdsTypeInfo> {
-        let name = name.as_ref();
-
-        let length_bytes = self
-            .device
-            .read_write(self.target, DATATYPE_INFO_BY_NAME_INDEX_GROUP, 0, 4, name)
-            .await?;
-
-        let entry_length = u32::from_le_bytes(
-            length_bytes
-                .try_into()
-                .map_err(|_| crate::Error::InvalidPayload)?,
-        );
-
         let bytes = self
             .device
             .read_write(
                 self.target,
-                DATATYPE_INFO_BY_NAME_INDEX_GROUP,
-                0,
-                entry_length,
-                name,
+                IndexGroup::DATA_TYPE_INFO_BY_NAME_EX,
+                IndexOffset::ZERO,
+                1_048_576,
+                name.as_ref(),
             )
             .await?;
 
@@ -134,8 +118,8 @@ impl TypeDevice {
             .iter()
             .map(|name| {
                 SumReadWriteRequest::new(
-                    DATATYPE_INFO_BY_NAME_INDEX_GROUP,
-                    0,
+                    IndexGroup::DATA_TYPE_INFO_BY_NAME_EX,
+                    IndexOffset::ZERO,
                     1_048_576, // assumed max size of a single entry, router will return the actual size
                     name.as_ref().as_bytes(),
                 )
@@ -170,7 +154,12 @@ impl TypeDevice {
 
         let raw_blob = self
             .device
-            .read(self.target, DATATYPE_UPLOAD_INDEX_GROUP, 0, size)
+            .read(
+                self.target,
+                IndexGroup::DATA_TYPE_UPLOAD,
+                IndexOffset::ZERO,
+                size,
+            )
             .await?;
 
         Ok(AdsTypeInfoIteratorOwned::new(raw_blob).map(|res| res.map_err(crate::Error::from)))
@@ -182,8 +171,8 @@ impl TypeDevice {
             .device
             .read(
                 self.target,
-                SYMBOL_UPLOAD_INFO_INDEX_GROUP,
-                0,
+                IndexGroup::SYMBOL_UPLOAD_INFO2,
+                IndexOffset::ZERO,
                 AdsSymbolUploadInfoV3::LENGTH as u32,
             )
             .await?;

@@ -1,13 +1,9 @@
-use super::{
-    SYMBOL_INFO_BY_NAME_EX_INDEX_GROUP, SYMBOL_INFO_UPLOAD_INDEX_GROUP,
-    SYMBOL_UPLOAD_INFO_INDEX_GROUP,
-};
 use crate::devices::blocking::{AdsDevice, SumDevice};
 use std::net::ToSocketAddrs;
 use std::time::Duration;
 use tcads_core::{
     AdsError, AdsSymbolInfo, AdsSymbolInfoIteratorOwned, AdsSymbolUploadInfo,
-    AdsSymbolUploadInfoV3, AmsAddr, AmsPort, SumReadWriteRequest,
+    AdsSymbolUploadInfoV3, AmsAddr, AmsPort, IndexGroup, IndexOffset, SumReadWriteRequest,
 };
 
 /// An ADS device client for accessing TwinCAT Symbol Information.
@@ -96,26 +92,15 @@ impl SymbolInfoDevice {
 
     // Fetches the metadata for a specific Symbol by its instance path (e.g. `"MAIN.nCount"`).
     pub fn get_symbol_info(&self, name: impl AsRef<str>) -> crate::Result<AdsSymbolInfo> {
-        let name = name.as_ref();
-        let entry_len_bytes =
-            self.device
-                .read_write(self.target, SYMBOL_INFO_BY_NAME_EX_INDEX_GROUP, 0, 4, name)?;
-
-        let entry_length = u32::from_le_bytes(
-            entry_len_bytes
-                .try_into()
-                .map_err(|_| crate::Error::InvalidPayload)?,
-        );
-
         let bytes = self.device.read_write(
             self.target,
-            SYMBOL_INFO_BY_NAME_EX_INDEX_GROUP,
-            0,
-            entry_length,
-            name,
+            IndexGroup::SYMBOL_INFO_BY_NAME_EX,
+            IndexOffset::ZERO,
+            1_048_576,
+            name.as_ref(),
         )?;
 
-        Ok(AdsSymbolInfo::try_from(bytes.as_ref()).map_err(AdsError::from)?)
+        Ok(AdsSymbolInfo::try_from(bytes.as_ref())?)
     }
 
     /// Fetches multiple TwinCAT symbol information by their instance paths.
@@ -130,8 +115,8 @@ impl SymbolInfoDevice {
             .iter()
             .map(|name| {
                 SumReadWriteRequest::new(
-                    SYMBOL_INFO_BY_NAME_EX_INDEX_GROUP,
-                    0,
+                    IndexGroup::SYMBOL_INFO_BY_NAME_EX,
+                    IndexOffset::ZERO,
                     1_048_576,
                     name.as_ref().as_bytes(),
                 )
@@ -160,9 +145,12 @@ impl SymbolInfoDevice {
 
         let blob_size = info.symbol_blob_size();
 
-        let raw_blob =
-            self.device
-                .read(self.target, SYMBOL_INFO_UPLOAD_INDEX_GROUP, 0, blob_size)?;
+        let raw_blob = self.device.read(
+            self.target,
+            IndexGroup::SYMBOL_UPLOAD,
+            IndexOffset::ZERO,
+            blob_size,
+        )?;
 
         Ok(AdsSymbolInfoIteratorOwned::new(raw_blob).map(|res| res.map_err(crate::Error::from)))
     }
@@ -171,8 +159,8 @@ impl SymbolInfoDevice {
     pub fn get_upload_info(&self) -> crate::Result<AdsSymbolUploadInfo> {
         let bytes = self.device.read(
             self.target,
-            SYMBOL_UPLOAD_INFO_INDEX_GROUP,
-            0,
+            IndexGroup::SYMBOL_UPLOAD_INFO2,
+            IndexOffset::ZERO,
             AdsSymbolUploadInfoV3::LENGTH as u32,
         )?;
         Ok(AdsSymbolUploadInfo::try_from(bytes.as_ref()).map_err(AdsError::from)?)

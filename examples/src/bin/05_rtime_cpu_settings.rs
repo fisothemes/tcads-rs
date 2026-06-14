@@ -9,13 +9,13 @@ use tcads::core::protocol::{
     AdsReadRequest, AdsReadResponse, GetLocalNetIdRequest, GetLocalNetIdResponse,
     PortConnectRequest, PortConnectResponse,
 };
-use tcads::core::{AdsReturnCode, AmsAddr};
+use tcads::core::{AdsReturnCode, AmsAddr, IndexGroup, IndexOffset};
 
 type BoxError = Box<dyn std::error::Error>;
 type Result<T> = std::result::Result<T, BoxError>;
 
-pub const ADSSRVID_READDEVICEINFO: u32 = 0x01;
-pub const RTIME_CPU_SETTINGS: u32 = 0xD;
+pub const ADSSRVID_READDEVICEINFO: IndexGroup = IndexGroup::new(0x01);
+pub const RTIME_CPU_SETTINGS: IndexOffset = IndexOffset::new(0xD);
 
 fn main() -> Result<()> {
     let mut stream = AmsStream::connect("127.0.0.1:48898")?;

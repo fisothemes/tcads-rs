@@ -4,6 +4,8 @@ pub mod device_version;
 pub mod error;
 pub mod filetime;
 pub mod header;
+pub mod index_group;
+pub mod index_offset;
 pub mod log_entry;
 pub mod logger_message_type;
 pub mod notification_attrib;
@@ -27,6 +29,8 @@ pub use error::{
 };
 pub use filetime::WindowsFileTime;
 pub use header::AdsHeader;
+pub use index_group::IndexGroup;
+pub use index_offset::IndexOffset;
 pub use log_entry::LogEntry;
 pub use logger_message_type::LogMessageType;
 pub use notification_attrib::AdsNotificationAttrib;
@@ -50,8 +54,5 @@ pub use symbol::{
     AdsTypeInfo, AdsTypeInfoIterator, AdsTypeInfoIteratorOwned, Guid,
 };
 pub use trans_mode::AdsTransMode;
-
-pub type IndexGroup = u32;
-pub type IndexOffset = u32;
 
 pub type InvokeId = u32;

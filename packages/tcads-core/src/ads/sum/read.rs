@@ -14,7 +14,7 @@ impl SumReadRequest {
     pub const LENGTH: usize = 12;
 
     /// Creates a new [`SumReadRequest`] with the given parameters.
-    pub fn new(index_group: IndexGroup, index_offset: IndexOffset, length: u32) -> Self {
+    pub const fn new(index_group: IndexGroup, index_offset: IndexOffset, length: u32) -> Self {
         Self {
             index_group,
             index_offset,
@@ -23,17 +23,17 @@ impl SumReadRequest {
     }
 
     /// The Index Group of the target variable.
-    pub fn index_group(&self) -> IndexGroup {
+    pub const fn index_group(&self) -> IndexGroup {
         self.index_group
     }
 
     /// The Index Offset of the target variable.
-    pub fn index_offset(&self) -> IndexOffset {
+    pub const fn index_offset(&self) -> IndexOffset {
         self.index_offset
     }
 
     /// The expected maximum length of the data to read in bytes.
-    pub fn length(&self) -> u32 {
+    pub const fn length(&self) -> u32 {
         self.length
     }
 
@@ -43,10 +43,10 @@ impl SumReadRequest {
     }
 
     /// Reads a [`SumReadRequest`] from a byte buffer.
-    pub fn from_bytes(bytes: [u8; Self::LENGTH]) -> Self {
+    pub const fn from_bytes(bytes: [u8; Self::LENGTH]) -> Self {
         Self {
-            index_group: IndexGroup::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
-            index_offset: IndexOffset::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
+            index_group: IndexGroup::from_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]),
+            index_offset: IndexOffset::from_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]),
             length: u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]),
         }
     }
@@ -54,8 +54,8 @@ impl SumReadRequest {
     /// Converts this request to a byte buffer.
     pub fn to_bytes(&self) -> [u8; Self::LENGTH] {
         let mut buf = [0; Self::LENGTH];
-        buf[0..4].copy_from_slice(&self.index_group.to_le_bytes());
-        buf[4..8].copy_from_slice(&self.index_offset.to_le_bytes());
+        buf[0..4].copy_from_slice(&self.index_group.to_bytes());
+        buf[4..8].copy_from_slice(&self.index_offset.to_bytes());
         buf[8..12].copy_from_slice(&self.length.to_le_bytes());
         buf
     }
@@ -102,7 +102,7 @@ pub struct SumReadResponse<'a> {
 
 impl<'a> SumReadResponse<'a> {
     /// Creates a new [`SumReadResponse`] from a raw buffer and a slice of requests.
-    pub fn new(buffer: &'a [u8], requests: &'a [SumReadRequest]) -> Self {
+    pub const fn new(buffer: &'a [u8], requests: &'a [SumReadRequest]) -> Self {
         Self {
             buffer,
             request_count: requests.len(),
@@ -116,12 +116,12 @@ impl<'a> SumReadResponse<'a> {
     }
 
     /// Returns a reference to the raw underlying network buffer.
-    pub fn buffer(&self) -> &[u8] {
+    pub const fn buffer(&self) -> &[u8] {
         &self.buffer
     }
 
     /// Returns the number of requests that were part of this response.
-    pub fn request_count(&self) -> usize {
+    pub const fn request_count(&self) -> usize {
         self.request_count
     }
 
@@ -168,7 +168,7 @@ pub struct SumReadResponseOwned {
 
 impl SumReadResponseOwned {
     /// Creates a new [`SumReadResponseOwned`] from a raw buffer and a slice of requests.
-    pub fn new(buffer: Vec<u8>, requests: &[SumReadRequest]) -> Self {
+    pub const fn new(buffer: Vec<u8>, requests: &[SumReadRequest]) -> Self {
         Self {
             buffer,
             request_count: requests.len(),
@@ -187,7 +187,7 @@ impl SumReadResponseOwned {
     }
 
     /// Returns the number of requests that were part of this response.
-    pub fn request_count(&self) -> usize {
+    pub const fn request_count(&self) -> usize {
         self.request_count
     }
 
@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn test_read_request_layout() {
-        let req = SumReadRequest::new(0x4020, 0, 4);
+        let req = SumReadRequest::new(0x4020.into(), 0.into(), 4);
         assert_eq!(req.to_bytes().len(), 12);
         assert_eq!(SumReadRequest::LENGTH, 12);
     }
@@ -297,8 +297,8 @@ mod tests {
         buffer.extend_from_slice(&[0xAA, 0xBB, 0xCC, 0xDD]);
 
         let reqs = vec![
-            SumReadRequest::new(0x4020, 0, 4),
-            SumReadRequest::new(0x4020, 4, 4),
+            SumReadRequest::new(0x4020.into(), 0.into(), 4),
+            SumReadRequest::new(0x4020.into(), 4.into(), 4),
         ];
 
         let response = SumReadResponse::new(&buffer, &reqs);

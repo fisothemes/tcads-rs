@@ -18,7 +18,7 @@ impl<'a> SumWriteRequest<'a> {
     pub const HEADER_LENGTH: usize = 12;
 
     /// Creates a new instance of [`SumWriteRequest`] with the given parameters.
-    pub fn new(index_group: IndexGroup, index_offset: IndexOffset, data: &'a [u8]) -> Self {
+    pub const fn new(index_group: IndexGroup, index_offset: IndexOffset, data: &'a [u8]) -> Self {
         Self {
             index_group,
             index_offset,
@@ -27,25 +27,25 @@ impl<'a> SumWriteRequest<'a> {
     }
 
     /// The Index Group of the target variable.
-    pub fn index_group(&self) -> IndexGroup {
+    pub const fn index_group(&self) -> IndexGroup {
         self.index_group
     }
 
     /// The Index Offset of the target variable.
-    pub fn index_offset(&self) -> IndexOffset {
+    pub const fn index_offset(&self) -> IndexOffset {
         self.index_offset
     }
 
     /// The raw byte data to write.
-    pub fn data(&self) -> &'a [u8] {
+    pub const fn data(&self) -> &'a [u8] {
         self.data
     }
 
     /// Serializes the 12-byte header (IndexGroup, IndexOffset, DataLength).
     pub fn header_to_bytes(&self) -> [u8; 12] {
         let mut buf = [0; Self::HEADER_LENGTH];
-        buf[0..4].copy_from_slice(&self.index_group.to_le_bytes());
-        buf[4..8].copy_from_slice(&self.index_offset.to_le_bytes());
+        buf[0..4].copy_from_slice(&self.index_group.to_bytes());
+        buf[4..8].copy_from_slice(&self.index_offset.to_bytes());
         buf[8..12].copy_from_slice(&(self.data.len() as u32).to_le_bytes());
         buf
     }
@@ -65,8 +65,8 @@ impl<'a> SumWriteRequest<'a> {
             });
         }
 
-        let index_group = IndexGroup::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
-        let index_offset = IndexOffset::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
+        let index_group = IndexGroup::from_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+        let index_offset = IndexOffset::from_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
         let data_len = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]) as usize;
 
         if bytes.len() < Self::HEADER_LENGTH + data_len {
@@ -108,7 +108,7 @@ impl SumWriteResponse {
     }
 
     /// Creates a new [`SumWriteResponse`] with no data.
-    pub fn empty() -> Self {
+    pub const fn empty() -> Self {
         Self { buffer: Vec::new() }
     }
 
@@ -118,12 +118,12 @@ impl SumWriteResponse {
     }
 
     /// Returns the number of return codes in the response.
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.buffer.len() / AdsReturnCode::LENGTH
     }
 
     /// Returns `true` if the response is empty.
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.buffer.is_empty()
     }
 
@@ -215,7 +215,7 @@ mod tests {
     #[test]
     fn test_write_request_header() {
         let data: &[u8] = &[0x01, 0x02, 0x03];
-        let req = SumWriteRequest::new(0x4020, 0, data);
+        let req = SumWriteRequest::new(0x4020.into(), 0.into(), data);
 
         let header = req.header_to_bytes();
         assert_eq!(header.len(), 12);

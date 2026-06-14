@@ -1,17 +1,13 @@
-use super::{
-    SUM_ADD_NOTIFICATION_INDEX_GROUP, SUM_DELETE_NOTIFICATION_INDEX_GROUP, SUM_READ_EX_INDEX_GROUP,
-    SUM_READ_WRITE_INDEX_GROUP, SUM_WRITE_INDEX_GROUP,
-};
 use crate::devices::blocking::AdsDevice;
 use crate::tasks::blocking::AmsRequestDispatchKey;
 use std::net::ToSocketAddrs;
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
 use tcads_core::{
-    AdsError, AdsNotificationSampleOwned, AdsReturnCode, AmsAddr, IndexOffset, NotificationHandle,
-    SumAddNotificationRequest, SumAddNotificationResponse, SumDeleteNotificationResponse,
-    SumReadRequest, SumReadResponseOwned, SumReadWriteRequest, SumReadWriteResponseOwned,
-    SumWriteRequest, SumWriteResponse,
+    AdsError, AdsNotificationSampleOwned, AdsReturnCode, AmsAddr, IndexGroup, IndexOffset,
+    NotificationHandle, SumAddNotificationRequest, SumAddNotificationResponse,
+    SumDeleteNotificationResponse, SumReadRequest, SumReadResponseOwned, SumReadWriteRequest,
+    SumReadWriteResponseOwned, SumWriteRequest, SumWriteResponse,
 };
 
 /// An ADS device client for executing batch operations (Sum Commands).
@@ -103,9 +99,13 @@ impl SumDevice {
         }
 
         let read_len = (n * 8) + expected_data_len;
-        let resp = self
-            .inner
-            .read_write(target, SUM_READ_EX_INDEX_GROUP, n, read_len, buf)?;
+        let resp = self.inner.read_write(
+            target,
+            IndexGroup::SUM_READ_EX,
+            IndexOffset::new(n),
+            read_len,
+            buf,
+        )?;
 
         Ok(SumReadResponseOwned::new(resp, requests))
     }
@@ -140,8 +140,8 @@ impl SumDevice {
 
         let resp = self.inner.read_write(
             target,
-            SUM_WRITE_INDEX_GROUP,
-            n as IndexOffset,
+            IndexGroup::SUM_WRITE,
+            IndexOffset::new(n as u32),
             (n * AdsReturnCode::LENGTH) as u32,
             buf,
         )?;
@@ -186,8 +186,8 @@ impl SumDevice {
 
         let resp = self.inner.read_write(
             target,
-            SUM_READ_WRITE_INDEX_GROUP,
-            n as IndexOffset,
+            IndexGroup::SUM_READ_WRITE,
+            IndexOffset::new(n as u32),
             read_len as u32,
             buf,
         )?;
@@ -241,8 +241,8 @@ impl SumDevice {
             target,
             self.inner.source()?,
             invoke_id,
-            SUM_ADD_NOTIFICATION_INDEX_GROUP,
-            n as u32,
+            IndexGroup::SUM_ADD_NOTIFICATION,
+            IndexOffset::new(n as u32),
             expected_read_len,
             write_buf,
         )
@@ -310,8 +310,8 @@ impl SumDevice {
 
         let resp_bytes = self.inner.read_write(
             target,
-            SUM_DELETE_NOTIFICATION_INDEX_GROUP,
-            n as u32,
+            IndexGroup::SUM_DELETE_NOTIFICATION,
+            IndexOffset::new(n as u32),
             (n * 4) as u32,
             buf,
         )?;

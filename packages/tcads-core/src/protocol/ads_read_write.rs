@@ -115,8 +115,8 @@ impl<'a> AdsReadWriteRequest<'a> {
             })?;
         }
 
-        let index_group = IndexGroup::from_le_bytes(payload[0..4].try_into().unwrap());
-        let index_offset = IndexOffset::from_le_bytes(payload[4..8].try_into().unwrap());
+        let index_group = IndexGroup::from_bytes(payload[0..4].try_into().unwrap());
+        let index_offset = IndexOffset::from_bytes(payload[4..8].try_into().unwrap());
         let read_length = u32::from_le_bytes(payload[8..12].try_into().unwrap());
         let write_length = u32::from_le_bytes(payload[12..16].try_into().unwrap()) as usize;
 
@@ -275,8 +275,8 @@ impl From<&AdsReadWriteRequestOwned> for AmsFrame {
         );
 
         payload.extend_from_slice(&value.header.to_bytes());
-        payload.extend_from_slice(&value.index_group.to_le_bytes());
-        payload.extend_from_slice(&value.index_offset.to_le_bytes());
+        payload.extend_from_slice(&value.index_group.to_bytes());
+        payload.extend_from_slice(&value.index_offset.to_bytes());
         payload.extend_from_slice(&value.read_length.to_le_bytes());
         payload.extend_from_slice(&(value.data.len() as u32).to_le_bytes());
         payload.extend_from_slice(&value.data);
@@ -561,8 +561,8 @@ mod tests {
             target,
             source,
             99,
-            0xF003,
-            0x0000,
+            0xF003.into(),
+            0x0000.into(),
             4,
             write_data.clone(),
         );
@@ -570,8 +570,8 @@ mod tests {
 
         let view = AdsReadWriteRequest::try_from(&frame).expect("Should parse");
 
-        assert_eq!(view.index_group(), 0xF003);
-        assert_eq!(view.index_offset(), 0x0000);
+        assert_eq!(view.index_group(), 0xF003.into());
+        assert_eq!(view.index_offset(), 0x0000.into());
         assert_eq!(view.read_length(), 4);
         assert_eq!(view.data(), write_data.as_slice());
         assert_eq!(view.header().invoke_id(), 99);
@@ -583,8 +583,15 @@ mod tests {
         let (target, source) = make_addrs();
         let write_data = vec![0xDE, 0xAD, 0xBE, 0xEF];
 
-        let owned =
-            AdsReadWriteRequestOwned::new(target, source, 1, 0x1, 0x2, 4, write_data.clone());
+        let owned = AdsReadWriteRequestOwned::new(
+            target,
+            source,
+            1,
+            0x1.into(),
+            0x2.into(),
+            4,
+            write_data.clone(),
+        );
         let frame = owned.to_frame();
 
         let view = AdsReadWriteRequest::try_from(&frame).expect("Should parse");
@@ -600,7 +607,8 @@ mod tests {
     fn test_request_empty_write_data() {
         let (target, source) = make_addrs();
 
-        let owned = AdsReadWriteRequestOwned::new(target, source, 1, 0x1, 0x0, 16, []);
+        let owned =
+            AdsReadWriteRequestOwned::new(target, source, 1, 0x1.into(), 0x0.into(), 16, []);
         let frame = owned.to_frame();
 
         let view = AdsReadWriteRequest::try_from(&frame).expect("Should parse");
@@ -613,8 +621,15 @@ mod tests {
         let (target, source) = make_addrs();
         let write_data = b"MAIN.counter\0".to_vec();
 
-        let owned =
-            AdsReadWriteRequestOwned::new(target, source, 1, 0xF003, 0x0, 4, write_data.clone());
+        let owned = AdsReadWriteRequestOwned::new(
+            target,
+            source,
+            1,
+            IndexGroup::SYMBOL_HANDLE_BY_NAME,
+            0x0.into(),
+            4,
+            write_data.clone(),
+        );
         let frame = owned.to_frame();
 
         let view = AdsReadWriteRequest::try_from(&frame).expect("Should parse");
@@ -629,12 +644,19 @@ mod tests {
         let (target, source) = make_addrs();
         let write_data = vec![1, 2, 3];
 
-        let owned =
-            AdsReadWriteRequestOwned::new(target, source, 1, 0xF003, 0x0, 4, write_data.clone());
+        let owned = AdsReadWriteRequestOwned::new(
+            target,
+            source,
+            1,
+            IndexGroup::SYMBOL_HANDLE_BY_NAME,
+            0x0.into(),
+            4,
+            write_data.clone(),
+        );
         let view = owned.as_view();
 
         assert_eq!(view.data(), write_data.as_slice());
-        assert_eq!(view.index_group(), 0xF003);
+        assert_eq!(view.index_group(), 0xF003.into());
     }
 
     #[test]
@@ -710,8 +732,8 @@ mod tests {
             target,
             source,
             1,
-            0xF080,
-            0x0,
+            IndexGroup::SUM_READ,
+            0x0.into(),
             32_768,
             large_write.clone(),
         );
@@ -741,8 +763,8 @@ mod tests {
             target,
             source,
             1,
-            0xF003, // ADSIGRP_SYM_HNDBYNAME
-            0x0000,
+            IndexGroup::SYMBOL_HANDLE_BY_NAME,
+            IndexOffset::ZERO,
             4, // handle is 4 bytes
             symbol_name.to_vec(),
         );
@@ -751,7 +773,7 @@ mod tests {
 
         assert_eq!(view.data(), symbol_name);
         assert_eq!(view.read_length(), 4);
-        assert_eq!(view.index_group(), 0xF003);
+        assert_eq!(view.index_group(), IndexGroup::SYMBOL_HANDLE_BY_NAME);
 
         // Simulate the response: server sends back a 4-byte handle
         let handle = 0x0000_001Au32.to_le_bytes();
@@ -768,8 +790,15 @@ mod tests {
         let (target, source) = make_addrs();
         let write_data = vec![1, 2, 3];
 
-        let owned =
-            AdsReadWriteRequestOwned::new(target, source, 1, 0x1, 0x2, 8, write_data.clone());
+        let owned = AdsReadWriteRequestOwned::new(
+            target,
+            source,
+            1,
+            0x1.into(),
+            0x2.into(),
+            8,
+            write_data.clone(),
+        );
 
         let view: AdsReadWriteRequest<'_> = AdsReadWriteRequest::from(&owned);
         assert_eq!(view.data(), write_data.as_slice());

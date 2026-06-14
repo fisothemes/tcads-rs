@@ -1,12 +1,9 @@
-use super::{
-    DATATYPE_INFO_BY_NAME_INDEX_GROUP, DATATYPE_UPLOAD_INDEX_GROUP, SYMBOL_UPLOAD_INFO_INDEX_GROUP,
-};
 use crate::devices::blocking::{AdsDevice, SumDevice};
 use std::net::ToSocketAddrs;
 use std::time::Duration;
 use tcads_core::{
     AdsError, AdsSymbolUploadInfo, AdsSymbolUploadInfoV3, AdsTypeInfo, AdsTypeInfoIteratorOwned,
-    AmsAddr, AmsPort, SumReadWriteRequest,
+    AmsAddr, AmsPort, IndexGroup, IndexOffset, SumReadWriteRequest,
 };
 
 /// An ADS device client for fetching data type info from a PLC runtime.
@@ -95,14 +92,12 @@ impl TypeInfoDevice {
 
     /// Fetches the TwinCAT type information for a specific type by name.
     pub fn get_type_info(&self, name: impl AsRef<str>) -> crate::Result<AdsTypeInfo> {
-        let name = name.as_ref();
-
         let bytes = self.device.read_write(
             self.target,
-            DATATYPE_INFO_BY_NAME_INDEX_GROUP,
-            0,
+            IndexGroup::DATA_TYPE_INFO_BY_NAME_EX,
+            IndexOffset::ZERO,
             1_048_576, // assumed max size of a single entry, router will return the actual size
-            name,
+            name.as_ref(),
         )?;
 
         Ok(AdsTypeInfo::try_from(bytes.as_ref())?)
@@ -120,8 +115,8 @@ impl TypeInfoDevice {
             .iter()
             .map(|name| {
                 SumReadWriteRequest::new(
-                    DATATYPE_INFO_BY_NAME_INDEX_GROUP,
-                    0,
+                    IndexGroup::DATA_TYPE_INFO_BY_NAME_EX,
+                    IndexOffset::ZERO,
                     1_048_576, // assumed max size of a single entry, router will return the actual size
                     name.as_ref().as_bytes(),
                 )
@@ -155,9 +150,12 @@ impl TypeInfoDevice {
             .data_type_blob_size()
             .unwrap_or(1_048_576 * 4);
 
-        let raw_blob = self
-            .device
-            .read(self.target, DATATYPE_UPLOAD_INDEX_GROUP, 0, size)?;
+        let raw_blob = self.device.read(
+            self.target,
+            IndexGroup::DATA_TYPE_UPLOAD,
+            IndexOffset::ZERO,
+            size,
+        )?;
 
         Ok(AdsTypeInfoIteratorOwned::new(raw_blob).map(|res| res.map_err(crate::Error::from)))
     }
@@ -166,8 +164,8 @@ impl TypeInfoDevice {
     pub fn get_upload_info(&self) -> crate::Result<AdsSymbolUploadInfo> {
         let bytes = self.device.read(
             self.target,
-            SYMBOL_UPLOAD_INFO_INDEX_GROUP,
-            0,
+            IndexGroup::SYMBOL_UPLOAD_INFO2,
+            IndexOffset::ZERO,
             // Using the largest version because server will return the largest version it supports.
             AdsSymbolUploadInfoV3::LENGTH as u32,
         )?;

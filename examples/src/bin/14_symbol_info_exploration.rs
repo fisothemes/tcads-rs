@@ -38,11 +38,7 @@ fn main() -> Result<()> {
         println!("  Type:    {}", sym.type_name());
         println!("  Size:    {} bytes", sym.size());
         println!("  Comment: {}", sym.comment());
-        println!(
-            "  Index:   {:#010X}:{:#010X}",
-            sym.index_group(),
-            sym.index_offset()
-        );
+        println!("  Index:   {}:{}", sym.index_group(), sym.index_offset());
         println!();
     }
 

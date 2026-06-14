@@ -186,8 +186,8 @@ impl AdsAddDeviceNotificationRequest {
             })?;
         }
 
-        let index_group = IndexGroup::from_le_bytes(payload[0..4].try_into().unwrap());
-        let index_offset = IndexOffset::from_le_bytes(payload[4..8].try_into().unwrap());
+        let index_group = IndexGroup::from_bytes(payload[0..4].try_into().unwrap());
+        let index_offset = IndexOffset::from_bytes(payload[4..8].try_into().unwrap());
         let length = u32::from_le_bytes(payload[8..12].try_into().unwrap());
         let trans_mode = AdsTransMode::try_from_slice(&payload[12..16]).map_err(AdsError::from)?;
         let max_delay = u32::from_le_bytes(payload[16..20].try_into().unwrap());
@@ -209,8 +209,8 @@ impl From<&AdsAddDeviceNotificationRequest> for AmsFrame {
             Vec::with_capacity(AdsHeader::LENGTH + AdsAddDeviceNotificationRequest::PAYLOAD_SIZE);
 
         payload.extend_from_slice(&value.header.to_bytes());
-        payload.extend_from_slice(&value.index_group.to_le_bytes());
-        payload.extend_from_slice(&value.index_offset.to_le_bytes());
+        payload.extend_from_slice(&value.index_group.to_bytes());
+        payload.extend_from_slice(&value.index_offset.to_bytes());
         payload.extend_from_slice(&value.notif_attr.to_bytes());
         payload.extend_from_slice(&value.reserved);
 
@@ -422,8 +422,8 @@ mod tests {
             target,
             source,
             0xCAFE,
-            0xF005,
-            0x0001_0203,
+            IndexGroup::new(0xF005),
+            IndexOffset::new(0x0001_0203),
             AdsNotificationAttrib {
                 length: 4,
                 trans_mode: AdsTransMode::ClientOnChange,
@@ -435,8 +435,8 @@ mod tests {
         let frame = request.to_frame();
         let decoded = AdsAddDeviceNotificationRequest::try_from(&frame).expect("Should parse");
 
-        assert_eq!(decoded.index_group(), 0xF005);
-        assert_eq!(decoded.index_offset(), 0x0001_0203);
+        assert_eq!(decoded.index_group(), IndexGroup::new(0xF005));
+        assert_eq!(decoded.index_offset(), IndexOffset::new(0x0001_0203));
         assert_eq!(decoded.length(), 4);
         assert_eq!(decoded.trans_mode(), AdsTransMode::ClientOnChange);
         assert_eq!(decoded.max_delay(), 0);
@@ -453,8 +453,8 @@ mod tests {
             target,
             source,
             1,
-            0x4020,
-            0x0,
+            IndexGroup::new(0x4020),
+            IndexOffset::ZERO,
             AdsNotificationAttrib {
                 length: 4,
                 trans_mode: AdsTransMode::ClientCycle,
@@ -479,8 +479,8 @@ mod tests {
             target,
             source,
             1,
-            0x1,
-            0x0,
+            IndexGroup::new(0x1),
+            IndexOffset::ZERO,
             AdsNotificationAttrib {
                 length: 4,
                 trans_mode: AdsTransMode::None,
@@ -529,8 +529,8 @@ mod tests {
             target,
             source,
             invoke_id,
-            0xF005,
-            0x1234,
+            IndexGroup::new(0xF005),
+            IndexOffset::new(0x1234),
             AdsNotificationAttrib {
                 length: 4,
                 trans_mode: AdsTransMode::ClientOnChange,
@@ -574,8 +574,8 @@ mod tests {
             target,
             source,
             1,
-            0x1,
-            0x0,
+            IndexGroup::new(0x1),
+            IndexOffset::ZERO,
             AdsNotificationAttrib {
                 length: 4,
                 trans_mode: AdsTransMode::None,

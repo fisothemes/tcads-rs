@@ -23,8 +23,18 @@ fn main() -> Result<()> {
 
     // 2. Resolve symbol handles
     let reqs = [
-        SumReadWriteRequest::new(0xF003, 0, 4, b"MAIN.bIncrement\0"),
-        SumReadWriteRequest::new(0xF003, 0, 4, b"MAIN.nCount\0"),
+        SumReadWriteRequest::new(
+            IndexGroup::SYMBOL_HANDLE_BY_NAME,
+            IndexOffset::ZERO,
+            4,
+            b"MAIN.bIncrement\0",
+        ),
+        SumReadWriteRequest::new(
+            IndexGroup::SYMBOL_HANDLE_BY_NAME,
+            IndexOffset::ZERO,
+            4,
+            b"MAIN.nCount\0",
+        ),
     ];
 
     println!("Resolving symbol handles...");
@@ -44,13 +54,13 @@ fn main() -> Result<()> {
     // 3. Register batch notifications
     let reqs = [
         SumAddNotificationRequest::new(
-            0xF005,
-            handles[0],
+            IndexGroup::SYMBOL_VALUE_BY_HANDLE,
+            IndexOffset::from(handles[0]),
             AdsNotificationAttrib::new(1, AdsTransMode::ServerOnChange, 0, 100_000),
         ),
         SumAddNotificationRequest::new(
-            0xF005,
-            handles[1],
+            IndexGroup::SYMBOL_VALUE_BY_HANDLE,
+            IndexOffset::from(handles[1]),
             AdsNotificationAttrib::new(4, AdsTransMode::ServerOnChange, 0, 100_000),
         ),
     ];

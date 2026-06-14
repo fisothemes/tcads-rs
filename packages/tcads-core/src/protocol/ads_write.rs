@@ -100,8 +100,8 @@ impl<'a> AdsWriteRequest<'a> {
             })?;
         }
 
-        let index_group = IndexGroup::from_le_bytes(payload[0..4].try_into().unwrap());
-        let index_offset = IndexOffset::from_le_bytes(payload[4..8].try_into().unwrap());
+        let index_group = IndexGroup::from_bytes(payload[0..4].try_into().unwrap());
+        let index_offset = IndexOffset::from_bytes(payload[4..8].try_into().unwrap());
         let data_len = u32::from_le_bytes(payload[8..12].try_into().unwrap()) as usize;
 
         if payload.len() < Self::MIN_PAYLOAD_SIZE + data_len {
@@ -242,8 +242,8 @@ impl From<&AdsWriteRequestOwned> for AmsFrame {
         );
 
         payload.extend_from_slice(&value.header.to_bytes());
-        payload.extend_from_slice(&value.index_group.to_le_bytes());
-        payload.extend_from_slice(&value.index_offset.to_le_bytes());
+        payload.extend_from_slice(&value.index_group.to_bytes());
+        payload.extend_from_slice(&value.index_offset.to_bytes());
         payload.extend_from_slice(&(value.data.len() as u32).to_le_bytes());
         payload.extend_from_slice(&value.data);
 
@@ -408,13 +408,20 @@ mod tests {
         let (target, source) = make_addrs();
         let data = vec![0x01, 0x02, 0x03, 0x04];
 
-        let owned = AdsWriteRequestOwned::new(target, source, 42, 0x4020, 0x0000, data.clone());
+        let owned = AdsWriteRequestOwned::new(
+            target,
+            source,
+            42,
+            0x4020.into(),
+            0x0000.into(),
+            data.clone(),
+        );
         let frame = owned.to_frame();
 
         let view = AdsWriteRequest::try_from(&frame).expect("Should parse");
 
-        assert_eq!(view.index_group(), 0x4020);
-        assert_eq!(view.index_offset(), 0x0000);
+        assert_eq!(view.index_group(), 0x4020.into());
+        assert_eq!(view.index_offset(), 0x0000.into());
         assert_eq!(view.data(), data.as_slice());
         assert_eq!(view.header().invoke_id(), 42);
         assert!(view.header().state_flags().is_request());
@@ -425,7 +432,8 @@ mod tests {
         let (target, source) = make_addrs();
         let data = vec![0xDE, 0xAD, 0xBE, 0xEF];
 
-        let owned = AdsWriteRequestOwned::new(target, source, 1, 0x1, 0x2, data.clone());
+        let owned =
+            AdsWriteRequestOwned::new(target, source, 1, 0x1.into(), 0x2.into(), data.clone());
         let frame = owned.to_frame();
 
         let view = AdsWriteRequest::try_from(&frame).expect("Should parse");
@@ -440,7 +448,7 @@ mod tests {
     fn test_write_request_empty_data() {
         let (target, source) = make_addrs();
 
-        let owned = AdsWriteRequestOwned::new(target, source, 1, 0x4020, 0x0010, []);
+        let owned = AdsWriteRequestOwned::new(target, source, 1, 0x4020.into(), 0x0010.into(), []);
         let frame = owned.to_frame();
 
         let view = AdsWriteRequest::try_from(&frame).expect("Should parse");
@@ -452,13 +460,14 @@ mod tests {
         let (target, source) = make_addrs();
         let data = vec![0xAA, 0xBB];
 
-        let owned = AdsWriteRequestOwned::new(target, source, 1, 0x1, 0x2, data.clone());
+        let owned =
+            AdsWriteRequestOwned::new(target, source, 1, 0x1.into(), 0x2.into(), data.clone());
         let frame = owned.to_frame();
 
         let view = AdsWriteRequest::try_from(&frame).expect("Should parse");
         let converted = view.into_owned();
 
-        assert_eq!(converted.index_group(), 0x1);
+        assert_eq!(converted.index_group(), 0x1.into());
         assert_eq!(converted.data(), data.as_slice());
     }
 
@@ -467,11 +476,12 @@ mod tests {
         let (target, source) = make_addrs();
         let data = vec![1, 2, 3];
 
-        let owned = AdsWriteRequestOwned::new(target, source, 1, 0x4020, 0x0, data.clone());
+        let owned =
+            AdsWriteRequestOwned::new(target, source, 1, 0x4020.into(), 0x0.into(), data.clone());
         let view = owned.as_view();
 
         assert_eq!(view.data(), data.as_slice());
-        assert_eq!(view.index_group(), 0x4020);
+        assert_eq!(view.index_group(), 0x4020.into());
     }
 
     #[test]
@@ -479,7 +489,8 @@ mod tests {
         let (target, source) = make_addrs();
         let data = vec![0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
 
-        let original = AdsWriteRequestOwned::new(target, source, 99, 0x4020, 0x10, data.clone());
+        let original =
+            AdsWriteRequestOwned::new(target, source, 99, 0x4020.into(), 0x10.into(), data.clone());
         let frame = original.to_frame();
 
         let view = AdsWriteRequest::try_from(&frame).expect("Should parse");
@@ -499,7 +510,14 @@ mod tests {
         let (target, source) = make_addrs();
         let large_data = vec![0xAAu8; 32_768]; // 32KB
 
-        let owned = AdsWriteRequestOwned::new(target, source, 1, 0xF081, 0x0, large_data.clone());
+        let owned = AdsWriteRequestOwned::new(
+            target,
+            source,
+            1,
+            0xF081.into(),
+            0x0.into(),
+            large_data.clone(),
+        );
         let frame = owned.to_frame();
 
         let view = AdsWriteRequest::try_from(&frame).expect("Should parse");
@@ -512,7 +530,8 @@ mod tests {
         let (target, source) = make_addrs();
         let data = vec![1, 2, 3];
 
-        let owned = AdsWriteRequestOwned::new(target, source, 1, 0x1, 0x2, data.clone());
+        let owned =
+            AdsWriteRequestOwned::new(target, source, 1, 0x1.into(), 0x2.into(), data.clone());
 
         // &AdsWriteRequestOwned -> AdsWriteRequest<'_>
         let view: AdsWriteRequest<'_> = AdsWriteRequest::from(&owned);
@@ -541,7 +560,8 @@ mod tests {
         let (target, source) = make_addrs();
         let data = vec![0xAA, 0xBB];
 
-        let owned = AdsWriteRequestOwned::new(target, source, 1, 0x1, 0x2, data.clone());
+        let owned =
+            AdsWriteRequestOwned::new(target, source, 1, 0x1.into(), 0x2.into(), data.clone());
         let frame = owned.to_frame();
 
         // AMS payload = AdsHeader (32) + IndexGroup (4) + IndexOffset (4) + Length (4) + Data (2)
