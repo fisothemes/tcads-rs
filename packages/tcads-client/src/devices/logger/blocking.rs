@@ -1,4 +1,3 @@
-use super::{LOGGER_INDEX_GROUP, LOGGER_INDEX_OFFSET, LogEntry, LogMessageType};
 use crate::devices::blocking::AdsDevice;
 use crate::notif_guard::blocking::NotificationGuard;
 use std::collections::HashSet;
@@ -9,7 +8,7 @@ use std::time::Duration;
 use tcads_core::protocol::AdsLoggerWriteRequestOwned;
 use tcads_core::{
     AdsNotificationAttrib, AdsNotificationSampleOwned, AdsTransMode, AmsAddr, AmsNetId, AmsPort,
-    NotificationHandle, WindowsFileTime,
+    IndexGroup, IndexOffset, LogEntry, LogMessageType, NotificationHandle, WindowsFileTime,
 };
 
 /// Shared state of an [`AdsDevice`] client for the TwinCAT system logger.
@@ -193,8 +192,8 @@ impl Logger {
     pub fn subscribe(&self) -> crate::Result<(LogEntryReceiver, NotificationHandle)> {
         let (rx, handle) = self.inner.device.add_notification(
             self.inner.target,
-            LOGGER_INDEX_GROUP,
-            LOGGER_INDEX_OFFSET,
+            IndexGroup::SYSTEM_LOGGER,
+            IndexOffset::SYSTEM_LOGGER,
             AdsNotificationAttrib::new(LogEntry::MAX_PAYLOAD_LEN, AdsTransMode::ServerCycle, 0, 0),
         )?;
         match self.inner.handles.lock() {

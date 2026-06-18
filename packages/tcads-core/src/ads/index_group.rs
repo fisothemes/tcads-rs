@@ -12,6 +12,9 @@ impl IndexGroup {
     /// Wire length of an index group in bytes.
     pub const LENGTH: usize = 4;
 
+    /// System logger notifications.
+    pub const SYSTEM_LOGGER: Self = Self(0x0001);
+
     /// Read/write PLC input image bytes (`%I` field) via the PLC interface. (`0x4000`)
     pub const PLC_IO_INPUT_BYTES: Self = Self(0x4000);
     /// Read/write PLC output image bytes (`%Q` field) via the PLC interface. (`0x4010`)

@@ -11,6 +11,9 @@ impl IndexOffset {
     /// An index offset of zero.
     pub const ZERO: Self = Self(0);
 
+    /// System logger offset.
+    pub const SYSTEM_LOGGER: Self = Self(0xFFFF);
+
     /// Base byte offset for [`IndexGroup::IO_IMAGE_INPUT_BYTES`] (`%I` field).
     /// Valid offsets start at `0x0001F400`. (`0x0001F400`)
     pub const IO_IMAGE_INPUT_BASE: Self = Self(0x0001_F400);

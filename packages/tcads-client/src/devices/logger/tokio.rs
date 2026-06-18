@@ -1,4 +1,3 @@
-use super::{LOGGER_INDEX_GROUP, LOGGER_INDEX_OFFSET, LogEntry, LogMessageType};
 use crate::devices::tokio::AdsDevice;
 use crate::notif_guard::tokio::NotificationGuard;
 use std::collections::HashSet;
@@ -8,7 +7,7 @@ use std::time::Duration;
 use tcads_core::protocol::AdsLoggerWriteRequestOwned;
 use tcads_core::{
     AdsNotificationAttrib, AdsNotificationSampleOwned, AdsTransMode, AmsAddr, AmsNetId, AmsPort,
-    NotificationHandle, WindowsFileTime,
+    IndexGroup, IndexOffset, LogEntry, LogMessageType, NotificationHandle, WindowsFileTime,
 };
 use tokio::sync::mpsc::UnboundedReceiver as Receiver;
 use tokio::sync::mpsc::error::TryRecvError;
@@ -213,8 +212,8 @@ impl Logger {
             .device
             .add_notification(
                 self.inner.target,
-                LOGGER_INDEX_GROUP,
-                LOGGER_INDEX_OFFSET,
+                IndexGroup::SYSTEM_LOGGER,
+                IndexOffset::SYSTEM_LOGGER,
                 AdsNotificationAttrib::new(
                     LogEntry::MAX_PAYLOAD_LEN,
                     AdsTransMode::ServerCycle,
