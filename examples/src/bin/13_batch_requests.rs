@@ -10,15 +10,15 @@
 //! activate the configuration on your local machine, and put the PLC into RUN mode.
 
 use std::time::Duration;
-use tcads::client::devices::blocking::SumDevice;
+use tcads::client::devices::blocking::AdsDevice;
 use tcads::core::*;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 fn main() -> Result<()> {
     // 1. Connect to the local router
-    let device = SumDevice::connect(Duration::from_secs(5))?;
-    let target = AmsAddr::new(device.get_ref().get_local_net_id()?, 851);
+    let device = AdsDevice::connect(Duration::from_secs(5))?;
+    let target = AmsAddr::new(device.get_local_net_id()?, 851);
     println!("Connected! Target PLC: {}", target);
 
     // 2. Resolve symbol handles
@@ -39,7 +39,7 @@ fn main() -> Result<()> {
 
     println!("Resolving symbol handles...");
     let handles: Vec<u32> = device
-        .read_write(target, &reqs)?
+        .read_write_multi(target, &reqs)?
         .iter()
         .enumerate()
         .map(|(i, res)| {
@@ -66,7 +66,7 @@ fn main() -> Result<()> {
     ];
 
     println!("Registering notifications...");
-    let results = device.add_notification(target, &reqs)?;
+    let results = device.add_multi_notifications(target, &reqs)?;
 
     let mut notif_handles = Vec::new();
     let mut thread_handles = Vec::new();
@@ -97,7 +97,7 @@ fn main() -> Result<()> {
 
     // 5. Tear everything down gracefully
     println!("Initiating teardown...");
-    let del_results = device.delete_notification(target, &notif_handles)?;
+    let del_results = device.delete_multi_notifications(target, &notif_handles)?;
 
     for (i, res) in del_results.iter().enumerate() {
         match res {

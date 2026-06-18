@@ -1,4 +1,4 @@
-use crate::devices::blocking::{AdsDevice, SumDevice};
+use crate::devices::blocking::AdsDevice;
 use std::net::ToSocketAddrs;
 use std::time::Duration;
 use tcads_core::{
@@ -108,8 +108,6 @@ impl SymbolInfoDevice {
         &self,
         names: impl AsRef<[S]>,
     ) -> crate::Result<impl Iterator<Item = crate::Result<AdsSymbolInfo>>> {
-        let sum_device = SumDevice::new(self.device.clone());
-
         let reqs: Vec<_> = names
             .as_ref()
             .iter()
@@ -123,8 +121,9 @@ impl SymbolInfoDevice {
             })
             .collect();
 
-        let results: Vec<crate::Result<AdsSymbolInfo>> = sum_device
-            .read_write(self.target, &reqs)?
+        let results: Vec<crate::Result<AdsSymbolInfo>> = self
+            .device
+            .read_write_multi(self.target, &reqs)?
             .iter()
             .map(|res| match res {
                 Ok(chunk) => AdsSymbolInfo::try_from(chunk).map_err(crate::Error::from),

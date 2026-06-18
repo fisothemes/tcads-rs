@@ -1,4 +1,4 @@
-use crate::devices::tokio::{AdsDevice, SumDevice};
+use crate::devices::tokio::AdsDevice;
 use std::net::ToSocketAddrs;
 use std::time::Duration;
 use tcads_core::{
@@ -111,8 +111,6 @@ impl TypeDevice {
         &self,
         names: impl AsRef<[S]>,
     ) -> crate::Result<impl Iterator<Item = crate::Result<AdsTypeInfo>>> {
-        let sum_device = SumDevice::new(self.device.clone());
-
         let reqs: Vec<_> = names
             .as_ref()
             .iter()
@@ -126,8 +124,9 @@ impl TypeDevice {
             })
             .collect();
 
-        let results: Vec<crate::Result<AdsTypeInfo>> = sum_device
-            .read_write(self.target, &reqs)
+        let results: Vec<crate::Result<AdsTypeInfo>> = self
+            .device
+            .read_write_multi(self.target, &reqs)
             .await?
             .iter()
             .map(|res| match res {
