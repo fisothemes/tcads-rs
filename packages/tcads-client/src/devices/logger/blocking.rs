@@ -150,7 +150,7 @@ impl Logger {
         self.write_entry(LogEntry::new(
             WindowsFileTime::now(),
             message_type,
-            self.get_ref().source()?.port(),
+            self.get_ref().source().port(),
             task_name.as_ref().to_owned(),
             message.as_ref().to_owned(),
         ))
@@ -171,7 +171,7 @@ impl Logger {
     pub fn write_entry(&self, entry: LogEntry) -> crate::Result<()> {
         let frame = AdsLoggerWriteRequestOwned::new(
             self.target(),
-            self.get_ref().source()?,
+            self.get_ref().source(),
             entry.timestamp(),
             entry.message_type(),
             entry.sender(),

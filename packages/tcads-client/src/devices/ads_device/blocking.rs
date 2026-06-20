@@ -4,9 +4,9 @@ use crate::tasks::blocking::{
 };
 use std::io::{Read, Write};
 use std::net::{SocketAddr, ToSocketAddrs};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::Receiver;
-use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tcads_core::io::blocking::{AmsReader, AmsStream, AmsWriter};
 use tcads_core::protocol::{
@@ -44,7 +44,6 @@ pub struct AdsDeviceInner {
     pub ams_requests: Arc<AmsRequestDispatcher>,
     pub ads_notifs: Arc<AdsNotificationDispatcher>,
     pub router_notifs: Arc<RouterNotificationDispatcher>,
-    pub source: RwLock<AmsAddr>,
     pub invoke_id: AtomicU32,
     pub timeout: Option<Duration>,
 }
@@ -111,6 +110,7 @@ pub struct AdsDeviceInner {
 #[derive(Clone)]
 pub struct AdsDevice {
     inner: Arc<AdsDeviceInner>,
+    source: AmsAddr,
 }
 
 impl AdsDevice {
@@ -172,9 +172,8 @@ impl AdsDevice {
             }
             None => AmsStream::connect(addr)?.try_split()?,
         };
-        let device = Self::new(reader, writer, AmsAddr::default(), timeout);
-        let source = device.port_connect()?;
-        *device.inner.source.write()? = source;
+        let mut device = Self::new(reader, writer, AmsAddr::default(), timeout);
+        device.source = device.port_connect()?;
         Ok(device)
     }
 
@@ -280,10 +279,10 @@ impl AdsDevice {
                 ams_requests,
                 ads_notifs,
                 router_notifs,
-                source: RwLock::new(source),
                 invoke_id: AtomicU32::new(1),
                 timeout: timeout.into(),
             }),
+            source,
         }
     }
 
@@ -297,14 +296,14 @@ impl AdsDevice {
     /// If the send fails (already disconnected) this returns `Ok(())` meaning the
     /// connection is already gone.
     pub fn shutdown(&self) -> crate::Result<()> {
-        let frame = PortCloseRequest::new(self.source()?.port()).into_frame();
+        let frame = PortCloseRequest::new(self.source.port()).into_frame();
         let _ = self.inner.ams_requests.send_only(frame);
         Ok(())
     }
 
     /// Returns the source [`AmsAddr`] currently assigned to this connection.
-    pub fn source(&self) -> crate::Result<AmsAddr> {
-        Ok(*self.inner.source.read()?)
+    pub fn source(&self) -> AmsAddr {
+        self.source
     }
 
     /// Queries the local AMS router's Net ID.
@@ -340,7 +339,7 @@ impl AdsDevice {
     pub fn read_device_info(&self, target: AmsAddr) -> crate::Result<(AdsDeviceVersion, String)> {
         let invoke_id = self.next_invoke_id();
 
-        let frame = AdsReadDeviceInfoRequest::new(target, self.source()?, invoke_id).into_frame();
+        let frame = AdsReadDeviceInfoRequest::new(target, self.source, invoke_id).into_frame();
         let resp = AdsReadDeviceInfoResponse::try_from(self.send_and_wait(frame, invoke_id)?)?;
 
         Self::check_result(resp.result())?;
@@ -352,7 +351,7 @@ impl AdsDevice {
     pub fn read_state(&self, target: AmsAddr) -> crate::Result<(AdsState, DeviceState)> {
         let invoke_id = self.next_invoke_id();
 
-        let frame = AdsReadStateRequest::new(target, self.source()?, invoke_id).into_frame();
+        let frame = AdsReadStateRequest::new(target, self.source, invoke_id).into_frame();
         let resp = AdsReadStateResponse::try_from(self.send_and_wait(frame, invoke_id)?)?;
 
         Self::check_result(resp.result())?;
@@ -372,7 +371,7 @@ impl AdsDevice {
 
         let frame = AdsWriteControlRequestOwned::with_data(
             target,
-            self.source()?,
+            self.source,
             invoke_id,
             ads_state,
             device_state,
@@ -398,7 +397,7 @@ impl AdsDevice {
 
         let frame = AdsReadRequest::new(
             target,
-            self.source()?,
+            self.source,
             invoke_id,
             index_group,
             index_offset,
@@ -424,7 +423,7 @@ impl AdsDevice {
         let invoke_id = self.next_invoke_id();
         let frame = AdsWriteRequestOwned::new(
             target,
-            self.source()?,
+            self.source,
             invoke_id,
             index_group,
             index_offset,
@@ -452,7 +451,7 @@ impl AdsDevice {
         let invoke_id = self.next_invoke_id();
         let frame = AdsReadWriteRequestOwned::new(
             target,
-            self.source()?,
+            self.source,
             invoke_id,
             index_group,
             index_offset,
@@ -493,7 +492,7 @@ impl AdsDevice {
 
         let frame = AdsAddDeviceNotificationRequest::new(
             target,
-            self.source()?,
+            self.source,
             invoke_id,
             index_group,
             index_offset,
@@ -522,9 +521,8 @@ impl AdsDevice {
     ) -> crate::Result<()> {
         let invoke_id = self.next_invoke_id();
 
-        let frame =
-            AdsDeleteDeviceNotificationRequest::new(target, self.source()?, invoke_id, handle)
-                .into_frame();
+        let frame = AdsDeleteDeviceNotificationRequest::new(target, self.source, invoke_id, handle)
+            .into_frame();
         let resp =
             AdsDeleteDeviceNotificationResponse::try_from(self.send_and_wait(frame, invoke_id)?)?;
 
@@ -821,7 +819,7 @@ impl AdsDevice {
         let expected_read_len = (n * 8) as u32;
         let frame = AdsReadWriteRequestOwned::new(
             target,
-            self.source()?,
+            self.source,
             invoke_id,
             IndexGroup::SUM_ADD_NOTIFICATION,
             IndexOffset::new(n as u32),
