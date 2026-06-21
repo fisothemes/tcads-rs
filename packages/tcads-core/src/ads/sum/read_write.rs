@@ -160,6 +160,18 @@ impl SumReadWriteRequestOwned {
     }
 }
 
+impl From<SumReadWriteRequest<'_>> for SumReadWriteRequestOwned {
+    fn from(req: SumReadWriteRequest) -> Self {
+        req.into_owned()
+    }
+}
+
+impl<'a> From<&'a SumReadWriteRequestOwned> for SumReadWriteRequest<'a> {
+    fn from(req: &'a SumReadWriteRequestOwned) -> Self {
+        req.as_borrowed()
+    }
+}
+
 /// A wrapper for an ADS Sum Read/Write response.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SumReadWriteResponse<'a> {
