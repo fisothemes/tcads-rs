@@ -10,15 +10,15 @@
 //! activate the configuration on your local machine, and put the PLC into RUN mode.
 
 use std::time::Duration;
-use tcads::client::devices::blocking::TypeInfoDevice;
-use tcads::core::AdsTypeCategory;
+use tcads::client::devices::blocking::RuntimeDevice;
+use tcads::core::{AdsTypeCategory, AmsAddr};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 fn main() -> Result<()> {
     println!("Connecting to the PLC runtime...");
     // 1. Establish a connection a PLC runtime (Port 851 and local AMS router)
-    let device = TypeInfoDevice::connect(851, Duration::from_secs(5))?;
+    let device = RuntimeDevice::connect(AmsAddr::from_local(851), Duration::from_secs(5))?;
 
     // 2. Retrieve Architectural Metadata
     // We need the platform pointer size (4 or 8 bytes) to accurately

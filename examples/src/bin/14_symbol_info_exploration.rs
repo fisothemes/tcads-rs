@@ -10,14 +10,14 @@
 //! activate the configuration on your local machine, and put the PLC into RUN mode.
 
 use std::time::Duration;
-use tcads::client::devices::blocking::SymbolInfoDevice;
+use tcads::client::devices::blocking::RuntimeDevice;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 fn main() -> Result<()> {
     println!("Connecting to the PLC runtime...");
     // 1. Establish a connection to the first PLC runtime (Port 851, local AMS router)
-    let device = SymbolInfoDevice::connect(851, Duration::from_secs(5))?;
+    let device = RuntimeDevice::connect_local(851, Duration::from_secs(5))?;
 
     // 2. Retrieve Symbol Table Metadata
     // The upload info describes how many symbols exist and how large the raw blob is.
