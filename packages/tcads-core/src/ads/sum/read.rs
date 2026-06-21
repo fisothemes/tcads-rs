@@ -117,7 +117,7 @@ impl<'a> SumReadResponse<'a> {
 
     /// Returns a reference to the raw underlying network buffer.
     pub const fn buffer(&self) -> &[u8] {
-        &self.buffer
+        self.buffer
     }
 
     /// Returns the number of requests that were part of this response.
