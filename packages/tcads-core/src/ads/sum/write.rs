@@ -82,6 +82,109 @@ impl<'a> SumWriteRequest<'a> {
             data: &bytes[Self::HEADER_LENGTH..Self::HEADER_LENGTH + data_len],
         })
     }
+
+    /// Consumes the current request and returns a fully owned request.
+    pub fn into_owned(self) -> SumWriteRequestOwned {
+        SumWriteRequestOwned::new(self.index_group, self.index_offset, self.data)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SumWriteRequestOwned {
+    index_group: IndexGroup,
+    index_offset: IndexOffset,
+    data: Vec<u8>,
+}
+
+impl SumWriteRequestOwned {
+    /// The fixed byte length of the header for this request.
+    pub const HEADER_LENGTH: usize = 12;
+
+    /// Creates a new instance of [`SumWriteRequestOwned`] with the given parameters.
+    pub fn new(
+        index_group: IndexGroup,
+        index_offset: IndexOffset,
+        data: impl Into<Vec<u8>>,
+    ) -> Self {
+        Self {
+            index_group,
+            index_offset,
+            data: data.into(),
+        }
+    }
+
+    /// The Index Group of the target variable.
+    pub const fn index_group(&self) -> IndexGroup {
+        self.index_group
+    }
+
+    /// The Index Offset of the target variable.
+    pub const fn index_offset(&self) -> IndexOffset {
+        self.index_offset
+    }
+
+    /// The raw byte data to write.
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    /// Serializes the 12-byte header (IndexGroup, IndexOffset, DataLength).
+    pub fn header_to_bytes(&self) -> [u8; 12] {
+        let mut buf = [0; Self::HEADER_LENGTH];
+        buf[0..4].copy_from_slice(&self.index_group.to_bytes());
+        buf[4..8].copy_from_slice(&self.index_offset.to_bytes());
+        buf[8..12].copy_from_slice(&(self.data.len() as u32).to_le_bytes());
+        buf
+    }
+
+    /// Writes the header to a buffer. (the caller must append Data separately
+    /// to comply with the Sum Command wire format).
+    pub fn write_header_to(&self, buf: &mut Vec<u8>) {
+        buf.extend_from_slice(&self.header_to_bytes());
+    }
+
+    /// Parses a slice of bytes into [`SumWriteRequestOwned`].
+    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, SumError> {
+        if bytes.len() < Self::HEADER_LENGTH {
+            return Err(SumError::HeaderTooShort {
+                expected: Self::HEADER_LENGTH,
+                got: bytes.len(),
+            });
+        }
+
+        let index_group = IndexGroup::from_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
+        let index_offset = IndexOffset::from_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
+        let data_len = u32::from_le_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]) as usize;
+
+        if bytes.len() < Self::HEADER_LENGTH + data_len {
+            return Err(SumError::PayloadTooShort {
+                expected: Self::HEADER_LENGTH + data_len,
+                got: bytes.len(),
+            });
+        }
+
+        Ok(Self {
+            index_group,
+            index_offset,
+            data: bytes[Self::HEADER_LENGTH..Self::HEADER_LENGTH + data_len].to_vec(),
+        })
+    }
+
+    pub fn as_borrowed(&self) -> SumWriteRequest<'_> {
+        SumWriteRequest::new(self.index_group, self.index_offset, &self.data)
+    }
+}
+
+impl From<SumWriteRequest<'_>> for SumWriteRequestOwned {
+    fn from(req: SumWriteRequest<'_>) -> Self {
+        req.into_owned()
+    }
+}
+
+impl<'a> From<&'a SumWriteRequestOwned> for SumWriteRequest<'a> {
+    fn from(req: &'a SumWriteRequestOwned) -> Self {
+        req.as_borrowed()
+    }
 }
 
 /// A zero-copy, lazy-evaluating wrapper for an ADS Sum Write response.
