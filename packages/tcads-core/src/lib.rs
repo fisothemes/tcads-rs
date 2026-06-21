@@ -148,7 +148,7 @@ pub use ads::{
     SumDeleteNotificationIter, SumDeleteNotificationResponse, SumReadRequest, SumReadResponse,
     SumReadResponseIter, SumReadResponseOwned, SumReadWriteRequest, SumReadWriteRequestOwned,
     SumReadWriteResponse, SumReadWriteResponseIter, SumReadWriteResponseOwned, SumWriteIter,
-    SumWriteRequest, SumWriteResponse, WindowsFileTime,
+    SumWriteRequest, SumWriteResponse, SymbolHandle, WindowsFileTime,
 };
 pub use ams::{
     AmsAddr, AmsCommand, AmsError, AmsNetId, AmsPort, AmsTcpHeader, RouterState, RuntimeType,

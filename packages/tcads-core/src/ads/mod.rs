@@ -51,7 +51,7 @@ pub use symbol::{
     AdsSymbol2Flags, AdsSymbolFlags, AdsSymbolInfo, AdsSymbolInfoIterator,
     AdsSymbolInfoIteratorOwned, AdsSymbolUploadFlags, AdsSymbolUploadInfo, AdsSymbolUploadInfoV1,
     AdsSymbolUploadInfoV2, AdsSymbolUploadInfoV3, AdsTypeCategory, AdsTypeFlags, AdsTypeId,
-    AdsTypeInfo, AdsTypeInfoIterator, AdsTypeInfoIteratorOwned, Guid,
+    AdsTypeInfo, AdsTypeInfoIterator, AdsTypeInfoIteratorOwned, Guid, SymbolHandle,
 };
 pub use trans_mode::AdsTransMode;
 
