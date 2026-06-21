@@ -1,5 +1,5 @@
 //! Example 10: Advanced Shared Logger
-//! Run with: `cargo run --bin 10_advanced_system_logger`
+//! Run with: `cargo run --bin 11_advanced_system_logger`
 //!
 //! Demonstrates multiplexing: sharing a single AMS connection between a
 //! standard `AdsDevice` (for PLC control) and a `Logger` (for system monitoring).

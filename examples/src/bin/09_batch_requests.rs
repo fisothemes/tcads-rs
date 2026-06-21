@@ -1,5 +1,5 @@
 //! Example 13: Batch requests (Sum Commands).
-//! Run with: `cargo run --bin 13_batch_requests`
+//! Run with: `cargo run --bin 09_batch_requests`
 //!
 //! This example demonstrates how to use the `SumDevice` to resolve multiple symbol
 //! handles, register them for notifications in a single network round-trip,

@@ -1,5 +1,5 @@
 //! Example 12: Advanced Runtime Type System Exploration
-//! Run with: `cargo run --bin 12_advanced_rtime_type_exploration`
+//! Run with: `cargo run --bin 13_advanced_rtime_type_exploration`
 //!
 //! Demonstrates how to perform a deep-scan of a TwinCAT PLC's data type system.
 //! It shows how to classify types (Structs, FBs, Enums) dynamically based on the target
