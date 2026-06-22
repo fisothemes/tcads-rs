@@ -4,7 +4,7 @@ use std::time::Duration;
 use tcads_core::{
     AdsError, AdsSymbolInfo, AdsSymbolInfoIteratorOwned, AdsSymbolUploadInfo,
     AdsSymbolUploadInfoV3, AdsTypeInfo, AdsTypeInfoIteratorOwned, AmsAddr, AmsPort, IndexGroup,
-    IndexOffset, SumReadWriteRequest,
+    IndexOffset, SumReadRequest, SumReadWriteRequest, SumWriteRequest, SymbolHandle,
 };
 
 /// A high-level client for interacting with a specific TwinCAT runtime.
@@ -110,6 +110,261 @@ impl RuntimeDevice {
         Ok(info)
     }
 
+    /// Fetches a symbol handle by its instance path (e.g. `"MAIN.nCount"`)
+    pub fn get_handle_by_name(&self, name: impl AsRef<str>) -> crate::Result<SymbolHandle> {
+        let resp = self.device.read_write(
+            self.target,
+            IndexGroup::SYMBOL_HANDLE_BY_NAME,
+            IndexOffset::ZERO,
+            4,
+            name.as_ref(),
+        )?;
+
+        if resp.len() != 4 {
+            return Err(AdsError::UnexpectedDataLength {
+                expected: 4,
+                got: resp.len(),
+            }
+            .into());
+        }
+
+        Ok(SymbolHandle::from_bytes([
+            resp[0], resp[1], resp[2], resp[3],
+        ]))
+    }
+
+    /// Fetches multiple symbol handles in a single network transaction.
+    pub fn get_multi_handles_by_name<S: AsRef<str>>(
+        &self,
+        names: impl AsRef<[S]>,
+    ) -> crate::Result<impl Iterator<Item = crate::Result<SymbolHandle>>> {
+        let reqs: Vec<_> = names
+            .as_ref()
+            .iter()
+            .map(|name| {
+                SumReadWriteRequest::new(
+                    IndexGroup::SYMBOL_HANDLE_BY_NAME,
+                    IndexOffset::ZERO,
+                    4,
+                    name.as_ref().as_bytes(),
+                )
+            })
+            .collect();
+
+        let resp = self.device.read_write_multi(self.target, &reqs)?;
+
+        let results = resp
+            .into_iter()
+            .map(|res| match res {
+                Ok(chunk) => Ok(SymbolHandle::from_bytes([
+                    chunk[0], chunk[1], chunk[2], chunk[3],
+                ])),
+                Err(err) => Err(crate::Error::from(err)),
+            })
+            .collect::<Vec<_>>();
+
+        Ok(results.into_iter())
+    }
+
+    /// Releases a symbol handle.
+    pub fn release_handle(&self, handle: SymbolHandle) -> crate::Result<()> {
+        self.device.write(
+            self.target,
+            IndexGroup::SYMBOL_RELEASE_HANDLE,
+            IndexOffset::ZERO,
+            handle.to_bytes(),
+        )
+    }
+
+    /// Releases multiple symbol handles.
+    pub fn release_multi_handles(
+        &self,
+        handles: impl AsRef<[SymbolHandle]>,
+    ) -> crate::Result<impl Iterator<Item = crate::Result<()>>> {
+        let reqs: Vec<_> = handles
+            .as_ref()
+            .iter()
+            .map(|handle| {
+                SumWriteRequest::new(
+                    IndexGroup::SYMBOL_RELEASE_HANDLE,
+                    IndexOffset::ZERO,
+                    handle.as_bytes(),
+                )
+            })
+            .collect();
+
+        let resp = self.device.write_multi(self.target, &reqs)?;
+
+        let results = resp
+            .into_iter()
+            .map(|res| match res {
+                Ok(()) => Ok(()),
+                Err(err) => Err(crate::Error::from(err)),
+            })
+            .collect::<Vec<_>>();
+
+        Ok(results.into_iter())
+    }
+
+    /// Reads a value from the symbol as raw bytes using a handle.
+    pub fn read_bytes_by_handle(
+        &self,
+        handle: SymbolHandle,
+        length: usize,
+    ) -> crate::Result<Vec<u8>> {
+        self.device.read(
+            self.target,
+            IndexGroup::SYMBOL_VALUE_BY_HANDLE,
+            handle.as_u32().into(),
+            length as u32,
+        )
+    }
+
+    pub fn read_multi_as_bytes_by_handle(
+        &self,
+        infos: impl AsRef<[AdsSymbolInfo]>,
+    ) -> crate::Result<impl Iterator<Item = crate::Result<Vec<u8>>>> {
+        let reqs: Vec<_> = infos
+            .as_ref()
+            .iter()
+            .map(|info| SumReadRequest::new(info.index_group(), info.index_offset(), info.size()))
+            .collect();
+
+        let resp = self.device.read_multi(self.target, &reqs)?;
+
+        let results = resp
+            .into_iter()
+            .map(|res| match res {
+                Ok(chunk) => Ok(chunk.to_vec()),
+                Err(err) => Err(crate::Error::from(err)),
+            })
+            .collect::<Vec<_>>();
+
+        Ok(results.into_iter())
+    }
+
+    /// Writes a value to the symbol as raw bytes using a handle.
+    pub fn write_bytes_by_handle(
+        &self,
+        handle: SymbolHandle,
+        data: impl Into<Vec<u8>>,
+    ) -> crate::Result<()> {
+        self.device.write(
+            self.target,
+            IndexGroup::SYMBOL_VALUE_BY_HANDLE,
+            handle.as_u32().into(),
+            data,
+        )
+    }
+
+    pub fn write_multi_as_bytes_by_handle<S: AsRef<SymbolHandle>, D: AsRef<[u8]>>(
+        &self,
+        items: impl AsRef<[(S, D)]>,
+    ) -> crate::Result<impl Iterator<Item = crate::Result<()>>> {
+        let reqs: Vec<_> = items
+            .as_ref()
+            .iter()
+            .map(|(handle, data)| {
+                SumWriteRequest::new(
+                    IndexGroup::SYMBOL_VALUE_BY_HANDLE,
+                    handle.as_ref().as_u32().into(),
+                    data.as_ref(),
+                )
+            })
+            .collect();
+
+        let resp = self.device.write_multi(self.target, &reqs)?;
+
+        let results = resp
+            .into_iter()
+            .map(|res| match res {
+                Ok(()) => Ok(()),
+                Err(err) => Err(crate::Error::from(err)),
+            })
+            .collect::<Vec<_>>();
+
+        Ok(results.into_iter())
+    }
+
+    /// Reads raw bytes from a symbol directly using its absolute memory location
+    /// ([`IndexGroup`] and [`IndexOffset`]) provided by its [`AdsSymbolInfo`].
+    pub fn read_bytes_by_info(&self, info: &AdsSymbolInfo) -> crate::Result<Vec<u8>> {
+        self.device.read(
+            self.target,
+            info.index_group(),
+            info.index_offset(),
+            info.size(),
+        )
+    }
+
+    /// Reads raw bytes from multiple symbols directly using their absolute memory locations
+    /// ([`IndexGroup`] and [`IndexOffset`]) provided by their [`AdsSymbolInfo`]s in a single
+    /// network transaction.
+    pub fn read_multi_as_bytes_by_info(
+        &self,
+        infos: impl AsRef<[AdsSymbolInfo]>,
+    ) -> crate::Result<impl Iterator<Item = crate::Result<Vec<u8>>>> {
+        let reqs: Vec<_> = infos
+            .as_ref()
+            .iter()
+            .map(|info| SumReadRequest::new(info.index_group(), info.index_offset(), info.size()))
+            .collect();
+
+        let resp = self.device.read_multi(self.target, &reqs)?;
+
+        let results = resp
+            .into_iter()
+            .map(|res| match res {
+                Ok(chunk) => Ok(chunk.to_vec()),
+                Err(err) => Err(crate::Error::from(err)),
+            })
+            .collect::<Vec<_>>();
+
+        Ok(results.into_iter())
+    }
+
+    /// Writes raw bytes to a symbol directly using its absolute memory location
+    /// ([`IndexGroup`] and [`IndexOffset`]) provided by its [`AdsSymbolInfo`].
+    pub fn write_bytes_by_info(
+        &self,
+        info: &AdsSymbolInfo,
+        data: impl Into<Vec<u8>>,
+    ) -> crate::Result<()> {
+        self.device
+            .write(self.target, info.index_group(), info.index_offset(), data)
+    }
+
+    /// Writes raw bytes to multiple symbols directly using their absolute memory locations
+    /// provided by their [`AdsSymbolInfo`] in a single network transaction.
+    pub fn write_multi_as_bytes_by_info<S: AsRef<AdsSymbolInfo>, D: AsRef<[u8]>>(
+        &self,
+        items: impl AsRef<[(S, D)]>,
+    ) -> crate::Result<impl Iterator<Item = crate::Result<()>>> {
+        let reqs: Vec<_> = items
+            .as_ref()
+            .iter()
+            .map(|(info, data)| {
+                SumWriteRequest::new(
+                    info.as_ref().index_group(),
+                    info.as_ref().index_offset(),
+                    data.as_ref(),
+                )
+            })
+            .collect();
+
+        let resp = self.device.write_multi(self.target, &reqs)?;
+
+        let results = resp
+            .into_iter()
+            .map(|res| match res {
+                Ok(()) => Ok(()),
+                Err(err) => Err(crate::Error::from(err)),
+            })
+            .collect::<Vec<_>>();
+
+        Ok(results.into_iter())
+    }
+
     /// Fetches the metadata for a specific Symbol by its instance path (e.g. `"MAIN.nCount"`).
     pub fn get_symbol_info(&self, name: impl AsRef<str>) -> crate::Result<AdsSymbolInfo> {
         let bytes = self.device.read_write(
@@ -142,15 +397,15 @@ impl RuntimeDevice {
             })
             .collect();
 
-        let results: Vec<crate::Result<AdsSymbolInfo>> = self
-            .device
-            .read_write_multi(self.target, &reqs)?
-            .iter()
+        let resp = self.device.read_write_multi(self.target, &reqs)?;
+
+        let results = resp
+            .into_iter()
             .map(|res| match res {
                 Ok(chunk) => AdsSymbolInfo::try_from(chunk).map_err(crate::Error::from),
                 Err(err) => Err(crate::Error::from(err)),
             })
-            .collect();
+            .collect::<Vec<_>>();
 
         Ok(results.into_iter())
     }
