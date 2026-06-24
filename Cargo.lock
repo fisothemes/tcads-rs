@@ -559,6 +559,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tcads-serde"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tcads-core",
+ "thiserror",
+]
+
+[[package]]
 name = "tcads-server"
 version = "0.1.0"
 

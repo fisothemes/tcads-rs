@@ -1,11 +1,12 @@
 [workspace]
 resolver = "3"
 members = [
+    "examples",
     "packages/tcads",
     "packages/tcads-core",
     "packages/tcads-client",
+    "packages/tcads-serde",
     "packages/tcads-server",
-    "examples"
 ]
 
 [workspace.package]
@@ -18,6 +19,7 @@ repository = "https://github.com/fisothemes/tcads-rs"
 tcads = { path = "packages/tcads" }
 tcads-core = { path = "packages/tcads-core" }
 tcads-client = { path = "packages/tcads-client" }
+tcads-serde = {path = "packages/tcads-serde"}
 tcads-server = { path = "packages/tcads-server" }
 tokio = "1"
 tokio-test = "0.4"
