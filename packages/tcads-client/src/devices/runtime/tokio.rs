@@ -100,6 +100,32 @@ impl RuntimeDevice {
         Ok(AdsSymbolUploadInfo::try_from(bytes.as_ref()).map_err(AdsError::from)?)
     }
 
+    /// Fetches the current Symbol Version of the PLC runtime.
+    ///
+    /// The Symbol Version changes whenever the PLC's symbol configuration is
+    /// updated (e.g. during a TwinCAT "Online Change" or a completely new program download).
+    pub async fn get_symbol_version(&self) -> crate::Result<u8> {
+        let bytes = self
+            .device
+            .read(
+                self.target,
+                IndexGroup::SYMBOL_VERSION,
+                IndexOffset::ZERO,
+                1,
+            )
+            .await?;
+
+        if bytes.len() != 1 {
+            return Err(AdsError::UnexpectedDataLength {
+                expected: 1,
+                got: bytes.len(),
+            }
+            .into());
+        }
+
+        Ok(bytes[0])
+    }
+
     /// Fetches a symbol handle by its instance path (e.g. `"MAIN.nCount"`)
     pub async fn get_handle_by_name(&self, name: impl AsRef<str>) -> crate::Result<SymbolHandle> {
         let resp = self
