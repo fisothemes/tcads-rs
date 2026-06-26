@@ -1,12 +1,14 @@
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum Error {
+    #[error("Size mismatch: expected {expected} bytes, but PLC type has {got} bytes")]
+    SizeMismatch { expected: usize, got: usize },
     #[error("Shape mismatch: expected {expected} fields, but PLC struct has {got}")]
     ShapeMismatch { expected: usize, got: usize },
-    #[error("Type not found in cache: {0}")]
+    #[error("Type not found in provider: {0}")]
     TypeNotFound(String),
     #[error("Invalid byte length for primitive. Got {0} bytes.")]
     InvalidByteLength(usize),
-    #[error("Serde error: {0}")]
+    #[error("{0}")]
     Custom(String),
 }
 
