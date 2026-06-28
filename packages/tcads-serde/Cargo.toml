@@ -7,6 +7,10 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+indexmap = { workspace = true }
+serde = { workspace = true }
 tcads-core = { workspace = true }
 thiserror = { workspace = true }
-serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
