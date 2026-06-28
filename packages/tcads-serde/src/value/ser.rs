@@ -18,6 +18,12 @@ impl Serialize for Value {
                 }
                 map.end()
             }
+            Value::Enum { name, value } => {
+                let mut map = serializer.serialize_map(Some(2))?;
+                map.serialize_entry("name", name)?;
+                map.serialize_entry("value", value)?;
+                map.end()
+            }
         }
     }
 }

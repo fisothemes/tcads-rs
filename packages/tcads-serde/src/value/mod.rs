@@ -15,6 +15,7 @@ pub enum Value {
     String(String),
     Array(Vec<Value>),
     Struct(IndexMap<String, Value>),
+    Enum { name: String, value: Integer },
 }
 
 impl Value {
@@ -36,6 +37,10 @@ impl Value {
 
     pub const fn is_struct(&self) -> bool {
         matches!(self, Value::Struct(_))
+    }
+
+    pub const fn is_enum(&self) -> bool {
+        matches!(self, Value::Enum { .. })
     }
 
     pub const fn as_bool(&self) -> Option<bool> {
@@ -73,6 +78,13 @@ impl Value {
         }
     }
 
+    pub fn as_enum(&self) -> Option<(&String, &Integer)> {
+        match self {
+            Value::Enum { name, value } => Some((name, value)),
+            _ => None,
+        }
+    }
+
     pub const fn as_bool_mut(&mut self) -> Option<&mut bool> {
         match self {
             Value::Bool(b) => Some(b),
@@ -97,6 +109,13 @@ impl Value {
     pub fn as_struct_mut(&mut self) -> Option<&mut Slice<String, Value>> {
         match self {
             Value::Struct(fields) => Some(fields.as_mut_slice()),
+            _ => None,
+        }
+    }
+
+    pub fn as_enum_mut(&mut self) -> Option<(&mut String, &mut Integer)> {
+        match self {
+            Value::Enum { name, value } => Some((name, value)),
             _ => None,
         }
     }
