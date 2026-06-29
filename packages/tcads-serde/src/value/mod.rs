@@ -10,6 +10,7 @@ pub use number::{Float, Integer, Number, SignedInteger, UnsignedInteger};
 /// A dynamically typed TwinCAT Runtime ADS value.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
+    Null,
     Bool(bool),
     Number(Number),
     String(String),
@@ -19,6 +20,10 @@ pub enum Value {
 }
 
 impl Value {
+    pub const fn is_null(&self) -> bool {
+        matches!(self, Value::Null)
+    }
+
     pub const fn is_bool(&self) -> bool {
         matches!(self, Value::Bool(_))
     }

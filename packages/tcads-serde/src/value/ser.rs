@@ -7,6 +7,7 @@ impl Serialize for Value {
         S: Serializer,
     {
         match self {
+            Value::Null => serializer.serialize_unit(),
             Value::Bool(b) => serializer.serialize_bool(*b),
             Value::Number(n) => n.serialize(serializer),
             Value::String(s) => serializer.serialize_str(s),
