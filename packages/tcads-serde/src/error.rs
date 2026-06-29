@@ -3,8 +3,8 @@ use tcads_core::ads::{AdsSymbolInfoError, AdsTypeInfoError};
 
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum Error {
-    #[error("Type mismatch: expected {expected}, got {got}")]
-    TypeMismatch { expected: String, got: String },
+    #[error("Type mismatch: expected {expected}")]
+    TypeMismatch { expected: String },
     #[error(
         "Shape mismatch: Rust struct expected {expected} fields, but PLC type has {got} fields"
     )]
