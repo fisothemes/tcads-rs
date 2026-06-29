@@ -200,25 +200,63 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         visitor.visit_f64(f64::from_le_bytes(bytes))
     }
 
-    fn deserialize_char<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        todo!()
+        self.deserialize_string(visitor)
     }
 
-    fn deserialize_str<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        todo!()
+        self.deserialize_string(visitor)
     }
 
-    fn deserialize_string<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        todo!()
+        if self.input.len() != self.type_info.size() as usize {
+            return Err(crate::Error::SizeMismatch {
+                expected: self.type_info.size() as usize,
+                got: self.input.len(),
+            });
+        }
+
+        let decoded_string = match self.type_info.type_id() {
+            AdsTypeId::String => {
+                let null_pos = self
+                    .input
+                    .iter()
+                    .position(|&b| b == 0)
+                    .unwrap_or(self.input.len());
+                let str_bytes = &self.input[..null_pos];
+                encoding_rs::WINDOWS_1252.decode(str_bytes).0.to_string()
+            }
+            AdsTypeId::WString => {
+                let mut null_pos = self.input.len();
+
+                for (i, chunk) in self.input.chunks_exact(2).enumerate() {
+                    if chunk[0] == 0 && chunk[1] == 0 {
+                        null_pos = i * 2;
+                        break;
+                    }
+                }
+
+                let str_bytes = &self.input[..null_pos];
+
+                encoding_rs::UTF_16LE.decode(str_bytes).0.to_string()
+            }
+            _ => {
+                return Err(crate::Error::TypeMismatch {
+                    expected: "STRING/WSTRING based type.".into(),
+                });
+            }
+        };
+
+        visitor.visit_string(decoded_string)
     }
 
     fn deserialize_bytes<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
@@ -228,11 +266,11 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         todo!()
     }
 
-    fn deserialize_byte_buf<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        todo!()
+        self.deserialize_bytes(visitor)
     }
 
     fn deserialize_option<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
