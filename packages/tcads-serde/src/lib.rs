@@ -6,4 +6,4 @@ pub mod value;
 
 pub use error::{Error, Result};
 pub use type_provider::TypeProvider;
-pub use value::Value;
+pub use value::{Float, Integer, Number, SignedInteger, UnsignedInteger, Value};

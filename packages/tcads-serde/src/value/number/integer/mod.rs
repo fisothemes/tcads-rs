@@ -1,5 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
+use tcads_core::AdsTypeId;
 
 pub mod signed;
 pub mod unsigned;
@@ -26,6 +27,51 @@ impl Integer {
         match self {
             Integer::Signed(s) => s.is_zero(),
             Integer::Unsigned(u) => u.is_zero(),
+        }
+    }
+
+    pub fn try_from_le_slice(slice: &[u8], type_id: AdsTypeId) -> crate::Result<Self> {
+        fn read<const N: usize>(bytes: &[u8]) -> Result<[u8; N], crate::Error> {
+            bytes.try_into().map_err(|_| crate::Error::SizeMismatch {
+                expected: N,
+                got: bytes.len(),
+            })
+        }
+
+        match type_id {
+            AdsTypeId::Int8 => {
+                let bytes = read::<1>(slice)?;
+                Ok(Integer::from(i8::from_le_bytes(bytes)))
+            }
+            AdsTypeId::Int16 => {
+                let bytes = read::<2>(slice)?;
+                Ok(Integer::from(i16::from_le_bytes(bytes)))
+            }
+            AdsTypeId::Int32 => {
+                let bytes = read::<4>(slice)?;
+                Ok(Integer::from(i32::from_le_bytes(bytes)))
+            }
+            AdsTypeId::Int64 => {
+                let bytes = read::<8>(slice)?;
+                Ok(Integer::from(i64::from_le_bytes(bytes)))
+            }
+            AdsTypeId::UInt8 => {
+                let bytes = read::<1>(slice)?;
+                Ok(Integer::from(u8::from_le_bytes(bytes)))
+            }
+            AdsTypeId::UInt16 => {
+                let bytes = read::<2>(slice)?;
+                Ok(Integer::from(u16::from_le_bytes(bytes)))
+            }
+            AdsTypeId::UInt32 => {
+                let bytes = read::<4>(slice)?;
+                Ok(Integer::from(u32::from_le_bytes(bytes)))
+            }
+            AdsTypeId::UInt64 => {
+                let bytes = read::<8>(slice)?;
+                Ok(Integer::from(u64::from_le_bytes(bytes)))
+            }
+            other => Err(crate::Error::UnsupportedType(other)),
         }
     }
 
