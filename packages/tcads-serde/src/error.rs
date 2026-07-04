@@ -1,3 +1,4 @@
+use crate::Integer;
 use std::fmt;
 use tcads_core::ads::{AdsSymbolInfoError, AdsTypeInfoError};
 
@@ -18,7 +19,7 @@ pub enum Error {
     #[error("Unsupported ADS type: {0:?}")]
     UnsupportedType(tcads_core::ads::AdsTypeId),
     #[error("Enum discriminant {0} not found in type {1}")]
-    UnknownEnumDiscriminant(u64, String),
+    UnknownEnumDiscriminant(Integer, String),
     #[error("I/O or encoding error: {0}")]
     Custom(String),
     #[error(transparent)]
