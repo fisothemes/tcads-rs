@@ -119,19 +119,34 @@ impl From<UnsignedInteger> for u64 {
 
 impl From<UnsignedInteger> for u32 {
     fn from(val: UnsignedInteger) -> u32 {
-        val.into()
+        match val {
+            UnsignedInteger::Byte(n) => n as u32,
+            UnsignedInteger::UInt(n) => n as u32,
+            UnsignedInteger::UDInt(n) => n,
+            UnsignedInteger::ULInt(n) => n as u32,
+        }
     }
 }
 
 impl From<UnsignedInteger> for u16 {
     fn from(val: UnsignedInteger) -> u16 {
-        val.into()
+        match val {
+            UnsignedInteger::Byte(n) => n as u16,
+            UnsignedInteger::UInt(n) => n,
+            UnsignedInteger::UDInt(n) => n as u16,
+            UnsignedInteger::ULInt(n) => n as u16,
+        }
     }
 }
 
 impl From<UnsignedInteger> for u8 {
     fn from(val: UnsignedInteger) -> u8 {
-        val.into()
+        match val {
+            UnsignedInteger::Byte(n) => n,
+            UnsignedInteger::UInt(n) => n as u8,
+            UnsignedInteger::UDInt(n) => n as u8,
+            UnsignedInteger::ULInt(n) => n as u8,
+        }
     }
 }
 

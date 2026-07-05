@@ -129,19 +129,34 @@ impl From<SignedInteger> for i64 {
 
 impl From<SignedInteger> for i32 {
     fn from(val: SignedInteger) -> i32 {
-        val.into()
+        match val {
+            SignedInteger::SInt(n) => n as i32,
+            SignedInteger::Int(n) => n as i32,
+            SignedInteger::DInt(n) => n,
+            SignedInteger::LInt(n) => n as i32,
+        }
     }
 }
 
 impl From<SignedInteger> for i16 {
     fn from(val: SignedInteger) -> i16 {
-        val.into()
+        match val {
+            SignedInteger::SInt(n) => n as i16,
+            SignedInteger::Int(n) => n,
+            SignedInteger::DInt(n) => n as i16,
+            SignedInteger::LInt(n) => n as i16,
+        }
     }
 }
 
 impl From<SignedInteger> for i8 {
     fn from(val: SignedInteger) -> i8 {
-        val.into()
+        match val {
+            SignedInteger::SInt(n) => n,
+            SignedInteger::Int(n) => n as i8,
+            SignedInteger::DInt(n) => n as i8,
+            SignedInteger::LInt(n) => n as i8,
+        }
     }
 }
 
