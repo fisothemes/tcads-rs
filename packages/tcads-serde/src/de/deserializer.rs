@@ -347,19 +347,12 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
     fn deserialize_unit_struct<V>(
         self,
         _name: &'static str,
-        visitor: V,
+        _visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        let ptr_size = self.provider.get_platform_ptr_size();
-        let type_info = Self::resolve_alias(self.type_info, self.provider, ptr_size)?;
-
-        visitor.visit_map(AdsStructAccess::new(
-            type_info.field_infos(),
-            self.input,
-            self.provider,
-        ))
+        todo!()
     }
 
     fn deserialize_newtype_struct<V>(
@@ -410,12 +403,19 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         self,
         _name: &'static str,
         _fields: &'static [&'static str],
-        _visitor: V,
+        visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        todo!()
+        let ptr_size = self.provider.get_platform_ptr_size();
+        let type_info = Self::resolve_alias(self.type_info, self.provider, ptr_size)?;
+
+        visitor.visit_map(AdsStructAccess::new(
+            type_info.field_infos(),
+            self.input,
+            self.provider,
+        ))
     }
 
     fn deserialize_enum<V>(
