@@ -1,4 +1,4 @@
-use super::access::AdsEnumAccess;
+use super::access::{AdsEnumAccess, AdsStructAccess};
 use crate::{Integer, TypeProvider};
 use serde::de::{Deserializer, Visitor};
 use tcads_core::{AdsTypeCategory, AdsTypeId, AdsTypeInfo};
@@ -125,9 +125,10 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
                 let target = Self::resolve_alias(type_info, self.provider, pointer_size)?;
                 Self::new(self.input, target, self.provider).deserialize_any(visitor)
             }
-            AdsTypeCategory::Struct => todo!(),
+            AdsTypeCategory::Struct | AdsTypeCategory::FunctionBlock => {
+                self.deserialize_struct("", &[], visitor)
+            }
             AdsTypeCategory::Union => todo!(),
-            AdsTypeCategory::FunctionBlock => todo!(),
             AdsTypeCategory::Interface => todo!(),
             AdsTypeCategory::Array => todo!(),
             _ => todo!(),
@@ -346,12 +347,19 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
     fn deserialize_unit_struct<V>(
         self,
         _name: &'static str,
-        _visitor: V,
+        visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        todo!()
+        let ptr_size = self.provider.get_platform_ptr_size();
+        let type_info = Self::resolve_alias(self.type_info, self.provider, ptr_size)?;
+
+        visitor.visit_map(AdsStructAccess::new(
+            type_info.field_infos(),
+            self.input,
+            self.provider,
+        ))
     }
 
     fn deserialize_newtype_struct<V>(
