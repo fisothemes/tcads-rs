@@ -63,6 +63,20 @@ impl<'de, P: TypeProvider> AdsDeserializer<'de, P> {
         Self::validate_type_id(type_info, expected)
     }
 
+    pub fn resolve_alias<'a>(
+        type_info: &'a AdsTypeInfo,
+        provider: &'a P,
+        platform_ptr_size: u8,
+    ) -> Result<&'a AdsTypeInfo, crate::Error> {
+        let mut type_info = type_info;
+        while AdsTypeCategory::determine(type_info, platform_ptr_size) == AdsTypeCategory::Alias {
+            type_info = provider
+                .get_type_info(type_info.type_name())
+                .ok_or_else(|| crate::Error::TypeNotFound(type_info.type_name().to_string()))?;
+        }
+        Ok(type_info)
+    }
+
     pub fn extract_bytes<const N: usize>(data: impl AsRef<[u8]>) -> Result<[u8; N], crate::Error> {
         data.as_ref()
             .try_into()
@@ -80,11 +94,11 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
     where
         V: Visitor<'de>,
     {
-        let type_info = self.type_info();
+        let type_info = self.type_info;
         let pointer_size = self.provider.get_platform_ptr_size();
 
         match AdsTypeCategory::determine(type_info, pointer_size) {
-            AdsTypeCategory::Primitive => match self.type_info().type_id() {
+            AdsTypeCategory::Primitive => match type_info.type_id() {
                 AdsTypeId::Bit => self.deserialize_bool(visitor),
                 AdsTypeId::Int8 => self.deserialize_i8(visitor),
                 AdsTypeId::Int16 => self.deserialize_i16(visitor),
@@ -107,12 +121,15 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
                 8 => self.deserialize_u64(visitor),
                 other => Err(crate::Error::InvalidByteLength(other as usize)),
             },
+            AdsTypeCategory::Alias => {
+                let target = Self::resolve_alias(type_info, self.provider, pointer_size)?;
+                Self::new(self.input, target, self.provider).deserialize_any(visitor)
+            }
             AdsTypeCategory::Struct => todo!(),
             AdsTypeCategory::Union => todo!(),
             AdsTypeCategory::FunctionBlock => todo!(),
             AdsTypeCategory::Interface => todo!(),
             AdsTypeCategory::Array => todo!(),
-            AdsTypeCategory::Alias => todo!(),
             _ => todo!(),
         }
     }
@@ -402,8 +419,10 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
     where
         V: Visitor<'de>,
     {
-        let variant_name = self
-            .type_info
+        let ptr_size = self.provider.get_platform_ptr_size();
+        let type_info = Self::resolve_alias(self.type_info, self.provider, ptr_size)?;
+
+        let variant_name = type_info
             .enum_infos()
             .iter()
             .find(|e| e.value() == self.input)
