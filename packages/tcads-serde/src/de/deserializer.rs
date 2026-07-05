@@ -98,22 +98,23 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         let pointer_size = self.provider.get_platform_ptr_size();
 
         match AdsTypeCategory::determine(type_info, pointer_size) {
-            AdsTypeCategory::Primitive => match type_info.type_id() {
-                AdsTypeId::Bit => self.deserialize_bool(visitor),
-                AdsTypeId::Int8 => self.deserialize_i8(visitor),
-                AdsTypeId::Int16 => self.deserialize_i16(visitor),
-                AdsTypeId::Int32 => self.deserialize_i32(visitor),
-                AdsTypeId::Int64 => self.deserialize_i64(visitor),
-                AdsTypeId::UInt8 => self.deserialize_u8(visitor),
-                AdsTypeId::UInt16 => self.deserialize_u16(visitor),
-                AdsTypeId::UInt32 => self.deserialize_u32(visitor),
-                AdsTypeId::UInt64 => self.deserialize_u64(visitor),
-                AdsTypeId::Real32 => self.deserialize_f32(visitor),
-                AdsTypeId::Real64 => self.deserialize_f64(visitor),
-                AdsTypeId::String => self.deserialize_string(visitor),
-                AdsTypeId::WString => self.deserialize_string(visitor),
-                _ => todo!(),
-            },
+            AdsTypeCategory::Primitive | AdsTypeCategory::SubRange | AdsTypeCategory::Bitset => {
+                match type_info.type_id() {
+                    AdsTypeId::Bit => self.deserialize_bool(visitor),
+                    AdsTypeId::Int8 => self.deserialize_i8(visitor),
+                    AdsTypeId::Int16 => self.deserialize_i16(visitor),
+                    AdsTypeId::Int32 => self.deserialize_i32(visitor),
+                    AdsTypeId::Int64 => self.deserialize_i64(visitor),
+                    AdsTypeId::UInt8 => self.deserialize_u8(visitor),
+                    AdsTypeId::UInt16 => self.deserialize_u16(visitor),
+                    AdsTypeId::UInt32 => self.deserialize_u32(visitor),
+                    AdsTypeId::UInt64 => self.deserialize_u64(visitor),
+                    AdsTypeId::Real32 => self.deserialize_f32(visitor),
+                    AdsTypeId::Real64 => self.deserialize_f64(visitor),
+                    other => Err(crate::Error::UnsupportedType(other)),
+                }
+            }
+            AdsTypeCategory::String => self.deserialize_string(visitor),
             AdsTypeCategory::Enum => self.deserialize_enum("", &[], visitor),
             AdsTypeCategory::Pointer | AdsTypeCategory::Reference => match pointer_size {
                 2 => self.deserialize_u16(visitor),
@@ -128,10 +129,12 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
             AdsTypeCategory::Struct | AdsTypeCategory::FunctionBlock => {
                 self.deserialize_struct("", &[], visitor)
             }
+            AdsTypeCategory::Array => self.deserialize_seq(visitor),
             AdsTypeCategory::Union => todo!(),
             AdsTypeCategory::Interface => todo!(),
-            AdsTypeCategory::Array => todo!(),
-            _ => todo!(),
+            AdsTypeCategory::Program => todo!(),
+            AdsTypeCategory::Function => todo!(),
+            AdsTypeCategory::None => self.deserialize_unit(visitor),
         }
     }
 
