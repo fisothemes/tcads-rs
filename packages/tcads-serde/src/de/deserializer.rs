@@ -273,18 +273,18 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         self.deserialize_bytes(visitor)
     }
 
-    fn deserialize_option<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        todo!()
+        visitor.visit_some(self)
     }
 
-    fn deserialize_unit<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        todo!()
+        visitor.visit_unit()
     }
 
     fn deserialize_unit_struct<V>(
