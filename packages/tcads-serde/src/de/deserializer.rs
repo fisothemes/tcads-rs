@@ -1,4 +1,5 @@
-use crate::TypeProvider;
+use super::access::AdsEnumAccess;
+use crate::{Integer, TypeProvider};
 use serde::de::{Deserializer, Visitor};
 use tcads_core::{AdsTypeCategory, AdsTypeId, AdsTypeInfo};
 
@@ -58,35 +59,34 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
     where
         V: Visitor<'de>,
     {
-        match self.type_info.type_id() {
-            AdsTypeId::Bit => self.deserialize_bool(visitor),
-            AdsTypeId::Int8 => self.deserialize_i8(visitor),
-            AdsTypeId::Int16 => self.deserialize_i16(visitor),
-            AdsTypeId::Int32 => self.deserialize_i32(visitor),
-            AdsTypeId::Int64 => self.deserialize_i64(visitor),
-            AdsTypeId::UInt8 => self.deserialize_u8(visitor),
-            AdsTypeId::UInt16 => self.deserialize_u16(visitor),
-            AdsTypeId::UInt32 => self.deserialize_u32(visitor),
-            AdsTypeId::UInt64 => self.deserialize_u64(visitor),
-            AdsTypeId::Real32 => self.deserialize_f32(visitor),
-            AdsTypeId::Real64 => self.deserialize_f64(visitor),
-            AdsTypeId::String => self.deserialize_string(visitor),
-            AdsTypeId::WString => self.deserialize_string(visitor),
-            _ => {
-                match AdsTypeCategory::determine(
-                    &self.type_info.clone(),
-                    self.provider.get_platform_ptr_size(),
-                ) {
-                    AdsTypeCategory::Enum => todo!(),
-                    AdsTypeCategory::Struct => todo!(),
-                    AdsTypeCategory::Union => todo!(),
-                    AdsTypeCategory::FunctionBlock => todo!(),
-                    AdsTypeCategory::Interface | AdsTypeCategory::Pointer => todo!(),
-                    AdsTypeCategory::Array => todo!(),
-                    AdsTypeCategory::Alias => todo!(),
-                    _ => todo!(),
-                }
-            }
+        let type_info = self.type_info();
+        let pointer_size = self.provider.get_platform_ptr_size();
+
+        match AdsTypeCategory::determine(type_info, pointer_size) {
+            AdsTypeCategory::Primitive => match self.type_info().type_id() {
+                AdsTypeId::Bit => self.deserialize_bool(visitor),
+                AdsTypeId::Int8 => self.deserialize_i8(visitor),
+                AdsTypeId::Int16 => self.deserialize_i16(visitor),
+                AdsTypeId::Int32 => self.deserialize_i32(visitor),
+                AdsTypeId::Int64 => self.deserialize_i64(visitor),
+                AdsTypeId::UInt8 => self.deserialize_u8(visitor),
+                AdsTypeId::UInt16 => self.deserialize_u16(visitor),
+                AdsTypeId::UInt32 => self.deserialize_u32(visitor),
+                AdsTypeId::UInt64 => self.deserialize_u64(visitor),
+                AdsTypeId::Real32 => self.deserialize_f32(visitor),
+                AdsTypeId::Real64 => self.deserialize_f64(visitor),
+                AdsTypeId::String => self.deserialize_string(visitor),
+                AdsTypeId::WString => self.deserialize_string(visitor),
+                _ => todo!(),
+            },
+            AdsTypeCategory::Enum => self.deserialize_enum("", &[], visitor),
+            AdsTypeCategory::Struct => todo!(),
+            AdsTypeCategory::Union => todo!(),
+            AdsTypeCategory::FunctionBlock => todo!(),
+            AdsTypeCategory::Interface | AdsTypeCategory::Pointer => todo!(),
+            AdsTypeCategory::Array => todo!(),
+            AdsTypeCategory::Alias => todo!(),
+            _ => todo!(),
         }
     }
 
@@ -105,7 +105,7 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         V: Visitor<'de>,
     {
         Self::validate_type_id(self.type_info, AdsTypeId::Int8)?;
-        let bytes = Self::extract_bytes::<{ size_of::<i8>() }>(self.input)?;
+        let bytes = Self::extract_bytes::<1>(self.input)?;
 
         visitor.visit_i8(i8::from_le_bytes(bytes))
     }
@@ -115,7 +115,7 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         V: Visitor<'de>,
     {
         Self::validate_type_id(self.type_info, AdsTypeId::Int16)?;
-        let bytes = Self::extract_bytes::<{ size_of::<i16>() }>(self.input)?;
+        let bytes = Self::extract_bytes::<2>(self.input)?;
 
         visitor.visit_i16(i16::from_le_bytes(bytes))
     }
@@ -125,7 +125,7 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         V: Visitor<'de>,
     {
         Self::validate_type_id(self.type_info, AdsTypeId::Int32)?;
-        let bytes = Self::extract_bytes::<{ size_of::<i32>() }>(self.input)?;
+        let bytes = Self::extract_bytes::<4>(self.input)?;
 
         visitor.visit_i32(i32::from_le_bytes(bytes))
     }
@@ -135,7 +135,7 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         V: Visitor<'de>,
     {
         Self::validate_type_id(self.type_info, AdsTypeId::Int64)?;
-        let bytes = Self::extract_bytes::<{ size_of::<i64>() }>(self.input)?;
+        let bytes = Self::extract_bytes::<8>(self.input)?;
 
         visitor.visit_i64(i64::from_le_bytes(bytes))
     }
@@ -145,7 +145,7 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         V: Visitor<'de>,
     {
         Self::validate_type_id(self.type_info, AdsTypeId::UInt8)?;
-        let bytes = Self::extract_bytes::<{ size_of::<u8>() }>(self.input)?;
+        let bytes = Self::extract_bytes::<1>(self.input)?;
 
         visitor.visit_u8(u8::from_le_bytes(bytes))
     }
@@ -155,7 +155,7 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         V: Visitor<'de>,
     {
         Self::validate_type_id(self.type_info, AdsTypeId::UInt16)?;
-        let bytes = Self::extract_bytes::<{ size_of::<u16>() }>(self.input)?;
+        let bytes = Self::extract_bytes::<2>(self.input)?;
 
         visitor.visit_u16(u16::from_le_bytes(bytes))
     }
@@ -165,7 +165,7 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         V: Visitor<'de>,
     {
         Self::validate_type_id(self.type_info, AdsTypeId::UInt32)?;
-        let bytes = Self::extract_bytes::<{ size_of::<u32>() }>(self.input)?;
+        let bytes = Self::extract_bytes::<4>(self.input)?;
 
         visitor.visit_u32(u32::from_le_bytes(bytes))
     }
@@ -175,7 +175,7 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         V: Visitor<'de>,
     {
         Self::validate_type_id(self.type_info, AdsTypeId::UInt64)?;
-        let bytes = Self::extract_bytes::<{ size_of::<u64>() }>(self.input)?;
+        let bytes = Self::extract_bytes::<8>(self.input)?;
 
         visitor.visit_u64(u64::from_le_bytes(bytes))
     }
@@ -358,12 +358,29 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         self,
         _name: &'static str,
         _variants: &'static [&'static str],
-        _visitor: V,
+        visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        todo!()
+        let variant_name = self
+            .type_info
+            .enum_infos()
+            .iter()
+            .find(|e| e.value() == self.input)
+            .map(|e| e.name());
+
+        match variant_name {
+            Some(name) => visitor.visit_enum(AdsEnumAccess::new(name)),
+            None => {
+                let discriminant =
+                    Integer::try_from_le_slice(self.input, self.type_info.type_id())?;
+                Err(crate::Error::UnknownEnumDiscriminant(
+                    discriminant,
+                    self.type_info.name().to_string(),
+                ))
+            }
+        }
     }
 
     fn deserialize_identifier<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
