@@ -1,4 +1,4 @@
-use super::access::{AdsEnumAccess, AdsStructAccess};
+use super::access::{AdsArrayAccess, AdsEnumAccess, AdsStructAccess};
 use crate::{Integer, TypeProvider};
 use serde::de::{Deserializer, Visitor};
 use tcads_core::{AdsTypeCategory, AdsTypeId, AdsTypeInfo};
@@ -369,11 +369,19 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         todo!()
     }
 
-    fn deserialize_seq<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        todo!()
+        let ptr_size = self.provider.get_platform_ptr_size();
+        let type_info = Self::resolve_alias(self.type_info, self.provider, ptr_size)?;
+        let array = AdsArrayAccess::new(
+            type_info.array_infos(),
+            type_info.type_name(),
+            self.input,
+            self.provider,
+        );
+        visitor.visit_seq(array)
     }
 
     fn deserialize_tuple<V>(self, _len: usize, _visitor: V) -> Result<V::Value, Self::Error>
