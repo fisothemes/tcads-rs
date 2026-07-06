@@ -150,25 +150,26 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
             }
             AdsTypeCategory::String => self.deserialize_string(visitor),
             AdsTypeCategory::Enum => self.deserialize_enum("", &[], visitor),
-            AdsTypeCategory::Pointer | AdsTypeCategory::Reference => match pointer_size {
-                2 => self.deserialize_u16(visitor),
-                4 => self.deserialize_u32(visitor),
-                8 => self.deserialize_u64(visitor),
-                other => Err(crate::Error::InvalidByteLength(other as usize)),
-            },
+            AdsTypeCategory::Pointer | AdsTypeCategory::Reference | AdsTypeCategory::Interface => {
+                match pointer_size {
+                    2 => self.deserialize_u16(visitor),
+                    4 => self.deserialize_u32(visitor),
+                    8 => self.deserialize_u64(visitor),
+                    other => Err(crate::Error::InvalidByteLength(other as usize)),
+                }
+            }
             AdsTypeCategory::Alias => {
                 let target = Self::resolve_alias(type_info, self.provider, pointer_size)?;
                 Self::new(self.input, target, self.provider).deserialize_any(visitor)
             }
-            AdsTypeCategory::Struct | AdsTypeCategory::FunctionBlock => {
+            AdsTypeCategory::Struct | AdsTypeCategory::FunctionBlock | AdsTypeCategory::Union => {
                 self.deserialize_struct("", &[], visitor)
             }
             AdsTypeCategory::Array => self.deserialize_seq(visitor),
-            AdsTypeCategory::Union => todo!(),
-            AdsTypeCategory::Interface => todo!(),
-            AdsTypeCategory::Program => todo!(),
-            AdsTypeCategory::Function => todo!(),
             AdsTypeCategory::None => self.deserialize_unit(visitor),
+            AdsTypeCategory::Program | AdsTypeCategory::Function => {
+                unreachable!("AdsTypeCategory::determine never returns Program/Function")
+            }
         }
     }
 
@@ -434,6 +435,7 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
             &[
                 AdsTypeCategory::Struct,
                 AdsTypeCategory::FunctionBlock,
+                AdsTypeCategory::Union,
                 AdsTypeCategory::Array,
             ],
             ptr_size,
@@ -510,7 +512,11 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
 
         Self::validate_type_category(
             type_info,
-            &[AdsTypeCategory::Struct, AdsTypeCategory::FunctionBlock],
+            &[
+                AdsTypeCategory::Struct,
+                AdsTypeCategory::FunctionBlock,
+                AdsTypeCategory::Union,
+            ],
             ptr_size,
         )?;
         Self::validate_min_size(self.input, type_info.size() as usize)?;
