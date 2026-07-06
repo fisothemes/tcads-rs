@@ -1,4 +1,4 @@
-use super::access::{AdsArrayAccess, AdsEnumAccess, AdsStructAccess};
+use super::access::{AdsArrayAccess, AdsEnumAccess, AdsStructAccess, AdsStructSeqAccess};
 use crate::{Integer, TypeProvider};
 use serde::de::{Deserializer, Visitor};
 use tcads_core::{AdsTypeCategory, AdsTypeId, AdsTypeInfo};
@@ -384,23 +384,60 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         visitor.visit_seq(array)
     }
 
-    fn deserialize_tuple<V>(self, _len: usize, _visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        todo!()
+        let ptr_size = self.provider.get_platform_ptr_size();
+        let type_info = Self::resolve_alias(self.type_info, self.provider, ptr_size)?;
+
+        match AdsTypeCategory::determine(type_info, ptr_size) {
+            AdsTypeCategory::Array => {
+                let count: usize = type_info
+                    .array_infos()
+                    .iter()
+                    .map(|d| d.element_count() as usize)
+                    .product();
+                if count != len {
+                    return Err(crate::Error::ShapeMismatch {
+                        expected: len,
+                        got: count,
+                    });
+                }
+                let array = AdsArrayAccess::new(
+                    type_info.array_infos(),
+                    type_info.type_name(),
+                    self.input,
+                    self.provider,
+                );
+                visitor.visit_seq(array)
+            }
+            AdsTypeCategory::Struct | AdsTypeCategory::FunctionBlock => {
+                let fields = type_info.field_infos();
+                if fields.len() != len {
+                    return Err(crate::Error::ShapeMismatch {
+                        expected: len,
+                        got: fields.len(),
+                    });
+                }
+                visitor.visit_seq(AdsStructSeqAccess::new(fields, self.input, self.provider))
+            }
+            _ => Err(crate::Error::TypeMismatch {
+                expected: "array or struct (for tuple deserialization)".into(),
+            }),
+        }
     }
 
     fn deserialize_tuple_struct<V>(
         self,
         _name: &'static str,
-        _len: usize,
-        _visitor: V,
+        len: usize,
+        visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        todo!()
+        self.deserialize_tuple(len, visitor)
     }
 
     fn deserialize_map<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
