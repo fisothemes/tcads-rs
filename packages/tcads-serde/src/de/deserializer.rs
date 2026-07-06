@@ -63,6 +63,40 @@ impl<'de, P: TypeProvider> AdsDeserializer<'de, P> {
         Self::validate_type_id(type_info, expected)
     }
 
+    pub fn validate_type_category(
+        type_info: &AdsTypeInfo,
+        expected: &[AdsTypeCategory],
+        platform_ptr_size: u8,
+    ) -> Result<(), crate::Error> {
+        let category = AdsTypeCategory::determine(type_info, platform_ptr_size);
+        if !expected.contains(&category) {
+            return Err(crate::Error::TypeMismatch {
+                expected: format!("one of {:?}", expected),
+            });
+        }
+        Ok(())
+    }
+
+    pub fn validate_exact_size(input: &[u8], expected: usize) -> Result<(), crate::Error> {
+        if input.len() != expected {
+            return Err(crate::Error::SizeMismatch {
+                expected,
+                got: input.len(),
+            });
+        }
+        Ok(())
+    }
+
+    pub fn validate_min_size(input: &[u8], expected: usize) -> Result<(), crate::Error> {
+        if input.len() < expected {
+            return Err(crate::Error::SizeMismatch {
+                expected,
+                got: input.len(),
+            });
+        }
+        Ok(())
+    }
+
     pub fn resolve_alias<'a>(
         type_info: &'a AdsTypeInfo,
         provider: &'a P,
@@ -375,6 +409,10 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
     {
         let ptr_size = self.provider.get_platform_ptr_size();
         let type_info = Self::resolve_alias(self.type_info, self.provider, ptr_size)?;
+
+        Self::validate_type_category(type_info, &[AdsTypeCategory::Array], ptr_size)?;
+        Self::validate_exact_size(self.input, type_info.size() as usize)?;
+
         let array = AdsArrayAccess::new(
             type_info.array_infos(),
             type_info.type_name(),
@@ -390,6 +428,17 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
     {
         let ptr_size = self.provider.get_platform_ptr_size();
         let type_info = Self::resolve_alias(self.type_info, self.provider, ptr_size)?;
+
+        Self::validate_type_category(
+            type_info,
+            &[
+                AdsTypeCategory::Struct,
+                AdsTypeCategory::FunctionBlock,
+                AdsTypeCategory::Array,
+            ],
+            ptr_size,
+        )?;
+        Self::validate_min_size(self.input, type_info.size() as usize)?;
 
         match AdsTypeCategory::determine(type_info, ptr_size) {
             AdsTypeCategory::Array => {
@@ -459,6 +508,13 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         let ptr_size = self.provider.get_platform_ptr_size();
         let type_info = Self::resolve_alias(self.type_info, self.provider, ptr_size)?;
 
+        Self::validate_type_category(
+            type_info,
+            &[AdsTypeCategory::Struct, AdsTypeCategory::FunctionBlock],
+            ptr_size,
+        )?;
+        Self::validate_min_size(self.input, type_info.size() as usize)?;
+
         visitor.visit_map(AdsStructAccess::new(
             type_info.field_infos(),
             self.input,
@@ -477,6 +533,9 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
     {
         let ptr_size = self.provider.get_platform_ptr_size();
         let type_info = Self::resolve_alias(self.type_info, self.provider, ptr_size)?;
+
+        Self::validate_type_category(type_info, &[AdsTypeCategory::Enum], ptr_size)?;
+        Self::validate_exact_size(self.input, type_info.size() as usize)?;
 
         let variant_name = type_info
             .enum_infos()
