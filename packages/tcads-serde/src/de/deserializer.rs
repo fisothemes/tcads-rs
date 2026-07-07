@@ -440,7 +440,7 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
             ],
             ptr_size,
         )?;
-        Self::validate_min_size(self.input, type_info.size() as usize)?;
+        Self::validate_exact_size(self.input, type_info.size() as usize)?;
 
         match AdsTypeCategory::determine(type_info, ptr_size) {
             AdsTypeCategory::Array => {
@@ -519,7 +519,7 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
             ],
             ptr_size,
         )?;
-        Self::validate_min_size(self.input, type_info.size() as usize)?;
+        Self::validate_exact_size(self.input, type_info.size() as usize)?;
 
         visitor.visit_map(AdsStructAccess::new(
             type_info.field_infos(),
