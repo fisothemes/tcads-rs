@@ -49,7 +49,7 @@ impl<'de, P: TypeProvider> AdsDeserializer<'de, P> {
     ) -> Result<(), crate::Error> {
         if matches!(
             AdsTypeCategory::determine(type_info, platform_ptr_size),
-            AdsTypeCategory::Pointer | AdsTypeCategory::Reference
+            AdsTypeCategory::Pointer | AdsTypeCategory::Reference | AdsTypeCategory::Interface
         ) {
             return if platform_ptr_size as usize == N {
                 Ok(())
