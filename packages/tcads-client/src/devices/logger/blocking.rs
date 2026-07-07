@@ -80,7 +80,7 @@ impl Logger {
     ///
     /// Performs a [`PortConnect`](tcads_core::protocol::PortConnectRequest) handshake
     /// to obtain a dynamically assigned source address from the local router.
-    pub fn connect_to(
+    pub fn connect_local(
         net_id: AmsNetId,
         timeout: impl Into<Option<Duration>>,
     ) -> crate::Result<Self> {
