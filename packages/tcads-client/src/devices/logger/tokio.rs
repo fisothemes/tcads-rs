@@ -83,7 +83,7 @@ impl Logger {
     ///
     /// On Windows, connecting via `127.0.0.1` requires the `EnableAmsTcpLoopback`
     /// registry key to be set. This is enabled by default in TwinCAT 4024.5 and newer.
-    pub async fn connect(timeout: impl Into<Option<Duration>>) -> crate::Result<Self> {
+    pub async fn connect_local(timeout: impl Into<Option<Duration>>) -> crate::Result<Self> {
         let device = AdsDevice::connect(timeout).await?;
         let net_id = device.get_local_net_id().await?;
         Ok(Self::new(device, net_id))
@@ -97,7 +97,7 @@ impl Logger {
     ///
     /// Performs a [`PortConnect`](tcads_core::protocol::PortConnectRequest) handshake
     /// to obtain a dynamically assigned source address from the local router
-    pub async fn connect_local(
+    pub async fn connect(
         net_id: AmsNetId,
         timeout: impl Into<Option<Duration>>,
     ) -> crate::Result<Self> {

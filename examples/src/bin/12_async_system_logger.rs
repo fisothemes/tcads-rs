@@ -10,7 +10,7 @@
 
 use std::time::Duration;
 use tcads::client::devices::tokio::Logger;
-use tcads::core::LogMessageType;
+use tcads::core::{AmsNetId, LogMessageType};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -20,7 +20,7 @@ async fn main() -> Result<()> {
 
     // 1. Connect directly to the logger.
     // This handles the PortConnect handshake and targets Port 100 automatically.
-    let logger = Logger::connect(Duration::from_secs(5)).await?;
+    let logger = Logger::connect(AmsNetId::local(), Duration::from_secs(5)).await?;
 
     // 2. Subscribe to the logger notification stream.
     // Clone the logger so the listener task and the main task share the same

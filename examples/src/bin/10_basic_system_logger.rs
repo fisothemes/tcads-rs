@@ -20,7 +20,7 @@ fn main() -> Result<()> {
 
     // 1. Connect directly to the logger
     // This handles the port handshake and targets Port 100 automatically.
-    let logger = Logger::connect(Duration::from_secs(5))?;
+    let logger = Logger::connect_local(Duration::from_secs(5))?;
 
     // 2. Subscribe to the logger notification stream
     let (rx, handle) = logger.subscribe()?;
