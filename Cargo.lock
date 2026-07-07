@@ -555,6 +555,7 @@ name = "tcads-examples"
 version = "0.1.0"
 dependencies = [
  "tcads",
+ "tcads-serde",
  "tokio",
 ]
 

@@ -9,4 +9,5 @@ publish = false
 
 [dependencies]
 tcads = { workspace = true }
+tcads-serde = { workspace = true }
 tokio = { workspace = true , features = ["full"] }
