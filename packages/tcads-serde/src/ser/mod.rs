@@ -11,9 +11,9 @@ use tcads_core::AdsTypeInfo;
 /// `buf` must be exactly [`type_info.size()`](AdsTypeInfo::size) bytes.
 pub fn to_bytes<T, P>(
     value: &T,
+    buf: &mut [u8],
     type_info: &AdsTypeInfo,
     provider: &P,
-    buf: &mut [u8],
 ) -> crate::Result<()>
 where
     T: Serialize,
@@ -31,6 +31,6 @@ where
     P: TypeProvider,
 {
     let mut buf = vec![0u8; type_info.size() as usize];
-    to_bytes(value, type_info, provider, &mut buf)?;
+    to_bytes(value, &mut buf, type_info, provider)?;
     Ok(buf)
 }
