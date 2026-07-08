@@ -9,6 +9,7 @@ pub mod value;
 
 pub use de::{AdsDeserializer, from_bytes};
 pub use error::{Error, Result};
+pub use ser::{AdsSerializer, to_bytes, to_vec};
 pub use type_cache::AdsTypeCache;
 pub use type_provider::TypeProvider;
 pub use value::{Float, Integer, Number, SignedInteger, UnsignedInteger, Value};
