@@ -8,6 +8,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
+serde = { workspace = true }
 tcads = { workspace = true }
 tcads-serde = { workspace = true }
 tokio = { workspace = true , features = ["full"] }
