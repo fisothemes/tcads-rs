@@ -1,5 +1,6 @@
 use crate::TypeProvider;
 use crate::de::AdsDeserializer;
+use crate::resolvers::resolve_alias;
 use serde::de::{DeserializeSeed, SeqAccess};
 use tcads_core::AdsFieldInfo;
 
@@ -46,8 +47,7 @@ impl<'de, P: TypeProvider> SeqAccess<'de> for AdsStructSeqAccess<'de, P> {
             .provider
             .get_type_info(field.type_name())
             .ok_or_else(|| crate::Error::TypeNotFound(field.type_name().to_string()))?;
-        let field_type_info =
-            AdsDeserializer::resolve_alias(raw_type_info, self.provider, ptr_size)?;
+        let field_type_info = resolve_alias(raw_type_info, self.provider, ptr_size)?;
 
         seed.deserialize(AdsDeserializer::new(
             field_bytes,

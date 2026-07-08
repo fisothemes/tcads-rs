@@ -1,5 +1,6 @@
 use crate::TypeProvider;
 use crate::de::AdsDeserializer;
+use crate::resolvers::resolve_alias;
 use serde::de::{DeserializeSeed, Deserializer, SeqAccess, Visitor};
 use tcads_core::AdsArrayInfo;
 
@@ -64,8 +65,7 @@ impl<'de, P: TypeProvider> SeqAccess<'de> for AdsArrayAccess<'de, P> {
                 .provider
                 .get_type_info(self.element_type_name)
                 .ok_or_else(|| crate::Error::TypeNotFound(self.element_type_name.to_string()))?;
-            let elem_type_info =
-                AdsDeserializer::resolve_alias(raw_type_info, self.provider, ptr_size)?;
+            let elem_type_info = resolve_alias(raw_type_info, self.provider, ptr_size)?;
             seed.deserialize(AdsDeserializer::new(
                 elem_bytes,
                 elem_type_info,
