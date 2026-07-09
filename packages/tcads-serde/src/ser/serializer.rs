@@ -1,9 +1,12 @@
+use super::access::AdsArraySerializer;
 use crate::TypeProvider;
 use crate::resolvers::resolve_alias;
-use crate::validators::{validate_exact_size, validate_integer_type_id, validate_type_id};
+use crate::validators::{
+    validate_exact_size, validate_integer_type_id, validate_type_category, validate_type_id,
+};
 use serde::Serialize;
 use serde::ser::{Impossible, Serializer};
-use tcads_core::{AdsTypeId, AdsTypeInfo};
+use tcads_core::{AdsTypeCategory, AdsTypeId, AdsTypeInfo};
 
 pub struct AdsSerializer<'ser, P: TypeProvider> {
     output: &'ser mut [u8],
@@ -72,7 +75,7 @@ impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
     type Ok = ();
     type Error = crate::Error;
 
-    type SerializeSeq = Impossible<(), crate::Error>;
+    type SerializeSeq = AdsArraySerializer<'ser, P>;
     type SerializeTuple = Impossible<(), crate::Error>;
     type SerializeTupleStruct = Impossible<(), crate::Error>;
     type SerializeTupleVariant = Impossible<(), crate::Error>;
@@ -241,8 +244,20 @@ impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
         })
     }
 
-    fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
-        todo!()
+    fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
+        let ptr_size = self.provider.get_platform_ptr_size();
+        let type_info = resolve_alias(self.type_info, self.provider, ptr_size)?;
+
+        validate_type_category(type_info, &[AdsTypeCategory::Array], ptr_size)?;
+        validate_exact_size(self.output, type_info.size() as usize)?;
+
+        AdsArraySerializer::new(
+            type_info.array_infos(),
+            type_info.type_name(),
+            self.output,
+            self.provider,
+            len,
+        )
     }
 
     fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, Self::Error> {
