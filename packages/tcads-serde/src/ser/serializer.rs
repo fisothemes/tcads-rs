@@ -1,4 +1,5 @@
 use crate::TypeProvider;
+use crate::resolvers::resolve_alias;
 use crate::validators::{validate_exact_size, validate_integer_type_id, validate_type_id};
 use serde::Serialize;
 use serde::ser::{Impossible, Serializer};
@@ -192,9 +193,26 @@ impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
         self,
         _name: &'static str,
         _variant_index: u32,
-        _variant: &'static str,
+        variant: &'static str,
     ) -> Result<Self::Ok, Self::Error> {
-        todo!()
+        let ptr_size = self.provider.get_platform_ptr_size();
+        let type_info = resolve_alias(self.type_info, self.provider, ptr_size)?;
+
+        let value = type_info
+            .enum_infos()
+            .iter()
+            .find(|e| e.name() == variant)
+            .map(|e| e.value())
+            .ok_or_else(|| {
+                crate::Error::UnknownUnknownEnumVariant(
+                    variant.to_string(),
+                    type_info.name().to_string(),
+                )
+            })?;
+
+        validate_exact_size(self.output, value.len())?;
+        self.output.copy_from_slice(value);
+        Ok(())
     }
 
     fn serialize_newtype_struct<T>(

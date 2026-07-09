@@ -20,6 +20,8 @@ pub enum Error {
     UnsupportedType(tcads_core::ads::AdsTypeId),
     #[error("Enum discriminant {0} not found in type {1}")]
     UnknownEnumDiscriminant(Integer, String),
+    #[error("Enum variant '{0}' not found in type {1}")]
+    UnknownUnknownEnumVariant(String, String),
     #[error("I/O or encoding error: {0}")]
     Custom(String),
     #[error(transparent)]
