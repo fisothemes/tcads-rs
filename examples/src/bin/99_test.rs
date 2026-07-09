@@ -12,8 +12,8 @@ fn main() -> Result<()> {
 
     let (rx, _) = device.add_notification(
         (target, 851).into(),
-        0xF008,
-        0,
+        IndexGroup::SYMBOL_VERSION,
+        IndexOffset::ZERO,
         AdsNotificationAttrib::new(1, AdsTransMode::ServerOnChange, 0, 0),
     )?;
 
