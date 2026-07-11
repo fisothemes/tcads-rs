@@ -3,7 +3,11 @@ use tcads_core::{AdsTypeCategory, AdsTypeId, AdsTypeInfo};
 pub fn validate_type_id(type_info: &AdsTypeInfo, expected: AdsTypeId) -> Result<(), crate::Error> {
     if type_info.type_id() != expected {
         return Err(crate::Error::TypeMismatch {
-            expected: type_info.name().into(),
+            expected: format!(
+                "{expected:?}, but PLC type is '{}' ({:?})",
+                type_info.name(),
+                type_info.type_id(),
+            ),
         });
     }
     Ok(())
@@ -38,7 +42,10 @@ pub fn validate_type_category(
     let category = AdsTypeCategory::determine(type_info, platform_ptr_size);
     if !expected.contains(&category) {
         return Err(crate::Error::TypeMismatch {
-            expected: format!("one of {:?}", expected),
+            expected: format!(
+                "one of {expected:?}, but PLC type is '{}' ({category:?})",
+                type_info.name(),
+            ),
         });
     }
     Ok(())
