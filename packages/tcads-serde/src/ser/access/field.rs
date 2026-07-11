@@ -3,7 +3,7 @@ use crate::resolvers::resolve_alias;
 use crate::ser::AdsSerializer;
 use tcads_core::AdsFieldInfo;
 
-pub fn write_field_bytes<T, P>(
+pub(super) fn write_field_bytes<T, P>(
     output: &mut [u8],
     field: &AdsFieldInfo,
     provider: &P,
