@@ -31,26 +31,28 @@ impl<'ser, P: TypeProvider> AdsSerializer<'ser, P> {
         }
     }
 
-    /// The buffer that was passed to the constructor.
+    /// The buffer that was passed to the serializer, i.e. the memory layout that will be written to
+    /// the PLC.
     pub fn output(&self) -> &[u8] {
         self.output
     }
 
-    /// The `AdsTypeInfo` that was used to resolve the type.
+    /// The [`AdsTypeInfo`] that was used to resolve the type.
     pub fn type_info(&self) -> &AdsTypeInfo {
         self.type_info
     }
 
-    /// The `TypeProvider` that was used to resolve the type.
+    /// The [`TypeProvider`] that is used to resolve the type if necessary, e.g. for aliases,
+    /// structs, arrays, etc.
     pub fn provider(&self) -> &P {
         self.provider
     }
 
-    /// Writes an exact number of bytes into a mutable byte slice.
+    /// Writes an exact number of bytes into a mutable output buffer.
     ///
     /// # Type Parameters
     ///
-    /// - `N`: The size of the `bytes` array, determined at compile time.
+    /// - `N`: The size of the byte array, determined at compile time.
     pub fn write_bytes<const N: usize>(
         data: &mut [u8],
         bytes: [u8; N],

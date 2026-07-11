@@ -1,4 +1,4 @@
-use super::access::{AdsArrayAccess, AdsEnumAccess, AdsStructAccess, AdsStructSeqAccess};
+use super::access::{AdsArrayAccess, AdsEnumAccess, AdsMapAccess, AdsStructAccess};
 use crate::resolvers::resolve_alias;
 use crate::validators::{
     validate_exact_size, validate_integer_type_id, validate_type_category, validate_type_id,
@@ -15,6 +15,7 @@ pub struct AdsDeserializer<'de, P: TypeProvider> {
 }
 
 impl<'de, P: TypeProvider> AdsDeserializer<'de, P> {
+    /// Creates a new instance of the [`AdsDeserializer`].
     pub fn new(input: &'de [u8], type_info: &'de AdsTypeInfo, provider: &'de P) -> Self {
         Self {
             input,
@@ -23,18 +24,28 @@ impl<'de, P: TypeProvider> AdsDeserializer<'de, P> {
         }
     }
 
+    /// The buffer that was passed to the deserializer, i.e. the memory layout that was obtained
+    /// from the PLC.
     pub fn input(&self) -> &[u8] {
         self.input
     }
 
+    /// The [`AdsTypeInfo`] that was passed to the deserializer.
     pub fn type_info(&self) -> &AdsTypeInfo {
         self.type_info
     }
 
+    /// The [`TypeProvider`] that is used to resolve the type further if necessary, e.g. for
+    /// aliases, structs, arrays, etc.
     pub fn provider(&self) -> &P {
         self.provider
     }
 
+    /// Reads the exact number of bytes from the input buffer.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `N`: The size of the byte array, determined at compile time.
     pub fn read_bytes<const N: usize>(data: impl AsRef<[u8]>) -> Result<[u8; N], crate::Error> {
         data.as_ref()
             .try_into()
@@ -44,12 +55,14 @@ impl<'de, P: TypeProvider> AdsDeserializer<'de, P> {
             })
     }
 
+    /// Decodes a `STRING`'s raw bytes (null-terminated Windows-1252) to UTF-8.
     fn read_string(input: &'de [u8]) -> Cow<'de, str> {
         let null_pos = input.iter().position(|&b| b == 0).unwrap_or(input.len());
         encoding_rs::WINDOWS_1252.decode(&input[..null_pos]).0
     }
 
-    fn read_wstring(input: &[u8]) -> String {
+    /// Decodes a `WSTRING`'s raw bytes (null-terminated UTF-16LE) to UTF-8.
+    fn read_wstring(input: &'de [u8]) -> Cow<'de, str> {
         let mut null_pos = input.len();
         for (i, chunk) in input.chunks_exact(2).enumerate() {
             if chunk[0] == 0 && chunk[1] == 0 {
@@ -57,10 +70,7 @@ impl<'de, P: TypeProvider> AdsDeserializer<'de, P> {
                 break;
             }
         }
-        encoding_rs::UTF_16LE
-            .decode(&input[..null_pos])
-            .0
-            .into_owned()
+        encoding_rs::UTF_16LE.decode(&input[..null_pos]).0
     }
 }
 
@@ -106,7 +116,7 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
                 Self::new(self.input, target, self.provider).deserialize_any(visitor)
             }
             AdsTypeCategory::Struct | AdsTypeCategory::FunctionBlock | AdsTypeCategory::Union => {
-                self.deserialize_struct("", &[], visitor)
+                self.deserialize_map(visitor)
             }
             AdsTypeCategory::Array => self.deserialize_seq(visitor),
             AdsTypeCategory::None => self.deserialize_unit(visitor),
@@ -121,7 +131,7 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         V: Visitor<'de>,
     {
         validate_type_id(self.type_info, AdsTypeId::Bit)?;
-        let byte = Self::read_bytes::<{ size_of::<bool>() }>(self.input)?[0];
+        let byte = Self::read_bytes::<1>(self.input)?[0];
 
         visitor.visit_bool(byte != 0)
     }
@@ -256,9 +266,15 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
                 Cow::Borrowed(s) => visitor.visit_borrowed_str(s),
                 Cow::Owned(s) => visitor.visit_string(s),
             },
-            AdsTypeId::WString => visitor.visit_string(Self::read_wstring(self.input)),
-            _ => Err(crate::Error::TypeMismatch {
-                expected: "STRING/WSTRING based type.".into(),
+            AdsTypeId::WString => match Self::read_wstring(self.input) {
+                Cow::Borrowed(s) => visitor.visit_borrowed_str(s),
+                Cow::Owned(s) => visitor.visit_string(s),
+            },
+            other => Err(crate::Error::TypeMismatch {
+                expected: format!(
+                    "STRING/WSTRING, but PLC type is '{}' ({other:?})",
+                    self.type_info.name(),
+                ),
             }),
         }
     }
@@ -271,10 +287,13 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
 
         let decoded_string = match self.type_info.type_id() {
             AdsTypeId::String => Self::read_string(self.input).into_owned(),
-            AdsTypeId::WString => Self::read_wstring(self.input),
-            _ => {
+            AdsTypeId::WString => Self::read_wstring(self.input).into_owned(),
+            other => {
                 return Err(crate::Error::TypeMismatch {
-                    expected: "STRING/WSTRING based type.".into(),
+                    expected: format!(
+                        "STRING/WSTRING, but PLC type is '{}' ({other:?})",
+                        self.type_info.name(),
+                    ),
                 });
             }
         };
@@ -347,7 +366,7 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
             type_info.type_name(),
             self.input,
             self.provider,
-        );
+        )?;
         visitor.visit_seq(array)
     }
 
@@ -388,10 +407,10 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
                     type_info.type_name(),
                     self.input,
                     self.provider,
-                );
+                )?;
                 visitor.visit_seq(array)
             }
-            AdsTypeCategory::Struct | AdsTypeCategory::FunctionBlock => {
+            AdsTypeCategory::Struct | AdsTypeCategory::FunctionBlock | AdsTypeCategory::Union => {
                 let fields = type_info.field_infos();
                 if fields.len() != len {
                     return Err(crate::Error::ShapeMismatch {
@@ -399,7 +418,7 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
                         got: fields.len(),
                     });
                 }
-                visitor.visit_seq(AdsStructSeqAccess::new(fields, self.input, self.provider))
+                visitor.visit_seq(AdsStructAccess::new(fields, self.input, self.provider))
             }
             _ => Err(crate::Error::TypeMismatch {
                 expected: "array or struct (for tuple deserialization)".into(),
@@ -423,13 +442,31 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
     where
         V: Visitor<'de>,
     {
-        self.deserialize_struct("", &[], visitor)
+        let ptr_size = self.provider.get_platform_ptr_size();
+        let type_info = resolve_alias(self.type_info, self.provider, ptr_size)?;
+
+        validate_type_category(
+            type_info,
+            &[
+                AdsTypeCategory::Struct,
+                AdsTypeCategory::FunctionBlock,
+                AdsTypeCategory::Union,
+            ],
+            ptr_size,
+        )?;
+        validate_exact_size(self.input, type_info.size() as usize)?;
+
+        visitor.visit_map(AdsMapAccess::new(
+            type_info.field_infos(),
+            self.input,
+            self.provider,
+        ))
     }
 
     fn deserialize_struct<V>(
         self,
         _name: &'static str,
-        _fields: &'static [&'static str],
+        fields: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
@@ -449,11 +486,15 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         )?;
         validate_exact_size(self.input, type_info.size() as usize)?;
 
-        visitor.visit_map(AdsStructAccess::new(
-            type_info.field_infos(),
-            self.input,
-            self.provider,
-        ))
+        let plc_fields = type_info.field_infos();
+        if plc_fields.len() != fields.len() {
+            return Err(crate::Error::ShapeMismatch {
+                expected: fields.len(),
+                got: plc_fields.len(),
+            });
+        }
+
+        visitor.visit_seq(AdsStructAccess::new(plc_fields, self.input, self.provider))
     }
 
     fn deserialize_enum<V>(
