@@ -1,25 +1,44 @@
+use super::unsupported_serialize_methods;
 use crate::TypeProvider;
 use crate::resolvers::resolve_alias;
 use crate::ser::AdsSerializer;
-use serde::ser::{SerializeSeq, SerializeTuple, SerializeTupleStruct};
-use tcads_core::AdsArrayInfo;
+use serde::ser::{Impossible, SerializeSeq, SerializeTuple, SerializeTupleStruct};
+use tcads_core::{AdsArrayInfo, AdsTypeInfo};
 
-pub struct AdsArraySerializer<'a, P: TypeProvider> {
-    remaining_dims: &'a [AdsArrayInfo],
-    element_type_name: &'a str,
-    output: &'a mut [u8],
-    provider: &'a P,
+/// Writes elements into a fixed-stride array/tuple slot of the output buffer.
+pub struct AdsArraySerializer<'ser, P: TypeProvider> {
+    remaining_dims: &'ser [AdsArrayInfo],
+    element_type_info: &'ser AdsTypeInfo,
+    output: &'ser mut [u8],
+    provider: &'ser P,
     index: usize,
     count: usize,
     stride: usize,
 }
 
-impl<'a, P: TypeProvider> AdsArraySerializer<'a, P> {
+impl<'ser, P: TypeProvider> AdsArraySerializer<'ser, P> {
+    /// Create a new instance of an [`AdsArraySerializer`].
     pub fn new(
-        dims: &'a [AdsArrayInfo],
-        element_type_name: &'a str,
-        output: &'a mut [u8],
-        provider: &'a P,
+        dims: &'ser [AdsArrayInfo],
+        element_type_name: &'ser str,
+        output: &'ser mut [u8],
+        provider: &'ser P,
+        len_hint: Option<usize>,
+    ) -> Result<Self, crate::Error> {
+        let raw_type_info = provider
+            .get_type_info(element_type_name)
+            .ok_or_else(|| crate::Error::TypeNotFound(element_type_name.to_string()))?;
+        let element_type_info =
+            resolve_alias(raw_type_info, provider, provider.get_platform_ptr_size())?;
+
+        Self::with_element_type(dims, element_type_info, output, provider, len_hint)
+    }
+
+    fn with_element_type(
+        dims: &'ser [AdsArrayInfo],
+        element_type_info: &'ser AdsTypeInfo,
+        output: &'ser mut [u8],
+        provider: &'ser P,
         len_hint: Option<usize>,
     ) -> Result<Self, crate::Error> {
         let (dim, remaining_dims) = dims
@@ -37,10 +56,22 @@ impl<'a, P: TypeProvider> AdsArraySerializer<'a, P> {
             }
         }
 
-        let stride = output.len() / count.max(1);
+        let inner: usize = remaining_dims
+            .iter()
+            .map(|d| d.element_count() as usize)
+            .product();
+        let stride = element_type_info.size() as usize * inner;
+
+        if stride * count != output.len() {
+            return Err(crate::Error::SizeMismatch {
+                expected: stride * count,
+                got: output.len(),
+            });
+        }
+
         Ok(Self {
             remaining_dims,
-            element_type_name,
+            element_type_info,
             output,
             provider,
             index: 0,
@@ -61,33 +92,19 @@ impl<'a, P: TypeProvider> AdsArraySerializer<'a, P> {
         }
 
         let start = self.index * self.stride;
-        let end = start + self.stride;
-        let len = self.output.len();
-        let elem_output = self
-            .output
-            .get_mut(start..end)
-            .ok_or(crate::Error::SizeMismatch {
-                expected: end,
-                got: len,
-            })?;
+        let elem_output = &mut self.output[start..start + self.stride];
         self.index += 1;
 
         if self.remaining_dims.is_empty() {
-            let ptr_size = self.provider.get_platform_ptr_size();
-            let raw_type_info = self
-                .provider
-                .get_type_info(self.element_type_name)
-                .ok_or_else(|| crate::Error::TypeNotFound(self.element_type_name.to_string()))?;
-            let elem_type_info = resolve_alias(raw_type_info, self.provider, ptr_size)?;
             value.serialize(AdsSerializer::new(
                 elem_output,
-                elem_type_info,
+                self.element_type_info,
                 self.provider,
             ))
         } else {
-            let sub_array = AdsArraySerializer::new(
+            let sub_array = AdsArraySerializer::with_element_type(
                 self.remaining_dims,
-                self.element_type_name,
+                self.element_type_info,
                 elem_output,
                 self.provider,
                 None,
@@ -113,126 +130,66 @@ impl<'a, P: TypeProvider> AdsArraySerializer<'a, P> {
     }
 }
 
-impl<'a, P: TypeProvider> SerializeSeq for AdsArraySerializer<'a, P> {
+impl<'ser, P: TypeProvider> SerializeSeq for AdsArraySerializer<'ser, P> {
     type Ok = ();
     type Error = crate::Error;
+
     fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
         T: ?Sized + serde::Serialize,
     {
         self.serialize_next(value)
     }
+
     fn end(self) -> Result<Self::Ok, Self::Error> {
         self.finish()
     }
 }
 
-impl<'a, P: TypeProvider> SerializeTuple for AdsArraySerializer<'a, P> {
+impl<'ser, P: TypeProvider> SerializeTuple for AdsArraySerializer<'ser, P> {
     type Ok = ();
     type Error = crate::Error;
+
     fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
         T: ?Sized + serde::Serialize,
     {
         self.serialize_next(value)
     }
+
     fn end(self) -> Result<Self::Ok, Self::Error> {
         self.finish()
     }
 }
 
-impl<'a, P: TypeProvider> SerializeTupleStruct for AdsArraySerializer<'a, P> {
+impl<'ser, P: TypeProvider> SerializeTupleStruct for AdsArraySerializer<'ser, P> {
     type Ok = ();
     type Error = crate::Error;
+
     fn serialize_field<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
         T: ?Sized + serde::Serialize,
     {
         self.serialize_next(value)
     }
+
     fn end(self) -> Result<Self::Ok, Self::Error> {
         self.finish()
     }
 }
 
-impl<'a, P: TypeProvider> serde::Serializer for AdsArraySerializer<'a, P> {
+impl<'ser, P: TypeProvider> serde::Serializer for AdsArraySerializer<'ser, P> {
     type Ok = ();
     type Error = crate::Error;
 
     type SerializeSeq = Self;
     type SerializeTuple = Self;
     type SerializeTupleStruct = Self;
-    type SerializeTupleVariant = serde::ser::Impossible<(), crate::Error>;
-    type SerializeMap = serde::ser::Impossible<(), crate::Error>;
-    type SerializeStruct = serde::ser::Impossible<(), crate::Error>;
-    type SerializeStructVariant = serde::ser::Impossible<(), crate::Error>;
+    type SerializeTupleVariant = Impossible<(), crate::Error>;
+    type SerializeMap = Impossible<(), crate::Error>;
+    type SerializeStruct = Impossible<(), crate::Error>;
+    type SerializeStructVariant = Impossible<(), crate::Error>;
 
-    fn serialize_bool(self, _v: bool) -> Result<Self::Ok, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_i8(self, _v: i8) -> Result<Self::Ok, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_i16(self, _v: i16) -> Result<Self::Ok, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-
-    fn serialize_i32(self, _v: i32) -> Result<Self::Ok, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_i64(self, _v: i64) -> Result<Self::Ok, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_u8(self, _v: u8) -> Result<Self::Ok, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_u16(self, _v: u16) -> Result<Self::Ok, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_u32(self, _v: u32) -> Result<Self::Ok, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_u64(self, _v: u64) -> Result<Self::Ok, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_f32(self, _v: f32) -> Result<Self::Ok, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_f64(self, _v: f64) -> Result<Self::Ok, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_char(self, _v: char) -> Result<Self::Ok, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_str(self, _v: &str) -> Result<Self::Ok, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_bytes(self, _v: &[u8]) -> Result<Self::Ok, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_some<T>(self, _value: &T) -> Result<Self::Ok, Self::Error>
-    where
-        T: ?Sized + serde::Serialize,
-    {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_unit_struct(self, _name: &'static str) -> Result<Self::Ok, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_unit_variant(
-        self,
-        _name: &'static str,
-        _variant_index: u32,
-        _variant: &'static str,
-    ) -> Result<Self::Ok, Self::Error> {
-        Err(Self::not_a_seq())
-    }
     fn serialize_newtype_struct<T>(
         self,
         _name: &'static str,
@@ -243,24 +200,15 @@ impl<'a, P: TypeProvider> serde::Serializer for AdsArraySerializer<'a, P> {
     {
         value.serialize(self)
     }
-    fn serialize_newtype_variant<T>(
-        self,
-        _name: &'static str,
-        _variant_index: u32,
-        _variant: &'static str,
-        _value: &T,
-    ) -> Result<Self::Ok, Self::Error>
-    where
-        T: ?Sized + serde::Serialize,
-    {
-        Err(Self::not_a_seq())
-    }
+
     fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
         Ok(self)
     }
+
     fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, Self::Error> {
         Ok(self)
     }
+
     fn serialize_tuple_struct(
         self,
         _name: &'static str,
@@ -268,32 +216,10 @@ impl<'a, P: TypeProvider> serde::Serializer for AdsArraySerializer<'a, P> {
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
         Ok(self)
     }
-    fn serialize_tuple_variant(
-        self,
-        _name: &'static str,
-        _variant_index: u32,
-        _variant: &'static str,
-        _len: usize,
-    ) -> Result<Self::SerializeTupleVariant, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_struct(
-        self,
-        _name: &'static str,
-        _len: usize,
-    ) -> Result<Self::SerializeStruct, Self::Error> {
-        Err(Self::not_a_seq())
-    }
-    fn serialize_struct_variant(
-        self,
-        _name: &'static str,
-        _variant_index: u32,
-        _variant: &'static str,
-        _len: usize,
-    ) -> Result<Self::SerializeStructVariant, Self::Error> {
-        Err(Self::not_a_seq())
+
+    unsupported_serialize_methods! {
+        Self::not_a_seq =>
+        bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str bytes none some
+        unit unit_struct unit_variant newtype_variant tuple_variant map r#struct struct_variant
     }
 }

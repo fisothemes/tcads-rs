@@ -1,4 +1,6 @@
-use super::access::AdsArraySerializer;
+use super::access::{
+    AdsArraySerializer, AdsMapSerializer, AdsStructSerializer, AdsTupleSerializer,
+};
 use crate::TypeProvider;
 use crate::resolvers::resolve_alias;
 use crate::validators::{
@@ -8,6 +10,11 @@ use serde::Serialize;
 use serde::ser::{Impossible, Serializer};
 use tcads_core::{AdsTypeCategory, AdsTypeId, AdsTypeInfo};
 
+/// Serializes a Rust value into a PLC memory layout, driven by `AdsTypeInfo` metadata.
+///
+/// # Note
+///
+/// The size of the buffer must be the size of [`AdsTypeInfo::size()`]
 pub struct AdsSerializer<'ser, P: TypeProvider> {
     output: &'ser mut [u8],
     type_info: &'ser AdsTypeInfo,
@@ -15,6 +22,7 @@ pub struct AdsSerializer<'ser, P: TypeProvider> {
 }
 
 impl<'ser, P: TypeProvider> AdsSerializer<'ser, P> {
+    /// Creates a new instance of the [`AdsSerializer`].
     pub fn new(output: &'ser mut [u8], type_info: &'ser AdsTypeInfo, provider: &'ser P) -> Self {
         Self {
             output,
@@ -23,18 +31,26 @@ impl<'ser, P: TypeProvider> AdsSerializer<'ser, P> {
         }
     }
 
+    /// The buffer that was passed to the constructor.
     pub fn output(&self) -> &[u8] {
         self.output
     }
 
+    /// The `AdsTypeInfo` that was used to resolve the type.
     pub fn type_info(&self) -> &AdsTypeInfo {
         self.type_info
     }
 
+    /// The `TypeProvider` that was used to resolve the type.
     pub fn provider(&self) -> &P {
         self.provider
     }
 
+    /// Writes an exact number of bytes into a mutable byte slice.
+    ///
+    /// # Type Parameters
+    ///
+    /// - `N`: The size of the `bytes` array, determined at compile time.
     pub fn write_bytes<const N: usize>(
         data: &mut [u8],
         bytes: [u8; N],
@@ -44,29 +60,39 @@ impl<'ser, P: TypeProvider> AdsSerializer<'ser, P> {
         Ok(())
     }
 
+    /// Encodes a `STRING` into a fixed-width, null-terminated Windows-1252 buffer.
     pub fn write_string(output: &mut [u8], value: &str) -> Result<(), crate::Error> {
         let (encoded, _, _) = encoding_rs::WINDOWS_1252.encode(value);
+
         if encoded.len() + 1 > output.len() {
             return Err(crate::Error::SizeMismatch {
                 expected: output.len(),
                 got: encoded.len() + 1,
             });
         }
-        output.fill(0);
+
         output[..encoded.len()].copy_from_slice(&encoded);
+        output[encoded.len()..].fill(0);
         Ok(())
     }
 
+    /// Encodes a `WSTRING` into a fixed-width, null-terminated UTF-16LE buffer.
     pub fn write_wstring(output: &mut [u8], value: &str) -> Result<(), crate::Error> {
-        let encoded: Vec<u8> = value.encode_utf16().flat_map(u16::to_le_bytes).collect();
-        if encoded.len() + 2 > output.len() {
+        let encoded = value.encode_utf16();
+        let needed = encoded.clone().count() * 2 + 2;
+        if needed > output.len() {
             return Err(crate::Error::SizeMismatch {
                 expected: output.len(),
-                got: encoded.len() + 2,
+                got: needed,
             });
         }
-        output.fill(0);
-        output[..encoded.len()].copy_from_slice(&encoded);
+
+        let mut pos = 0;
+        for unit in encoded {
+            output[pos..pos + 2].copy_from_slice(&unit.to_le_bytes());
+            pos += 2;
+        }
+        output[pos..].fill(0);
         Ok(())
     }
 }
@@ -76,11 +102,11 @@ impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
     type Error = crate::Error;
 
     type SerializeSeq = AdsArraySerializer<'ser, P>;
-    type SerializeTuple = Impossible<(), crate::Error>;
-    type SerializeTupleStruct = Impossible<(), crate::Error>;
+    type SerializeTuple = AdsTupleSerializer<'ser, P>;
+    type SerializeTupleStruct = AdsTupleSerializer<'ser, P>;
     type SerializeTupleVariant = Impossible<(), crate::Error>;
-    type SerializeMap = Impossible<(), crate::Error>;
-    type SerializeStruct = Impossible<(), crate::Error>;
+    type SerializeMap = AdsMapSerializer<'ser, P>;
+    type SerializeStruct = AdsStructSerializer<'ser, P>;
     type SerializeStructVariant = Impossible<(), crate::Error>;
 
     fn serialize_bool(self, v: bool) -> Result<Self::Ok, Self::Error> {
@@ -159,8 +185,11 @@ impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
         match self.type_info.type_id() {
             AdsTypeId::String => Self::write_string(self.output, v),
             AdsTypeId::WString => Self::write_wstring(self.output, v),
-            _ => Err(crate::Error::TypeMismatch {
-                expected: "STRING/WSTRING based type.".into(),
+            other => Err(crate::Error::TypeMismatch {
+                expected: format!(
+                    "STRING/WSTRING, but PLC type is '{}' ({other:?})",
+                    self.type_info.name(),
+                ),
             }),
         }
     }
@@ -172,8 +201,8 @@ impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
     }
 
     fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
-        Err(crate::Error::Custom(
-            "Cannot serialize `None` because PLC memory has no null representation.".into(),
+        Err(crate::Error::NoneNotRepresentable(
+            self.type_info.name().into(),
         ))
     }
 
@@ -201,16 +230,16 @@ impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
         let ptr_size = self.provider.get_platform_ptr_size();
         let type_info = resolve_alias(self.type_info, self.provider, ptr_size)?;
 
+        validate_type_category(type_info, &[AdsTypeCategory::Enum], ptr_size)?;
+        validate_exact_size(self.output, type_info.size() as usize)?;
+
         let value = type_info
             .enum_infos()
             .iter()
             .find(|e| e.name() == variant)
             .map(|e| e.value())
             .ok_or_else(|| {
-                crate::Error::UnknownUnknownEnumVariant(
-                    variant.to_string(),
-                    type_info.name().to_string(),
-                )
+                crate::Error::UnknownEnumVariant(variant.to_string(), type_info.name().to_string())
             })?;
 
         validate_exact_size(self.output, value.len())?;
@@ -260,8 +289,61 @@ impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
         )
     }
 
-    fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, Self::Error> {
-        todo!()
+    fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
+        let ptr_size = self.provider.get_platform_ptr_size();
+        let type_info = resolve_alias(self.type_info, self.provider, ptr_size)?;
+
+        validate_type_category(
+            type_info,
+            &[
+                AdsTypeCategory::Struct,
+                AdsTypeCategory::FunctionBlock,
+                AdsTypeCategory::Union,
+                AdsTypeCategory::Array,
+            ],
+            ptr_size,
+        )?;
+        validate_exact_size(self.output, type_info.size() as usize)?;
+
+        match AdsTypeCategory::determine(type_info, ptr_size) {
+            AdsTypeCategory::Array => {
+                let count: usize = type_info
+                    .array_infos()
+                    .iter()
+                    .map(|d| d.element_count() as usize)
+                    .product();
+                if count != len {
+                    return Err(crate::Error::ShapeMismatch {
+                        expected: len,
+                        got: count,
+                    });
+                }
+                Ok(AdsTupleSerializer::Array(AdsArraySerializer::new(
+                    type_info.array_infos(),
+                    type_info.type_name(),
+                    self.output,
+                    self.provider,
+                    Some(len),
+                )?))
+            }
+            AdsTypeCategory::Struct | AdsTypeCategory::FunctionBlock | AdsTypeCategory::Union => {
+                let fields = type_info.field_infos();
+                if fields.len() != len {
+                    return Err(crate::Error::ShapeMismatch {
+                        expected: len,
+                        got: fields.len(),
+                    });
+                }
+                Ok(AdsTupleSerializer::Struct(AdsStructSerializer::new(
+                    fields,
+                    self.output,
+                    self.provider,
+                )))
+            }
+            _ => Err(crate::Error::TypeMismatch {
+                expected: "array or struct (for tuple serialization)".into(),
+            }),
+        }
     }
 
     fn serialize_tuple_struct(
@@ -285,7 +367,26 @@ impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
     }
 
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
-        todo!()
+        let ptr_size = self.provider.get_platform_ptr_size();
+        let type_info = resolve_alias(self.type_info, self.provider, ptr_size)?;
+
+        validate_type_category(
+            type_info,
+            &[
+                AdsTypeCategory::Struct,
+                AdsTypeCategory::FunctionBlock,
+                AdsTypeCategory::Union,
+            ],
+            ptr_size,
+        )?;
+        validate_exact_size(self.output, type_info.size() as usize)?;
+
+        Ok(AdsMapSerializer::new(
+            type_info.name(),
+            type_info.field_infos(),
+            self.output,
+            self.provider,
+        ))
     }
 
     fn serialize_struct(
@@ -293,7 +394,29 @@ impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
         _name: &'static str,
         len: usize,
     ) -> Result<Self::SerializeStruct, Self::Error> {
-        self.serialize_map(Some(len))
+        let ptr_size = self.provider.get_platform_ptr_size();
+        let type_info = resolve_alias(self.type_info, self.provider, ptr_size)?;
+
+        validate_type_category(
+            type_info,
+            &[
+                AdsTypeCategory::Struct,
+                AdsTypeCategory::FunctionBlock,
+                AdsTypeCategory::Union,
+            ],
+            ptr_size,
+        )?;
+        validate_exact_size(self.output, type_info.size() as usize)?;
+
+        let fields = type_info.field_infos();
+        if fields.len() != len {
+            return Err(crate::Error::ShapeMismatch {
+                expected: len,
+                got: fields.len(),
+            });
+        }
+
+        Ok(AdsStructSerializer::new(fields, self.output, self.provider))
     }
 
     fn serialize_struct_variant(

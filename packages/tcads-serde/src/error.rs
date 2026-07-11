@@ -21,7 +21,16 @@ pub enum Error {
     #[error("Enum discriminant {0} not found in type {1}")]
     UnknownEnumDiscriminant(Integer, String),
     #[error("Enum variant '{0}' not found in type {1}")]
-    UnknownUnknownEnumVariant(String, String),
+    UnknownEnumVariant(String, String),
+    #[error("Field '{0}' not found in type {1}")]
+    UnknownField(String, String),
+    #[error(
+        "Cannot serialize `None`: PLC memory has no null representation, so `Option::None` \
+         would be indistinguishable from a real zero value of type {0} on read-back"
+    )]
+    NoneNotRepresentable(String),
+    #[error("Value too large for field: {value} bytes does not fit in {expected} bytes")]
+    ValueTooLarge { expected: usize, value: usize },
     #[error("I/O or encoding error: {0}")]
     Custom(String),
     #[error(transparent)]
