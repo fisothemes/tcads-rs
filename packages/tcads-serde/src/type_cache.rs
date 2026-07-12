@@ -108,6 +108,7 @@ impl Index<&str> for AdsTypeCache {
     /// Returns a reference to the type definition for the given name.
     ///
     /// # Panics
+    ///
     /// Panics if the type name is not present in the cache.
     fn index(&self, index: &str) -> &AdsTypeInfo {
         self.map.get(index).expect("Type not found in cache")

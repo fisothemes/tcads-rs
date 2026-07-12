@@ -1,8 +1,22 @@
 use crate::TypeProvider;
 use tcads_core::{AdsTypeCategory, AdsTypeInfo};
 
-const MAX_ALIAS_DEPTH: usize = 32;
+// The maximum allowed depth when recursively unwrapping `ALIAS` types.
+/// Prevents cyclic alias declarations in the PLC from causing an infinite loop.
+pub const MAX_ALIAS_DEPTH: usize = 32;
 
+/// Recursively resolves an IEC 61131-3 `ALIAS` type down to its underlying base memory type.
+///
+/// If the provided `type_info` is not an alias, it is immediately returned.
+/// If it is an alias, this function requests the target types sequentially from the
+/// [`TypeProvider`] until a non-alias type (like a Struct, Enum, or Primitive) is reached.
+///
+/// # Errors
+///
+/// - Returns [`crate::Error::TypeNotFound`] if the `TypeProvider` is missing a type in the chain.
+///
+/// - Returns [`crate::Error::Custom`] if the resolution chain exceeds `MAX_ALIAS_DEPTH`,
+/// which typically indicates a cyclic type definition in the PLC.
 pub fn resolve_alias<'a>(
     type_info: &'a AdsTypeInfo,
     provider: &'a impl TypeProvider,
