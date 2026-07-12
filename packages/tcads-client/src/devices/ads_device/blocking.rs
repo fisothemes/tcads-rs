@@ -132,7 +132,7 @@ impl AdsDevice {
     /// use std::time::Duration;
     ///
     /// let device = AdsDevice::connect(Duration::from_secs(5))?;
-    /// println!("Source: {}", device.source()?);
+    /// println!("Source: {}", device.source());
     /// device.shutdown()?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -151,7 +151,7 @@ impl AdsDevice {
     /// use tcads_client::devices::blocking::AdsDevice;
     ///
     /// let device = AdsDevice::connect_to("192.168.1.100:48898", None)?;
-    /// println!("Source: {}", device.source()?);
+    /// println!("Source: {}", device.source());
     /// device.shutdown()?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```

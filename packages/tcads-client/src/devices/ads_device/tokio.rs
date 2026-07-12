@@ -139,7 +139,7 @@ impl AdsDevice {
     /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let device = AdsDevice::connect(Duration::from_secs(5)).await?;
-    /// println!("Source: {}", device.source().await);
+    /// println!("Source: {}", device.source());
     /// device.shutdown().await;
     /// # Ok(())
     /// # }
@@ -161,7 +161,7 @@ impl AdsDevice {
     /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let device = AdsDevice::connect_to("192.168.1.50:48898", None).await?;
-    /// println!("Source: {}", device.source().await);
+    /// println!("Source: {}", device.source());
     /// device.shutdown().await;
     /// # Ok(())
     /// # }
