@@ -1,13 +1,14 @@
 //! Example 8: Advanced AdsDevice (Multithreading & Notifications)
 //! Run with: `cargo run --bin 08_advanced_ads_device`
 //!
-//! PREREQUISITE:
-//! Open `examples/twincat/TcAdsExamples.sln` in TwinCAT XAE, activate
-//! the configuration on your local machine, and put the PLC into RUN mode.
-//!
 //! This example demonstrates the `Send + Sync` capabilities of `AdsDevice`.
 //! It uses `std::thread` to spawn concurrent reader and writer threads
 //! that interact with the PLC simultaneously over the same multiplexed connection.
+//!
+//! ## PREREQUISITE
+//!
+//! Open `examples/twincat/TcAdsExamples.sln` in TwinCAT XAE, activate
+//! the configuration on your local machine, and put the PLC into RUN mode.
 
 use std::sync::mpsc::Receiver;
 use std::thread;

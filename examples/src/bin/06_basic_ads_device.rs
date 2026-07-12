@@ -5,7 +5,8 @@
 //! Notice how it eliminates the need to manage TCP sockets,
 //! AMS headers, or manual byte packing!
 //!
-//! PREREQUISITE:
+//! ## PREREQUISITE
+//!
 //! Open `twincat/TcAdsExamples.sln` in TwinCAT XAE,
 //! activate the configuration on your local machine, and put the PLC into RUN mode.
 

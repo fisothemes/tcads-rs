@@ -5,7 +5,8 @@
 //! handles, register them for notifications in a single network round-trip,
 //! stream the data in background threads, and gracefully tear everything down.
 //!
-//! PREREQUISITE:
+//! ## PREREQUISITE
+//!
 //! Open `twincat/TcAdsExamples.sln` in TwinCAT XAE,
 //! activate the configuration on your local machine, and put the PLC into RUN mode.
 

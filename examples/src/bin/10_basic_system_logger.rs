@@ -4,7 +4,7 @@
 //! Demonstrates how to connect to the TwinCAT Event Logger (Port 100),
 //! subscribe to system messages, and write our own custom log messages.
 //!
-//! PREREQUISITE:
+//! ## PREREQUISITE
 //! Open `examples/twincat/TcAdsExamples.sln` and put the PLC into RUN mode.
 //! Toggle `MAIN.bIncrement` or `MAIN.bDecrement` manually to generate logs, or
 //! start/stop the PLC to see system state logs.

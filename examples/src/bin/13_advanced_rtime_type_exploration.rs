@@ -5,7 +5,8 @@
 //! It shows how to classify types (Structs, FBs, Enums) dynamically based on the target
 //! platform's architecture.
 //!
-//! PREREQUISITE:
+//! ## PREREQUISITE
+//!
 //! Open `twincat/TcAdsExamples.sln` in TwinCAT XAE,
 //! activate the configuration on your local machine, and put the PLC into RUN mode.
 

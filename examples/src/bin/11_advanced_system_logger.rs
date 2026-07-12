@@ -4,7 +4,8 @@
 //! Demonstrates multiplexing: sharing a single AMS connection between a
 //! standard `AdsDevice` (for PLC control) and a `Logger` (for system monitoring).
 //!
-//! PREREQUISITE:
+//! ## PREREQUISITE
+//!
 //! Open `examples/twincat/TcAdsExamples.sln` and put the PLC into RUN mode.
 
 use std::time::Duration;

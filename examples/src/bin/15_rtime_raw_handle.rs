@@ -5,7 +5,7 @@
 //! to a variable, read its raw bytes, parse them manually using `from_le_bytes`, and write them
 //! back.
 //!
-//! ## Note:
+//! ## Note
 //!
 //!  - Handles are fast but must always be released to prevent PLC memory leaks!
 //!  - Handles automatically resolve PLC `REFERENCE TO` and `VAR_IN_OUT` variables under the hood.

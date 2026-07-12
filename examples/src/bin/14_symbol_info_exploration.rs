@@ -5,7 +5,8 @@
 //! It shows how to fetch upload statistics, look up a single symbol by name,
 //! and perform a full scan of every symbol in the PLC's symbol table.
 //!
-//! PREREQUISITE:
+//! ## PREREQUISITE
+//!
 //! Open `twincat/TcAdsExamples.sln` in TwinCAT XAE,
 //! activate the configuration on your local machine, and put the PLC into RUN mode.
 
