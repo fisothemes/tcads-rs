@@ -2,15 +2,21 @@ use super::UnsignedIntegerVisitor;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
+/// An exact-width representation of a TwinCAT unsigned integer.
 #[derive(Clone, Copy, Hash)]
 pub enum UnsignedInteger {
+    /// An IEC 61131-3 `USINT` or `BYTE` (8-bit unsigned integer).
     Byte(u8),
+    /// An IEC 61131-3 `UINT` or `WORD` (16-bit unsigned integer).
     UInt(u16),
+    /// An IEC 61131-3 `UDINT` or `DWORD` (32-bit unsigned integer).
     UDInt(u32),
+    /// An IEC 61131-3 `ULINT` or `LWORD` (64-bit unsigned integer).
     ULInt(u64),
 }
 
 impl UnsignedInteger {
+    /// Returns `true` if the integer is 0.
     pub const fn is_zero(&self) -> bool {
         match self {
             UnsignedInteger::Byte(n) => *n == 0,
@@ -20,18 +26,22 @@ impl UnsignedInteger {
         }
     }
 
+    /// Returns `true` if the value is an 8-bit `BYTE` / `USINT`.
     pub const fn is_byte(&self) -> bool {
         matches!(self, UnsignedInteger::Byte(_))
     }
 
+    /// Returns `true` if the value is a 16-bit `UINT` / `WORD`.
     pub const fn is_uint(&self) -> bool {
         matches!(self, UnsignedInteger::UInt(_))
     }
 
+    /// Returns `true` if the value is a 32-bit `UDINT` / `DWORD`.
     pub const fn is_udint(&self) -> bool {
         matches!(self, UnsignedInteger::UDInt(_))
     }
 
+    /// Returns `true` if the value is a 64-bit `ULINT` / `LWORD`.
     pub const fn is_ulint(&self) -> bool {
         matches!(self, UnsignedInteger::ULInt(_))
     }

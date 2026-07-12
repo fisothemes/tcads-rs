@@ -2,15 +2,21 @@ use super::SignedIntegerVisitor;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
+// An exact-width representation of a TwinCAT signed integer.
 #[derive(Clone, Copy, Hash)]
 pub enum SignedInteger {
+    /// An IEC 61131-3 `SINT` (8-bit signed integer).
     SInt(i8),
+    /// An IEC 61131-3 `INT` (16-bit signed integer).
     Int(i16),
+    /// An IEC 61131-3 `DINT` (32-bit signed integer).
     DInt(i32),
+    /// An IEC 61131-3 `LINT` (64-bit signed integer).
     LInt(i64),
 }
 
 impl SignedInteger {
+    /// Returns `true` if the integer is 0.
     pub const fn is_zero(&self) -> bool {
         match *self {
             SignedInteger::SInt(n) => n == 0,
@@ -20,6 +26,7 @@ impl SignedInteger {
         }
     }
 
+    /// Returns `true` if the integer is less than 0.
     pub const fn is_negative(&self) -> bool {
         match *self {
             SignedInteger::SInt(n) => n < 0,
@@ -29,22 +36,27 @@ impl SignedInteger {
         }
     }
 
+    /// Returns `true` if the integer is 0 or greater.
     pub const fn is_positive(&self) -> bool {
         !self.is_negative()
     }
 
+    /// Returns `true` if the value is an 8-bit `SINT`.
     pub const fn is_sint(&self) -> bool {
         matches!(self, SignedInteger::SInt(_))
     }
 
+    /// Returns `true` if the value is a 16-bit `INT`.
     pub const fn is_int(&self) -> bool {
         matches!(self, SignedInteger::Int(_))
     }
 
+    /// Returns `true` if the value is a 32-bit `DINT`.
     pub const fn is_dint(&self) -> bool {
         matches!(self, SignedInteger::DInt(_))
     }
 
+    /// Returns `true` if the value is a 64-bit `LINT`.
     pub const fn is_lint(&self) -> bool {
         matches!(self, SignedInteger::LInt(_))
     }

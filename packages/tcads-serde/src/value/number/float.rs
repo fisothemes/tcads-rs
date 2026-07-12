@@ -2,13 +2,17 @@ use super::FloatVisitor;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
+/// An exact-width representation of a TwinCAT floating-point number.
 #[derive(Clone, Copy)]
 pub enum Float {
+    /// An IEC 61131-3 `REAL` (32-bit floating point).
     Real(f32),
+    /// An IEC 61131-3 `LREAL` (64-bit floating point).
     LReal(f64),
 }
 
 impl Float {
+    /// Returns `true` if the value is 0.
     pub const fn is_zero(&self) -> bool {
         match *self {
             Float::Real(n) => n == 0.0,
@@ -16,6 +20,7 @@ impl Float {
         }
     }
 
+    /// Returns `true` if the underlying float is less than 0.0.
     pub const fn is_negative(&self) -> bool {
         match *self {
             Float::Real(n) => n < 0.0,
@@ -23,14 +28,17 @@ impl Float {
         }
     }
 
+    /// Returns `true` if the underlying float is 0.0 or greater.
     pub const fn is_positive(&self) -> bool {
         !self.is_negative()
     }
 
+    /// Returns `true` if the value is a 32-bit `REAL`
     pub const fn is_real(&self) -> bool {
         matches!(self, Float::Real(_))
     }
 
+    /// Returns `true` if the value is a 64-bit `LREAL`.
     pub const fn is_lreal(&self) -> bool {
         matches!(self, Float::LReal(_))
     }

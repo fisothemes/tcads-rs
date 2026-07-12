@@ -10,13 +10,24 @@ pub mod visitors;
 pub use number::{Float, Integer, Number, SignedInteger, UnsignedInteger};
 
 /// A dynamically typed TwinCAT Runtime ADS value.
+///
+/// [`Value`] is used to parse raw PLC memory when the layout is unknown at compile time.
+/// Instead of strictly binding to a `#[derive(serde::Deserialize)]` Rust struct, memory parsed
+/// into a [`Value`] becomes an explorable, JSON-like tree.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
+    /// An IEC 61131-3 `BOOL`.
     Bool(bool),
+    /// An IEC 61131-3 numeric type (`INT`, `LREAL`, `BYTE`, etc.).
     Number(Number),
+    /// An IEC 61131-3 `STRING` or `WSTRING`.
     String(String),
+    /// A TwinCAT `ARRAY` chunked into a dynamic list of values.
     Array(Vec<Value>),
+    /// A TwinCAT `STRUCT` or `FUNCTION_BLOCK`. Fields are stored in an `IndexMap`
+    /// to preserve the PLC's internal memory declaration order.
     Struct(IndexMap<String, Value>),
+    /// A TwinCAT `ENUM` variant, represented by its string name.
     Enum(String),
 }
 
@@ -47,30 +58,37 @@ impl Value {
         )
     }
 
+    /// Returns `true` if the value is a `Bool`.
     pub const fn is_bool(&self) -> bool {
         matches!(self, Value::Bool(_))
     }
 
+    /// Returns `true` if the value is a `Number`.
     pub const fn is_number(&self) -> bool {
         matches!(self, Value::Number(_))
     }
 
+    /// Returns `true` if the value is a `String`.
     pub const fn is_string(&self) -> bool {
         matches!(self, Value::String(_))
     }
 
+    /// Returns `true` if the value is an `Array`.
     pub const fn is_array(&self) -> bool {
         matches!(self, Value::Array(_))
     }
 
+    /// Returns `true` if the value is a `Struct`.
     pub const fn is_struct(&self) -> bool {
         matches!(self, Value::Struct(_))
     }
 
+    /// Returns `true` if the value is an `Enum`.
     pub const fn is_enum(&self) -> bool {
         matches!(self, Value::Enum(_))
     }
 
+    /// If the [`Value`] is a `Bool`, returns the associated `bool`. Returns `None` otherwise.
     pub const fn as_bool(&self) -> Option<bool> {
         match self {
             Value::Bool(b) => Some(*b),
@@ -78,6 +96,7 @@ impl Value {
         }
     }
 
+    /// If the [`Value`] is a `Number`, returns the associated `Number`. Returns `None` otherwise.
     pub const fn as_number(&self) -> Option<&Number> {
         match self {
             Value::Number(n) => Some(n),
@@ -85,6 +104,7 @@ impl Value {
         }
     }
 
+    /// If the `Value` is a `String`, returns the associated string slice. Returns `None` otherwise.
     pub const fn as_str(&self) -> Option<&str> {
         match self {
             Value::String(s) => Some(s.as_str()),
@@ -92,6 +112,7 @@ impl Value {
         }
     }
 
+    /// If the `Value` is an `Array`, returns the underlying vector as a slice. Returns `None` otherwise.
     pub const fn as_array(&self) -> Option<&[Value]> {
         match self {
             Value::Array(arr) => Some(arr.as_slice()),
@@ -99,6 +120,8 @@ impl Value {
         }
     }
 
+    /// If the `Value` is a `Struct`, returns a reference to the underlying index map as a slice of
+    /// key-value pairs. Returns `None` otherwise.
     pub fn as_struct(&self) -> Option<&Slice<String, Value>> {
         match self {
             Value::Struct(fields) => Some(fields.as_slice()),
@@ -106,6 +129,7 @@ impl Value {
         }
     }
 
+    /// If the `Value` is an `Enum`, returns the string name of the variant. Returns `None` otherwise.
     pub fn as_enum(&self) -> Option<&str> {
         match self {
             Value::Enum(name) => Some(name),
@@ -113,6 +137,8 @@ impl Value {
         }
     }
 
+    /// If the `Value` is a `Bool`, returns a mutable reference to the associated `bool`. Returns
+    /// `None` otherwise.
     pub const fn as_bool_mut(&mut self) -> Option<&mut bool> {
         match self {
             Value::Bool(b) => Some(b),
@@ -120,6 +146,8 @@ impl Value {
         }
     }
 
+    /// If the `Value` is a `Number`, returns a mutable reference to the underlying numeric enum.
+    /// Returns `None` otherwise.
     pub const fn as_number_mut(&mut self) -> Option<&mut Number> {
         match self {
             Value::Number(n) => Some(n),
@@ -127,6 +155,8 @@ impl Value {
         }
     }
 
+    /// If the `Value` is an `Array`, returns a mutable reference to the underlying vector slice.
+    /// Returns `None` otherwise.
     pub const fn as_array_mut(&mut self) -> Option<&mut [Value]> {
         match self {
             Value::Array(arr) => Some(arr.as_mut_slice()),
@@ -134,6 +164,8 @@ impl Value {
         }
     }
 
+    /// If the `Value` is a `Struct`, returns a mutable reference to the underlying index map slice.
+    /// Returns `None` otherwise.
     pub fn as_struct_mut(&mut self) -> Option<&mut Slice<String, Value>> {
         match self {
             Value::Struct(fields) => Some(fields.as_mut_slice()),
@@ -141,6 +173,8 @@ impl Value {
         }
     }
 
+    /// If the `Value` is an `Enum`, returns a mutable reference to the string name of the variant.
+    /// Returns `None` otherwise.
     pub fn as_enum_mut(&mut self) -> Option<&mut String> {
         match self {
             Value::Enum(name) => Some(name),
@@ -148,6 +182,12 @@ impl Value {
         }
     }
 
+    /// Accesses a nested `Value` by its string key.
+    ///
+    /// - If the value is a `Struct`, this looks up the child field by its exact name.
+    /// - If the value is an `Array`, this attempts to parse the string key as a `usize` index
+    ///   and fetches that element.
+    /// - Returns `None` for all other variants, or if the key/index does not exist.
     pub fn get(&self, key: &str) -> Option<&Value> {
         match self {
             Value::Struct(map) => map.get(key),
@@ -156,6 +196,12 @@ impl Value {
         }
     }
 
+    /// Accesses a mutable reference to a nested `Value` by its string key.
+    ///
+    /// - If the value is a `Struct`, this looks up the child field by its exact name.
+    /// - If the value is an `Array`, this attempts to parse the string key as a `usize` index and
+    ///   fetches that element.
+    /// - Returns `None` for all other variants, or if the key/index does not exist.
     pub fn get_mut(&mut self, key: &str) -> Option<&mut Value> {
         match self {
             Value::Struct(map) => map.get_mut(key),
