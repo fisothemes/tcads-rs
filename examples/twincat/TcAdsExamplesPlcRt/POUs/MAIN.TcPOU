@@ -4,9 +4,11 @@
     <Declaration><![CDATA[// This is an example TwinCAT Runtime project for tcads-rs demonstrations.
 PROGRAM MAIN
 VAR
-	nCount 		: UDINT := 99;
-	bIncrement 	: BOOL;
-	bDecrement 	: BOOL;
+	nCount 			: UDINT := 99;
+	bIncrement 		: BOOL;
+	bDecrement 		: BOOL;
+	
+	fbCurrentRecipe	: FB_Recipe;
 END_VAR
 ]]></Declaration>
     <Implementation>

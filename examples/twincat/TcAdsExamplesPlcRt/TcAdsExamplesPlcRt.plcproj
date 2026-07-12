@@ -18,7 +18,19 @@
     <LibraryReferences>{ea2a00a2-2073-4fb4-8bb5-88f83994c6c8}</LibraryReferences>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="DUTs\E_RecipeStepCommand.TcTLEO">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="DUTs\ST_Empty.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\ST_RecipeStep.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\T_RecipeId.TcDUT">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DUTs\T_RecipeStep.TcDUT">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="DUTs\T_STEmptyAlias.TcDUT">
@@ -58,6 +70,9 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FBs\FB_EmptyWithImplRPC.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="POUs\FBs\FB_Recipe.TcPOU">
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="POUs\FBs\FB_WithFields.TcPOU">

@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_Recipe" Id="{2c1dce7f-b1a0-4ffd-9ce2-743d05f393b3}" SpecialFunc="None">
+    <Declaration><![CDATA[{attribute 'no_explicit_call' := 'direct call for this function block is not allowed'}
+FUNCTION_BLOCK FB_Recipe IMPLEMENTS  __SYSTEM.IQueryInterface
+VAR
+	_nId 			: T_RecipeId;
+	_arSteps 		: ARRAY[0..4] OF T_RecipeStep;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+  </POU>
+</TcPlcObject>
