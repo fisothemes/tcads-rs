@@ -1,11 +1,17 @@
 use serde::de::value::StrDeserializer;
 use serde::de::{DeserializeSeed, EnumAccess, VariantAccess, Visitor};
 
+/// Provides access to TwinCAT Enum variants.
+///
+/// Because PLC enums are strictly integer-backed constants with string names attached
+/// via metadata, this accessor always maps to a Serde Unit Variant (a variant with no payload).
+/// It passes the string name of the PLC variant to Serde to match against the Rust enum.
 pub struct AdsEnumAccess<'de> {
     variant_name: &'de str,
 }
 
 impl<'de> AdsEnumAccess<'de> {
+    /// Creates a new [`AdsEnumAccess`] bound to the resolved PLC variant string name.
     pub fn new(variant_name: &'de str) -> Self {
         Self { variant_name }
     }

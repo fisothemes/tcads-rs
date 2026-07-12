@@ -3,7 +3,7 @@ use crate::TypeProvider;
 use serde::de::{DeserializeSeed, SeqAccess};
 use tcads_core::AdsFieldInfo;
 
-/// Yields struct fields in declaration order rather than by name.
+/// Yields struct fields sequentially based on their declaration order in memory.
 pub struct AdsStructAccess<'de, P: TypeProvider> {
     fields: std::slice::Iter<'de, AdsFieldInfo>,
     input: &'de [u8],

@@ -8,6 +8,7 @@ use serde::de::{Deserializer, Visitor};
 use std::borrow::Cow;
 use tcads_core::{AdsTypeCategory, AdsTypeId, AdsTypeInfo};
 
+/// Deserializes a PLC memory layout into a Rust type using the [`AdsTypeInfo`].
 pub struct AdsDeserializer<'de, P: TypeProvider> {
     input: &'de [u8],
     type_info: &'de AdsTypeInfo,
