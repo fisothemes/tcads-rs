@@ -9,6 +9,7 @@ The project is organized as a Cargo workspace with the following crates:
 - **[`tcads-core`](packages/tcads-core)**: The foundational crate. Provides protocol primitives, serialization, and raw TCP framing.
 - **[`tcads-client`](packages/tcads-client)**: The high-level API. Provides thread-safe, async-ready clients (like `AdsDevice`) for managing requests, symbols, and notifications.
 - **[`tcads-server`](packages/tcads-server)**: Framework for building custom ADS servers/devices in Rust.
+- **[`tcads-serde`](packages/tcads-serde)**: The serialization engine. Offers Serde-based serialization/deserialization of PLC data types, including dynamic type resolution, alias handling, and a `Value` enum for generic inspection.
 - **[`tcads`](packages/tcads)**: The top-level facade crate that bundles everything together for easy consumption.
 - **[`examples`](examples)**: A comprehensive, step-by-step learning progression demonstrating how to use the library from raw bytes up to high-level Actor clients.
 
