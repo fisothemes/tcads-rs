@@ -1,3 +1,4 @@
+use super::UnsignedIntegerVisitor;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
@@ -55,8 +56,7 @@ impl<'de> Deserialize<'de> for UnsignedInteger {
     where
         D: Deserializer<'de>,
     {
-        let n = u64::deserialize(deserializer)?;
-        Ok(UnsignedInteger::from(n))
+        deserializer.deserialize_any(UnsignedIntegerVisitor)
     }
 }
 

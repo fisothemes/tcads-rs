@@ -1,3 +1,6 @@
+use super::visitors::{
+    FloatVisitor, IntegerVisitor, NumberVisitor, SignedIntegerVisitor, UnsignedIntegerVisitor,
+};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
@@ -40,21 +43,15 @@ impl<'de> Deserialize<'de> for Number {
     where
         D: Deserializer<'de>,
     {
-        let f = f64::deserialize(deserializer)?;
-        if f.fract() == 0.0 && f >= i64::MIN as f64 && f <= i64::MAX as f64 {
-            let i = f as i64;
-            Ok(Number::Integer(i.into()))
-        } else {
-            Ok(Number::Float(f.into()))
-        }
+        deserializer.deserialize_any(NumberVisitor)
     }
 }
 
 impl fmt::Debug for Number {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Number::Integer(n) => write!(f, "{n:?})"),
-            Number::Float(n) => write!(f, "{n:?})"),
+            Number::Integer(n) => write!(f, "{n:?}"),
+            Number::Float(n) => write!(f, "{n:?}"),
         }
     }
 }

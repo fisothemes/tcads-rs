@@ -1,3 +1,4 @@
+use super::FloatVisitor;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
@@ -52,8 +53,7 @@ impl<'de> Deserialize<'de> for Float {
     where
         D: Deserializer<'de>,
     {
-        let n = f64::deserialize(deserializer)?;
-        Ok(Float::from(n))
+        deserializer.deserialize_any(FloatVisitor)
     }
 }
 

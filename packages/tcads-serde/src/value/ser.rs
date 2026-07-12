@@ -7,7 +7,6 @@ impl Serialize for Value {
         S: Serializer,
     {
         match self {
-            Value::Null => serializer.serialize_unit(),
             Value::Bool(b) => serializer.serialize_bool(*b),
             Value::Number(n) => n.serialize(serializer),
             Value::String(s) => serializer.serialize_str(s),
@@ -19,12 +18,7 @@ impl Serialize for Value {
                 }
                 map.end()
             }
-            Value::Enum { name, value } => {
-                let mut map = serializer.serialize_map(Some(2))?;
-                map.serialize_entry("name", name)?;
-                map.serialize_entry("value", value)?;
-                map.end()
-            }
+            Value::Enum(name) => serializer.serialize_str(name),
         }
     }
 }

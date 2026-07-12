@@ -1,3 +1,4 @@
+use super::{IntegerVisitor, SignedIntegerVisitor, UnsignedIntegerVisitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 use tcads_core::AdsTypeId;
@@ -160,21 +161,15 @@ impl<'de> Deserialize<'de> for Integer {
     where
         D: Deserializer<'de>,
     {
-        let n = i128::deserialize(deserializer)?;
-
-        if n >= 0 {
-            Ok(Integer::Unsigned(UnsignedInteger::from(n as u64)))
-        } else {
-            Ok(Integer::Signed(SignedInteger::from(n as i64)))
-        }
+        deserializer.deserialize_any(IntegerVisitor)
     }
 }
 
 impl fmt::Debug for Integer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Integer::Signed(s) => write!(f, "{s:?})"),
-            Integer::Unsigned(u) => write!(f, "{u:?})"),
+            Integer::Signed(s) => write!(f, "{s:?}"),
+            Integer::Unsigned(u) => write!(f, "{u:?}"),
         }
     }
 }

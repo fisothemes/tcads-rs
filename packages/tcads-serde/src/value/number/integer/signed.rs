@@ -1,3 +1,4 @@
+use super::SignedIntegerVisitor;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
@@ -68,8 +69,7 @@ impl<'de> Deserialize<'de> for SignedInteger {
     where
         D: Deserializer<'de>,
     {
-        let n = i64::deserialize(deserializer)?;
-        Ok(SignedInteger::from(n))
+        deserializer.deserialize_any(SignedIntegerVisitor)
     }
 }
 

@@ -2,26 +2,49 @@ use indexmap::IndexMap;
 use indexmap::map::Slice;
 use std::ops::{Index, IndexMut};
 
+pub mod de;
 pub mod number;
 pub mod ser;
+pub mod visitors;
 
 pub use number::{Float, Integer, Number, SignedInteger, UnsignedInteger};
 
 /// A dynamically typed TwinCAT Runtime ADS value.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
-    Null,
     Bool(bool),
     Number(Number),
     String(String),
     Array(Vec<Value>),
     Struct(IndexMap<String, Value>),
-    Enum { name: String, value: Integer },
+    Enum(String),
 }
 
 impl Value {
-    pub const fn is_null(&self) -> bool {
-        matches!(self, Value::Null)
+    /// Creats struct from pairs.
+    ///
+    /// # Example
+    ///
+    /// ```rust, no_run
+    /// use tcads_serde::Value;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let point = Value::struct_from([("x", 1.0), ("y", 2.0)]);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn struct_from<K, V, I>(pairs: I) -> Self
+    where
+        K: Into<String>,
+        V: Into<Value>,
+        I: IntoIterator<Item = (K, V)>,
+    {
+        Value::Struct(
+            pairs
+                .into_iter()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect(),
+        )
     }
 
     pub const fn is_bool(&self) -> bool {
@@ -45,7 +68,7 @@ impl Value {
     }
 
     pub const fn is_enum(&self) -> bool {
-        matches!(self, Value::Enum { .. })
+        matches!(self, Value::Enum(_))
     }
 
     pub const fn as_bool(&self) -> Option<bool> {
@@ -83,9 +106,9 @@ impl Value {
         }
     }
 
-    pub fn as_enum(&self) -> Option<(&String, &Integer)> {
+    pub fn as_enum(&self) -> Option<&str> {
         match self {
-            Value::Enum { name, value } => Some((name, value)),
+            Value::Enum(name) => Some(name),
             _ => None,
         }
     }
@@ -118,9 +141,9 @@ impl Value {
         }
     }
 
-    pub fn as_enum_mut(&mut self) -> Option<(&mut String, &mut Integer)> {
+    pub fn as_enum_mut(&mut self) -> Option<&mut String> {
         match self {
-            Value::Enum { name, value } => Some((name, value)),
+            Value::Enum(name) => Some(name),
             _ => None,
         }
     }
@@ -177,5 +200,44 @@ impl IndexMut<usize> for Value {
             .expect("Value is not an array")
             .get_mut(index)
             .expect("Index out of bounds")
+    }
+}
+
+impl From<bool> for Value {
+    fn from(b: bool) -> Self {
+        Value::Bool(b)
+    }
+}
+
+impl From<&str> for Value {
+    fn from(s: &str) -> Self {
+        Value::String(s.to_string())
+    }
+}
+
+impl From<String> for Value {
+    fn from(s: String) -> Self {
+        Value::String(s)
+    }
+}
+
+impl<T> From<T> for Value
+where
+    Number: From<T>,
+{
+    fn from(n: T) -> Self {
+        Value::Number(Number::from(n))
+    }
+}
+
+impl From<IndexMap<String, Value>> for Value {
+    fn from(m: IndexMap<String, Value>) -> Self {
+        Value::Struct(m)
+    }
+}
+
+impl<T: Into<Value>> FromIterator<T> for Value {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        Value::Array(iter.into_iter().map(Into::into).collect())
     }
 }
