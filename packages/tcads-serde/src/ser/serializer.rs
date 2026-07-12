@@ -97,6 +97,27 @@ impl<'ser, P: TypeProvider> AdsSerializer<'ser, P> {
         output[pos..].fill(0);
         Ok(())
     }
+
+    fn write_enum_variant(self, variant: &str) -> Result<(), crate::Error> {
+        let ptr_size = self.provider.get_platform_ptr_size();
+        let type_info = resolve_alias(self.type_info, self.provider, ptr_size)?;
+
+        validate_type_category(type_info, &[AdsTypeCategory::Enum], ptr_size)?;
+        validate_exact_size(self.output, type_info.size() as usize)?;
+
+        let value = type_info
+            .enum_infos()
+            .iter()
+            .find(|e| e.name() == variant)
+            .map(|e| e.value())
+            .ok_or_else(|| {
+                crate::Error::UnknownEnumVariant(variant.to_string(), type_info.name().to_string())
+            })?;
+
+        validate_exact_size(self.output, value.len())?;
+        self.output.copy_from_slice(value);
+        Ok(())
+    }
 }
 
 impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
@@ -184,7 +205,14 @@ impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
     }
 
     fn serialize_str(self, v: &str) -> Result<Self::Ok, Self::Error> {
-        match self.type_info.type_id() {
+        let ptr_size = self.provider.get_platform_ptr_size();
+        let type_info = resolve_alias(self.type_info, self.provider, ptr_size)?;
+
+        if AdsTypeCategory::determine(type_info, ptr_size) == AdsTypeCategory::Enum {
+            return self.write_enum_variant(v);
+        }
+
+        match type_info.type_id() {
             AdsTypeId::String => Self::write_string(self.output, v),
             AdsTypeId::WString => Self::write_wstring(self.output, v),
             other => Err(crate::Error::TypeMismatch {
@@ -229,24 +257,7 @@ impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
         _variant_index: u32,
         variant: &'static str,
     ) -> Result<Self::Ok, Self::Error> {
-        let ptr_size = self.provider.get_platform_ptr_size();
-        let type_info = resolve_alias(self.type_info, self.provider, ptr_size)?;
-
-        validate_type_category(type_info, &[AdsTypeCategory::Enum], ptr_size)?;
-        validate_exact_size(self.output, type_info.size() as usize)?;
-
-        let value = type_info
-            .enum_infos()
-            .iter()
-            .find(|e| e.name() == variant)
-            .map(|e| e.value())
-            .ok_or_else(|| {
-                crate::Error::UnknownEnumVariant(variant.to_string(), type_info.name().to_string())
-            })?;
-
-        validate_exact_size(self.output, value.len())?;
-        self.output.copy_from_slice(value);
-        Ok(())
+        self.write_enum_variant(variant)
     }
 
     fn serialize_newtype_struct<T>(
