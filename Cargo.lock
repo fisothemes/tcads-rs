@@ -527,10 +527,8 @@ dependencies = [
 name = "tcads-client"
 version = "0.1.0"
 dependencies = [
- "chrono",
- "encoding_rs",
- "serde",
  "tcads-core",
+ "tcads-serde",
  "thiserror",
  "tokio",
 ]
@@ -568,6 +566,7 @@ dependencies = [
  "indexmap",
  "serde",
  "serde_json",
+ "tcads-client",
  "tcads-core",
  "thiserror",
 ]
