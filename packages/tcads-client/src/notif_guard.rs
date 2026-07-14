@@ -1,7 +1,7 @@
 //! RAII notification handle guards.
 //!
 //! A [`NotificationGuard`](blocking::NotificationGuard) wraps a
-//! [`NotificationHandle`] and automatically calls [`delete_notification`](blocking::AdsDevice::delete_notification)
+//! [`NotificationHandle`] and automatically calls [`delete_notification`](crate::devices::blocking::AdsDevice::delete_notification)
 //! when dropped, ensuring notification handles are always cleaned up on the router.
 
 use tcads_core::{AmsAddr, NotificationHandle};

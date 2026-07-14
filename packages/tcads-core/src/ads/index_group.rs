@@ -78,20 +78,20 @@ impl IndexGroup {
     pub const DATA_TYPE_INFO_BY_NAME_EX: Self = Self(0xF011);
 
     /// Read/write physical input byte(s) (`%I` field). Index offset is a byte offset;
-    /// a valid range starts at [`IndexOffset::IO_IMAGE_INPUT_BASE`] (`0x0001F400`). (`0xF020`)
+    /// a valid range starts at [`IndexOffset::IO_IMAGE_INPUT_BASE`](super::IndexOffset::IO_IMAGE_INPUT_BASE) (`0x0001F400`). (`0xF020`)
     pub const IO_IMAGE_INPUT_BYTES: Self = Self(0xF020);
     /// Read/write a single physical input bit (`%IX` field). Index offset encodes the
     /// bit address: `base + byte_offset * 8 + bit_number`, where the base is
-    /// [`IndexOffset::IO_IMAGE_INPUT_BIT_BASE`] (`0x000FA000`). (`0xF021`)
+    /// [`IndexOffset::IO_IMAGE_INPUT_BIT_BASE`](super::IndexOffset::IO_IMAGE_INPUT_BIT_BASE) (`0x000FA000`). (`0xF021`)
     pub const IO_IMAGE_INPUT_BITS: Self = Self(0xF021);
     /// Read the byte length of the physical input process image. Index offset: `0`. (`0xF025`)
     pub const IO_IMAGE_INPUT_SIZE: Self = Self(0xF025);
     /// Read/write physical output byte(s) (`%Q` field). Index offset is a byte offset;
-    /// a valid range starts at [`IndexOffset::IO_IMAGE_OUTPUT_BASE`] (`0x0003E800`). (`0xF030`)
+    /// a valid range starts at [`IndexOffset::IO_IMAGE_OUTPUT_BASE`](super::IndexOffset::IO_IMAGE_OUTPUT_BASE) (`0x0003E800`). (`0xF030`)
     pub const IO_IMAGE_OUTPUT_BYTES: Self = Self(0xF030);
     /// Read/write a single physical output bit (`%QX` field). Index offset encodes the
     /// bit address: `base + byte_offset * 8 + bit_number`, where the base is
-    /// [`IndexOffset::IO_IMAGE_OUTPUT_BIT_BASE`] (`0x001F4000`). (`0xF031`)
+    /// [`IndexOffset::IO_IMAGE_OUTPUT_BIT_BASE`](super::IndexOffset::IO_IMAGE_OUTPUT_BIT_BASE) (`0x001F4000`). (`0xF031`)
     pub const IO_IMAGE_OUTPUT_BITS: Self = Self(0xF031);
     /// Read the byte length of the physical output process image. Index offset: `0`. (`0xF035`)
     pub const IO_IMAGE_OUTPUT_SIZE: Self = Self(0xF035);

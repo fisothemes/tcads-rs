@@ -8,7 +8,7 @@ use crate::ams::AmsPort;
 /// | Offset | Size | Field                                        |
 /// |--------|------|----------------------------------------------|
 /// | 0      | 8    | Timestamp (Windows FILETIME, LE u64)         |
-/// | 8      | 4    | [`MessageType`] mask (LE u32)                |
+/// | 8      | 4    | [`LogMessageType`] mask (LE u32)             |
 /// | 12     | 2    | Sender ADS port (LE u16)                     |
 /// | 14     | 2    | Unknown                                      |
 /// | 16     | 16   | Sender name (fixed, null-padded)             |

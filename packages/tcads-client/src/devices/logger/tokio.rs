@@ -156,7 +156,7 @@ impl Logger {
     /// Writes a log message to the TwinCAT logger using the current system time.
     ///
     /// `task_name` is encoded as Windows-1252 and truncated to
-    /// [`MAX_TASK_NAME_LEN`](super::MAX_TASK_NAME_LEN) - 1 characters if it exceeds
+    /// [`MAX_TASK_NAME_LEN`](LogEntry::MAX_TASK_NAME_LEN) - 1 characters if it exceeds
     /// that limit.
     pub async fn write_log<A: AsRef<str>>(
         &self,
@@ -184,7 +184,7 @@ impl Logger {
     /// timestamp via [`LogEntry::new`].
     ///
     /// `entry.sender` is encoded as Windows-1252 and truncated to
-    /// [`MAX_TASK_NAME_LEN`](super::MAX_TASK_NAME_LEN) - 1 characters if it exceeds
+    /// [`MAX_TASK_NAME_LEN`](LogEntry::MAX_TASK_NAME_LEN) - 1 characters if it exceeds
     /// that limit.
     pub async fn write_entry(&self, entry: LogEntry) -> crate::Result<()> {
         let frame = AdsLoggerWriteRequestOwned::new(
@@ -307,7 +307,7 @@ impl LogEntryReceiver {
 
     /// Returns the next log entry if one is immediately available, without awaiting.
     ///
-    /// Returns [`Ok(None)`] if no sample is currently available,
+    /// Returns `Ok(None)` if no sample is currently available,
     /// or [`Err(Error::Disconnected)`](crate::Error::Disconnected) if the
     /// subscription is cancelled or the connection is lost.
     pub fn try_recv(&mut self) -> crate::Result<Option<LogEntry>> {

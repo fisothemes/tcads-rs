@@ -14,15 +14,15 @@ use tcads_core::{AdsCommand, AdsHeader, AmsCommand, RouterState};
 ///
 /// # Frame Routing
 ///
-/// | [`AmsCommand`]                      | Routed to                          |
-/// |-------------------------------------|------------------------------------|
-/// | [`PortConnect`]                     | [`AmsRequestDispatcher`]           |
-/// | [`GetLocalNetId`]                   | [`AmsRequestDispatcher`]           |
-/// | [`AdsCommand`] (non-notification)   | [`AmsRequestDispatcher`]           |
-/// | [`AdsCommand`] (notification)       | [`AdsNotificationDispatcher`]      |
-/// | [`RouterNotification`]              | [`RouterNotificationDispatcher`]   |
-/// | [`PortClose`]                       | exits loop                         |
-/// | Malformed / unknown                 | skipped silently                   |
+/// | [`AmsCommand`]                                            | Routed to                          |
+/// |-----------------------------------------------------------|------------------------------------|
+/// | [`PortConnect`](AmsCommand::PortConnect)                  | [`AmsRequestDispatcher`]           |
+/// | [`GetLocalNetId`](AmsCommand::GetLocalNetId)              | [`AmsRequestDispatcher`]           |
+/// | [`AdsCommand`](AmsCommand::AdsCommand) (non-notification) | [`AmsRequestDispatcher`]           |
+/// | [`AdsCommand`](AmsCommand::AdsCommand) (notification)     | [`AdsNotificationDispatcher`]      |
+/// | [`RouterNotification`](AmsCommand::RouterNotification)    | [`RouterNotificationDispatcher`]   |
+/// | [`PortClose`](AmsCommand::PortClose)                      | exits loop                         |
+/// | Malformed / unknown                                       | skipped silently                   |
 pub struct AmsResponseReader;
 
 impl AmsResponseReader {

@@ -21,7 +21,7 @@ pub struct Guid([u8; 16]);
 impl Guid {
     pub const LENGTH: usize = 16;
 
-    /// Creates a new instance of the [GUID`]
+    /// Creates a new instance of the [`Guid`]()
     pub const fn new(bytes: [u8; 16]) -> Self {
         Self(bytes)
     }

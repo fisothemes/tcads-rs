@@ -634,7 +634,7 @@ impl SymbolVersionReceiver {
     /// Returns the new symbol version if a change is immediately available, without
     /// awaiting.
     ///
-    /// Returns [`Ok(None)`] if no sample is currently available,
+    /// Returns `Ok(None)` if no sample is currently available,
     /// or [`Err(Error::Disconnected)`](crate::Error::Disconnected) if the
     /// subscription is cancelled or the connection is lost.
     pub fn try_recv(&mut self) -> crate::Result<Option<u8>> {

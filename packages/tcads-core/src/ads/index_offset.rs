@@ -14,16 +14,16 @@ impl IndexOffset {
     /// System logger offset.
     pub const SYSTEM_LOGGER: Self = Self(0xFFFF);
 
-    /// Base byte offset for [`IndexGroup::IO_IMAGE_INPUT_BYTES`] (`%I` field).
+    /// Base byte offset for [`IndexGroup::IO_IMAGE_INPUT_BYTES`](super::IndexGroup::IO_IMAGE_INPUT_BYTES) (`%I` field).
     /// Valid offsets start at `0x0001F400`. (`0x0001F400`)
     pub const IO_IMAGE_INPUT_BASE: Self = Self(0x0001_F400);
-    /// Base bit-address offset for [`IndexGroup::IO_IMAGE_INPUT_BITS`] (`%IX` field).
+    /// Base bit-address offset for [`IndexGroup::IO_IMAGE_INPUT_BITS`](super::IndexGroup::IO_IMAGE_INPUT_BITS) (`%IX` field).
     /// Bit address = `IO_IMAGE_INPUT_BIT_BASE + byte_offset * 8 + bit_number`. (`0x000FA000`)
     pub const IO_IMAGE_INPUT_BIT_BASE: Self = Self(0x000F_A000);
-    /// Base byte offset for [`IndexGroup::IO_IMAGE_OUTPUT_BYTES`] (`%Q` field).
+    /// Base byte offset for [`IndexGroup::IO_IMAGE_OUTPUT_BYTES`](super::IndexGroup::IO_IMAGE_OUTPUT_BYTES) (`%Q` field).
     /// Valid offsets start at `0x0003E800`. (`0x0003E800`)
     pub const IO_IMAGE_OUTPUT_BASE: Self = Self(0x0003_E800);
-    /// Base bit-address offset for [`IndexGroup::IO_IMAGE_OUTPUT_BITS`] (`%QX` field).
+    /// Base bit-address offset for [`IndexGroup::IO_IMAGE_OUTPUT_BITS`](super::IndexGroup::IO_IMAGE_OUTPUT_BITS) (`%QX` field).
     /// Bit address = `IO_IMAGE_OUTPUT_BIT_BASE + byte_offset * 8 + bit_number`. (`0x001F4000`)
     pub const IO_IMAGE_OUTPUT_BIT_BASE: Self = Self(0x001F_4000);
 
