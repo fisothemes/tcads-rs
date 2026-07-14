@@ -1,10 +1,13 @@
 use crate::devices::blocking::AdsDevice;
+use crate::notif_guard::blocking::NotificationGuard;
 use std::net::ToSocketAddrs;
+use std::sync::mpsc::{Receiver, TryRecvError};
 use std::time::Duration;
 use tcads_core::{
-    AdsError, AdsSymbolInfo, AdsSymbolInfoIteratorOwned, AdsSymbolUploadInfo,
-    AdsSymbolUploadInfoV3, AdsTypeInfo, AdsTypeInfoIteratorOwned, AmsAddr, AmsPort, IndexGroup,
-    IndexOffset, SumReadRequest, SumReadWriteRequest, SumWriteRequest, SymbolHandle,
+    AdsError, AdsNotificationAttrib, AdsNotificationSampleOwned, AdsSymbolInfo,
+    AdsSymbolInfoIteratorOwned, AdsSymbolUploadInfo, AdsSymbolUploadInfoV3, AdsTransMode,
+    AdsTypeInfo, AdsTypeInfoIteratorOwned, AmsAddr, AmsPort, IndexGroup, IndexOffset,
+    NotificationHandle, SumReadRequest, SumReadWriteRequest, SumWriteRequest, SymbolHandle,
 };
 
 /// A high-level client for interacting with a specific TwinCAT runtime.
@@ -113,7 +116,7 @@ impl RuntimeDevice {
     /// Fetches the current Symbol Version of the PLC runtime.
     ///
     /// The Symbol Version changes whenever the PLC's symbol configuration is
-    /// updated (e.g. during a TwinCAT "Online Change" or a completely new program download).
+    /// updated (e.g. during a Login with download or a complete program reactivation).
     pub fn get_symbol_version(&self) -> crate::Result<u8> {
         let bytes = self.device.read(
             self.target,
@@ -131,6 +134,39 @@ impl RuntimeDevice {
         }
 
         Ok(bytes[0])
+    }
+
+    /// Subscribes to Symbol Version change notifications.
+    ///
+    /// The Symbol Version increments on a Login with download. An Online Change does not
+    /// change it, confirmed by reading [`get_symbol_version`](Self::get_symbol_version)
+    /// before and after an Online Change: the value was unchanged and no notification
+    /// fired. This lines up with what Online Change is for, preserving the existing
+    /// symbol layout for already-connected clients, so nothing here needs to invalidate.
+    ///
+    /// A Reactivation tears down the underlying connection, which ends this subscription:
+    /// the receiver's next call returns [`Err(Error::Disconnected)`](crate::Error::Disconnected)
+    /// rather than a version byte. Treat that error as a stronger signal than any
+    /// individual notification. It means you must reconnect and unconditionally re-fetch
+    /// the symbol version (and any [`AdsSymbolInfo`]/[`AdsTypeInfo`]/[`SymbolHandle`] you
+    /// were relying on) rather than assume nothing changed just because you didn't see a
+    /// notification for it.
+    ///
+    /// Returns a [`SymbolVersionReceiver`] that decodes each notification into the new
+    /// version byte. The subscription is cancelled automatically when the receiver is
+    /// dropped, or explicitly via [`SymbolVersionReceiver::unsubscribe`].
+    pub fn subscribe_symbol_version(
+        &self,
+    ) -> crate::Result<(SymbolVersionReceiver, NotificationHandle)> {
+        let (rx, handle) = self.device.add_notification(
+            self.target,
+            IndexGroup::SYMBOL_VERSION,
+            IndexOffset::ZERO,
+            AdsNotificationAttrib::new(1, AdsTransMode::ServerOnChange, 0, 0),
+        )?;
+
+        let guard = NotificationGuard::new(handle, self.target, self.device.clone());
+        Ok((SymbolVersionReceiver::new(rx, guard), handle))
     }
 
     /// Fetches a symbol handle by its instance path (e.g. `"MAIN.nCount"`)
@@ -522,5 +558,87 @@ impl RuntimeDevice {
         )?;
 
         Ok(AdsTypeInfoIteratorOwned::new(raw_blob).map(|res| res.map_err(crate::Error::from)))
+    }
+}
+
+/// A receiver for decoded Symbol Version change notifications.
+///
+/// Wraps the raw ADS notification channel and decodes each sample into the new version
+/// byte on demand. The subscription is cancelled automatically when this is dropped.
+///
+/// Obtain one by calling [`RuntimeDevice::subscribe_symbol_version`].
+pub struct SymbolVersionReceiver {
+    rx: Receiver<AdsNotificationSampleOwned>,
+    guard: NotificationGuard,
+}
+
+impl SymbolVersionReceiver {
+    /// Creates a new instance of the [`SymbolVersionReceiver`].
+    pub fn new(rx: Receiver<AdsNotificationSampleOwned>, guard: NotificationGuard) -> Self {
+        Self { rx, guard }
+    }
+
+    /// Returns the notification handle for this subscription.
+    pub fn handle(&self) -> NotificationHandle {
+        self.guard.handle()
+    }
+
+    fn decode(sample: AdsNotificationSampleOwned) -> crate::Result<u8> {
+        let data = sample.data();
+        if data.len() != 1 {
+            return Err(AdsError::UnexpectedDataLength {
+                expected: 1,
+                got: data.len(),
+            }
+            .into());
+        }
+        Ok(data[0])
+    }
+
+    /// Blocks until the symbol version changes.
+    ///
+    /// Returns [`Err`] when the subscription is cancelled or the connection is lost.
+    pub fn recv(&self) -> crate::Result<u8> {
+        Self::decode(self.rx.recv()?)
+    }
+
+    /// Blocks until the symbol version changes or `timeout` elapses.
+    ///
+    /// Returns [`Err(Error::Timeout)`](crate::Error::Timeout) if the timeout expires,
+    /// or [`Err(Error::Disconnected)`](crate::Error::Disconnected) if the subscription
+    /// is cancelled or the connection is lost.
+    pub fn recv_timeout(&self, timeout: Duration) -> crate::Result<u8> {
+        Self::decode(self.rx.recv_timeout(timeout)?)
+    }
+
+    /// Returns the new symbol version if a change is immediately available, without
+    /// blocking.
+    ///
+    /// Returns [`Ok(None)`] if no sample is currently available,
+    /// or [`Err(Error::Disconnected)`](crate::Error::Disconnected) if the
+    /// subscription is cancelled or the connection is lost.
+    pub fn try_recv(&self) -> crate::Result<Option<u8>> {
+        match self.rx.try_recv() {
+            Ok(sample) => Ok(Some(Self::decode(sample)?)),
+            Err(TryRecvError::Empty) => Ok(None),
+            Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
+        }
+    }
+
+    /// Returns an iterator that blocks on each call, yielding new symbol versions
+    /// until the subscription is cancelled or the connection is lost.
+    pub fn iter(&self) -> impl Iterator<Item = crate::Result<u8>> + '_ {
+        std::iter::from_fn(move || match self.recv() {
+            Err(crate::Error::Disconnected) => None,
+            result => Some(result),
+        })
+    }
+
+    /// Explicitly cancels the subscription, returning any error from the router.
+    ///
+    /// Dropping the receiver has the same effect but discards the result; prefer this
+    /// when you want to know cancellation actually succeeded.
+    pub fn unsubscribe(self) -> crate::Result<()> {
+        self.guard.cancel()
     }
 }

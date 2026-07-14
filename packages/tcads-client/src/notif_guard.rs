@@ -18,6 +18,7 @@ pub mod blocking {
         handle: NotificationHandle,
         target: AmsAddr,
         device: AdsDevice,
+        cancelled: bool,
     }
 
     impl NotificationGuard {
@@ -27,6 +28,7 @@ pub mod blocking {
                 handle,
                 target,
                 device,
+                cancelled: false,
             }
         }
 
@@ -44,10 +46,23 @@ pub mod blocking {
         pub fn device(&self) -> &AdsDevice {
             &self.device
         }
+
+        /// Explicitly deletes the notification, returning any error from the router.
+        ///
+        /// Unlike letting the guard drop, the result is not discarded. Marks the guard as
+        /// cancelled first, so the subsequent `Drop` is a no-op rather than deleting the
+        /// same (now-invalid) handle a second time.
+        pub fn cancel(mut self) -> crate::Result<()> {
+            self.cancelled = true;
+            self.device.delete_notification(self.target, self.handle)
+        }
     }
 
     impl Drop for NotificationGuard {
         fn drop(&mut self) {
+            if self.cancelled {
+                return;
+            }
             let _ = self.device.delete_notification(self.target, self.handle);
         }
     }
@@ -68,6 +83,7 @@ pub mod tokio {
         handle: NotificationHandle,
         target: AmsAddr,
         device: AdsDevice,
+        cancelled: bool,
     }
 
     impl NotificationGuard {
@@ -77,6 +93,7 @@ pub mod tokio {
                 handle,
                 target,
                 device,
+                cancelled: false,
             }
         }
 
@@ -94,10 +111,27 @@ pub mod tokio {
         pub fn device(&self) -> &AdsDevice {
             &self.device
         }
+
+        /// Explicitly deletes the notification, returning any error from the router.
+        ///
+        /// Unlike letting the guard drop, the result is not discarded, and clean-up runs
+        /// immediately on the current task rather than being spawned separately. Marks the
+        /// guard as cancelled first, so the subsequent `Drop` is a no-op rather than
+        /// deleting the same (now-invalid) handle a second time.
+        pub async fn cancel(mut self) -> crate::Result<()> {
+            self.cancelled = true;
+            self.device
+                .delete_notification(self.target, self.handle)
+                .await
+        }
     }
 
     impl Drop for NotificationGuard {
         fn drop(&mut self) {
+            if self.cancelled {
+                return;
+            }
+
             let device = self.device.clone();
             let target = self.target;
             let handle = self.handle;
