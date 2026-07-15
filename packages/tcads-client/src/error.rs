@@ -34,6 +34,10 @@ pub enum Error {
     PoisonedLock,
     #[error("Invalid payload")]
     InvalidPayload,
+    #[error(transparent)]
+    Serde(#[from] tcads_serde::Error),
+    #[error("Handle for symbol '{0}' is no longer valid")]
+    HandleInvalidated(Arc<str>),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

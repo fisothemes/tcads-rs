@@ -527,6 +527,7 @@ dependencies = [
 name = "tcads-client"
 version = "0.1.0"
 dependencies = [
+ "serde",
  "tcads-core",
  "tcads-serde",
  "thiserror",
