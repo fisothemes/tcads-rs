@@ -1,4 +1,5 @@
 use crate::TypeProvider;
+use std::collections::HashSet;
 use tcads_core::{AdsTypeCategory, AdsTypeInfo};
 
 // The maximum allowed depth when recursively unwrapping `ALIAS` types.
@@ -75,11 +76,11 @@ pub fn requires_read_modify_write(
     provider: &impl TypeProvider,
 ) -> Result<bool, crate::Error> {
     let ptr_size = provider.get_platform_ptr_size();
-    let mut worklist = vec![type_info.name().to_string()];
-    let mut visited = std::collections::HashSet::new();
+    let mut worklist = vec![type_info.name()];
+    let mut visited = HashSet::new();
 
     while let Some(name) = worklist.pop() {
-        if !visited.insert(name.clone()) {
+        if !visited.insert(name) {
             continue;
         }
         if visited.len() > MAX_TYPES_VISITED {
@@ -92,17 +93,17 @@ pub fn requires_read_modify_write(
 
         let current = provider
             .get_type_info(&name)
-            .ok_or_else(|| crate::Error::TypeNotFound(name.clone()))?;
+            .ok_or_else(|| crate::Error::TypeNotFound(name.into()))?;
         let current = resolve_alias(current, provider, ptr_size)?;
 
         match AdsTypeCategory::determine(current, ptr_size) {
             AdsTypeCategory::FunctionBlock | AdsTypeCategory::Program => return Ok(true),
             AdsTypeCategory::Array => {
-                worklist.push(current.type_name().to_string());
+                worklist.push(current.type_name());
             }
             AdsTypeCategory::Struct | AdsTypeCategory::Union => {
                 for field in current.field_infos() {
-                    worklist.push(field.type_name().to_string());
+                    worklist.push(field.type_name());
                 }
             }
             _ => {}
@@ -132,12 +133,12 @@ pub fn requires_read_modify_write(
 /// that needs a complete `TypeProvider`).
 pub fn missing_types(type_info: &AdsTypeInfo, provider: &impl TypeProvider) -> Vec<String> {
     let ptr_size = provider.get_platform_ptr_size();
-    let mut worklist = vec![type_info.name().to_string()];
-    let mut visited = std::collections::HashSet::new();
+    let mut worklist = vec![type_info.name()];
+    let mut visited = HashSet::new();
     let mut missing = Vec::new();
 
     while let Some(name) = worklist.pop() {
-        if !visited.insert(name.clone()) {
+        if !visited.insert(name) {
             continue;
         }
 
@@ -146,23 +147,23 @@ pub fn missing_types(type_info: &AdsTypeInfo, provider: &impl TypeProvider) -> V
         }
 
         let Some(current) = provider.get_type_info(&name) else {
-            missing.push(name);
+            missing.push(name.into());
             continue;
         };
 
         let current = match resolve_alias(current, provider, ptr_size) {
             Ok(resolved) => resolved,
             Err(_) => {
-                missing.push(current.type_name().to_string());
+                missing.push(current.type_name().into());
                 continue;
             }
         };
 
         match AdsTypeCategory::determine(current, ptr_size) {
-            AdsTypeCategory::Array => worklist.push(current.type_name().to_string()),
+            AdsTypeCategory::Array => worklist.push(current.type_name()),
             AdsTypeCategory::Struct | AdsTypeCategory::Union | AdsTypeCategory::FunctionBlock => {
                 for field in current.field_infos() {
-                    worklist.push(field.type_name().to_string());
+                    worklist.push(field.type_name());
                 }
             }
             _ => {}
