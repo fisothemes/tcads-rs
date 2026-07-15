@@ -17,7 +17,7 @@ pub const MAX_ALIAS_DEPTH: usize = 32;
 /// - Returns [`crate::Error::TypeNotFound`] if the `TypeProvider` is missing a type in the chain.
 ///
 /// - Returns [`crate::Error::Custom`] if the resolution chain exceeds `MAX_ALIAS_DEPTH`,
-/// which typically indicates a cyclic type definition in the PLC.
+///   which typically indicates a cyclic type definition in the PLC.
 pub fn resolve_alias<'a>(
     type_info: &'a AdsTypeInfo,
     provider: &'a impl TypeProvider,
@@ -92,7 +92,7 @@ pub fn requires_read_modify_write(
         }
 
         let current = provider
-            .get_type_info(&name)
+            .get_type_info(name)
             .ok_or_else(|| crate::Error::TypeNotFound(name.into()))?;
         let current = resolve_alias(current, provider, ptr_size)?;
 
@@ -146,7 +146,7 @@ pub fn missing_types(type_info: &AdsTypeInfo, provider: &impl TypeProvider) -> V
             break;
         }
 
-        let Some(current) = provider.get_type_info(&name) else {
+        let Some(current) = provider.get_type_info(name) else {
             missing.push(name.into());
             continue;
         };

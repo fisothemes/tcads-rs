@@ -5,7 +5,7 @@ use tcads_core::{AdsTypeCategory, AdsTypeId, AdsTypeInfo};
 /// # Errors
 ///
 /// - Returns [`crate::Error::TypeMismatch`] if the PLC's reported [`AdsTypeId`]
-/// does not match the `expected` ID.
+///   does not match the `expected` ID.
 pub fn validate_type_id(type_info: &AdsTypeInfo, expected: AdsTypeId) -> Result<(), crate::Error> {
     if type_info.type_id() != expected {
         return Err(crate::Error::TypeMismatch {
@@ -25,10 +25,10 @@ pub fn validate_type_id(type_info: &AdsTypeInfo, expected: AdsTypeId) -> Result<
 /// # Errors
 ///
 /// - Returns [`crate::Error::SizeMismatch`] if a pointer/interface type is evaluated,
-/// but its platform size does not match the requested integer byte width `N`.
+///   but its platform size does not match the requested integer byte width `N`.
 ///
 /// - Returns [`crate::Error::TypeMismatch`] if the type is a standard primitive
-/// but does not match the `expected` ID.
+///   but does not match the `expected` ID.
 pub fn validate_integer_type_id<const N: usize>(
     type_info: &AdsTypeInfo,
     expected: AdsTypeId,
@@ -58,7 +58,7 @@ pub fn validate_integer_type_id<const N: usize>(
 /// # Errors
 ///
 /// - Returns [`crate::Error::TypeMismatch`] if the evaluated `AdsTypeCategory`
-/// is not contained within the `expected` array.
+///   is not contained within the `expected` array.
 pub fn validate_type_category(
     type_info: &AdsTypeInfo,
     expected: &[AdsTypeCategory],
