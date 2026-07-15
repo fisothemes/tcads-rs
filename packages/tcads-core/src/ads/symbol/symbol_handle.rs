@@ -65,6 +65,24 @@ impl From<SymbolHandle> for [u8; SymbolHandle::LENGTH] {
     }
 }
 
+impl serde::Serialize for SymbolHandle {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_u32(self.as_u32())
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for SymbolHandle {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        u32::deserialize(deserializer).map(Self::new)
+    }
+}
+
 impl std::fmt::Debug for SymbolHandle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple(stringify!(SymbolHandle))
