@@ -1,3 +1,4 @@
+use super::access::resolved_field::{ResolvedField, resolve_fields};
 use super::access::{AdsArrayAccess, AdsEnumAccess, AdsMapAccess, AdsStructAccess};
 use crate::resolvers::resolve_alias;
 use crate::validators::{
@@ -6,6 +7,7 @@ use crate::validators::{
 use crate::{Integer, TypeProvider};
 use serde::de::{Deserializer, Visitor};
 use std::borrow::Cow;
+use std::rc::Rc;
 use tcads_core::{AdsTypeCategory, AdsTypeId, AdsTypeInfo};
 
 /// Deserializes a PLC memory layout into a Rust type using the [`AdsTypeInfo`].
@@ -13,6 +15,7 @@ pub struct AdsDeserializer<'de, P: TypeProvider> {
     input: &'de [u8],
     type_info: &'de AdsTypeInfo,
     provider: &'de P,
+    resolved_fields: Option<Rc<[ResolvedField<'de>]>>,
 }
 
 impl<'de, P: TypeProvider> AdsDeserializer<'de, P> {
@@ -22,6 +25,23 @@ impl<'de, P: TypeProvider> AdsDeserializer<'de, P> {
             input,
             type_info,
             provider,
+            resolved_fields: None,
+        }
+    }
+
+    /// Same as [`new`](Self::new), but carrying fields the caller already
+    /// resolved (see [`AdsArrayAccess`]'s doc comment for why this exists).
+    pub fn with_resolved_fields(
+        input: &'de [u8],
+        type_info: &'de AdsTypeInfo,
+        provider: &'de P,
+        resolved_fields: Rc<[ResolvedField<'de>]>,
+    ) -> Self {
+        Self {
+            input,
+            type_info,
+            provider,
+            resolved_fields: Some(resolved_fields),
         }
     }
 
@@ -412,6 +432,19 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
                 visitor.visit_seq(array)
             }
             AdsTypeCategory::Struct | AdsTypeCategory::FunctionBlock | AdsTypeCategory::Union => {
+                if let Some(resolved) = &self.resolved_fields {
+                    if resolved.len() != len {
+                        return Err(crate::Error::ShapeMismatch {
+                            expected: len,
+                            got: resolved.len(),
+                        });
+                    }
+                    return visitor.visit_seq(AdsStructAccess::new(
+                        resolved.clone(),
+                        self.input,
+                        self.provider,
+                    ));
+                }
                 let fields = type_info.field_infos();
                 if fields.len() != len {
                     return Err(crate::Error::ShapeMismatch {
@@ -419,7 +452,9 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
                         got: fields.len(),
                     });
                 }
-                visitor.visit_seq(AdsStructAccess::new(fields, self.input, self.provider))
+                let resolved: Rc<[ResolvedField<'de>]> =
+                    Rc::from(resolve_fields(fields, self.provider)?);
+                visitor.visit_seq(AdsStructAccess::new(resolved, self.input, self.provider))
             }
             _ => Err(crate::Error::TypeMismatch {
                 expected: "array or struct (for tuple deserialization)".into(),
@@ -487,6 +522,20 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         )?;
         validate_exact_size(self.input, type_info.size() as usize)?;
 
+        if let Some(resolved) = &self.resolved_fields {
+            if resolved.len() != fields.len() {
+                return Err(crate::Error::ShapeMismatch {
+                    expected: fields.len(),
+                    got: resolved.len(),
+                });
+            }
+            return visitor.visit_seq(AdsStructAccess::new(
+                resolved.clone(),
+                self.input,
+                self.provider,
+            ));
+        }
+
         let plc_fields = type_info.field_infos();
         if plc_fields.len() != fields.len() {
             return Err(crate::Error::ShapeMismatch {
@@ -495,7 +544,9 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
             });
         }
 
-        visitor.visit_seq(AdsStructAccess::new(plc_fields, self.input, self.provider))
+        let resolved: Rc<[ResolvedField<'de>]> =
+            Rc::from(resolve_fields(plc_fields, self.provider)?);
+        visitor.visit_seq(AdsStructAccess::new(resolved, self.input, self.provider))
     }
 
     fn deserialize_enum<V>(

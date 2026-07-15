@@ -1,13 +1,16 @@
+use super::resolved_field::{ResolvedField, resolve_fields};
 use crate::TypeProvider;
 use crate::de::AdsDeserializer;
 use crate::resolvers::resolve_alias;
 use serde::de::{DeserializeSeed, Deserializer, SeqAccess, Visitor};
-use tcads_core::{AdsArrayInfo, AdsTypeInfo};
+use std::rc::Rc;
+use tcads_core::{AdsArrayInfo, AdsTypeCategory, AdsTypeInfo};
 
 /// Yields elements from a fixed-stride array slot of the input buffer.
 pub struct AdsArrayAccess<'de, P: TypeProvider> {
     remaining_dims: &'de [AdsArrayInfo],
     element_type_info: &'de AdsTypeInfo,
+    resolved_fields: Option<Rc<[ResolvedField<'de>]>>,
     input: &'de [u8],
     provider: &'de P,
     index: usize,
@@ -56,9 +59,24 @@ impl<'de, P: TypeProvider> AdsArrayAccess<'de, P> {
             });
         }
 
+        let resolved_fields = if remaining_dims.is_empty() {
+            match AdsTypeCategory::determine(element_type_info, provider.get_platform_ptr_size()) {
+                AdsTypeCategory::Struct
+                | AdsTypeCategory::FunctionBlock
+                | AdsTypeCategory::Union => Some(Rc::from(resolve_fields(
+                    element_type_info.field_infos(),
+                    provider,
+                )?)),
+                _ => None,
+            }
+        } else {
+            None
+        };
+
         Ok(Self {
             remaining_dims,
             element_type_info,
+            resolved_fields,
             input,
             provider,
             index: 0,
@@ -83,12 +101,17 @@ impl<'de, P: TypeProvider> SeqAccess<'de> for AdsArrayAccess<'de, P> {
         self.index += 1;
 
         if self.remaining_dims.is_empty() {
-            seed.deserialize(AdsDeserializer::new(
-                elem_bytes,
-                self.element_type_info,
-                self.provider,
-            ))
-            .map(Some)
+            let deserializer = match &self.resolved_fields {
+                // Cheap: a refcount bump, not a re-resolve.
+                Some(fields) => AdsDeserializer::with_resolved_fields(
+                    elem_bytes,
+                    self.element_type_info,
+                    self.provider,
+                    fields.clone(),
+                ),
+                None => AdsDeserializer::new(elem_bytes, self.element_type_info, self.provider),
+            };
+            seed.deserialize(deserializer).map(Some)
         } else {
             let sub_array = AdsArrayAccess::with_element_type(
                 self.remaining_dims,
