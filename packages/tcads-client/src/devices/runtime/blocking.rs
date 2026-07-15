@@ -524,6 +524,33 @@ impl RuntimeDevice {
         }
     }
 
+    /// Fetches the entire type dictionary and symbol table in two bulk round
+    /// trips and populates the cache, so every symbol's metadata (type,
+    /// size, whether it needs read-modify-write) is resolved before calling
+    /// [`read_value`](Self::read_value)/[`write_value`](Self::write_value).
+    ///
+    /// # Note
+    ///
+    /// This operation costs two bulk transfers proportional to the project size (hundreds of KB
+    /// to a few MB on large projects), paid up front. Call this once after
+    /// connecting if you'd rather pay that eagerly than have each symbol's
+    /// first access pay its own smaller lazy cost.
+    pub fn preload(&self) -> crate::Result<()> {
+        let cache = self.symbol_cache()?;
+
+        cache.insert_types(self.get_all_type_infos()?.filter_map(|res| res.ok()))?;
+
+        for info in self.get_all_symbol_infos()? {
+            let info = info?;
+            if cache.get(info.name())?.is_some() {
+                continue;
+            }
+            let entry = cache.resolve_entry(info.type_name(), info.size())?;
+            cache.insert(Arc::from(info.name()), entry)?;
+        }
+        Ok(())
+    }
+
     /// Fetches the metadata for a specific Symbol by its instance path (e.g. `"MAIN.nCount"`).
     pub fn get_symbol_info(&self, name: impl AsRef<str>) -> crate::Result<AdsSymbolInfo> {
         let bytes = self.device.read_write(
