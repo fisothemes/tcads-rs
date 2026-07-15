@@ -56,7 +56,8 @@ pub const MAX_TYPES_VISITED: usize = 4096;
 /// arrays, strings, enums, and primitives do not. Implemented iteratively with an
 /// explicit worklist and a visited-set, rather than recursion: a genuine cycle in the
 /// type graph terminates cleanly (a type is only ever expanded once), a deep-but-acyclic
-/// type isn't mistaken for one, and there's no call-stack growth to bound.
+/// type (e.g. a long chain of nested arrays) isn't mistaken for one, and there's no
+/// call-stack growth to bound.
 ///
 /// Pointer, reference, and interface *fields* do not trigger RMW on their own: they map
 /// to pointer-sized integers during (de)serialization, so the value supplied by the
@@ -109,4 +110,64 @@ pub fn requires_read_modify_write(
     }
 
     Ok(false)
+}
+
+/// Collects every type name reachable from `type_info` that the `provider`
+/// doesn't currently have, without erroring on the first one found.
+///
+/// [`requires_read_modify_write`] bails out with [`crate::Error::TypeNotFound`]
+/// on the *first* missing type it hits mid-walk, which is the right behavior
+/// for answering a yes/no question, but wrong for resolving a symbol's full
+/// type closure: it means discovering missing types one at a time, each
+/// requiring its own network fetch before the walk can even continue past it.
+/// This does the equivalent walk but treats a missing type as a dead end to
+/// record, not an error, so it can surface the *entire* current frontier of
+/// missing types in one pass. The caller can then fetch all of them in a
+/// single batched request (e.g. `get_multi_type_infos`), insert them, and
+/// call this again: each round trip resolves one level of the type graph
+/// (however wide) rather than one type (however many levels deep).
+///
+/// An empty result means the closure is already fully cached; the caller can
+/// proceed straight to [`requires_read_modify_write`] (or any other traversal
+/// that needs a complete `TypeProvider`).
+pub fn missing_types(type_info: &AdsTypeInfo, provider: &impl TypeProvider) -> Vec<String> {
+    let ptr_size = provider.get_platform_ptr_size();
+    let mut worklist = vec![type_info.name().to_string()];
+    let mut visited = std::collections::HashSet::new();
+    let mut missing = Vec::new();
+
+    while let Some(name) = worklist.pop() {
+        if !visited.insert(name.clone()) {
+            continue;
+        }
+
+        if visited.len() > MAX_TYPES_VISITED {
+            break;
+        }
+
+        let Some(current) = provider.get_type_info(&name) else {
+            missing.push(name);
+            continue;
+        };
+
+        let current = match resolve_alias(current, provider, ptr_size) {
+            Ok(resolved) => resolved,
+            Err(_) => {
+                missing.push(current.type_name().to_string());
+                continue;
+            }
+        };
+
+        match AdsTypeCategory::determine(current, ptr_size) {
+            AdsTypeCategory::Array => worklist.push(current.type_name().to_string()),
+            AdsTypeCategory::Struct | AdsTypeCategory::Union | AdsTypeCategory::FunctionBlock => {
+                for field in current.field_infos() {
+                    worklist.push(field.type_name().to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+
+    missing
 }

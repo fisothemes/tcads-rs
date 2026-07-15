@@ -410,7 +410,7 @@ impl RuntimeDevice {
         let (cache, entry) = self.resolve_symbol(path)?;
 
         let (handle, size, type_info) = {
-            let guard = entry.read().map_err(|_| crate::Error::PoisonedLock)?;
+            let guard = entry.read()?;
             (
                 guard
                     .handle()
@@ -424,7 +424,7 @@ impl RuntimeDevice {
             .read_bytes_by_handle(handle, size as usize)
             .map_err(|err| self.map_stale(err, &cache, path))?;
 
-        tcads_serde::from_bytes(&bytes, &type_info, &*cache.types()).map_err(Into::into)
+        tcads_serde::from_bytes(&bytes, &type_info, &*cache.types()?).map_err(Into::into)
     }
 
     /// Writes raw bytes to a symbol directly using its absolute memory location
@@ -490,7 +490,7 @@ impl RuntimeDevice {
         let (cache, entry) = self.resolve_symbol(path)?;
 
         let (handle, size, requires_rmw, type_info) = {
-            let guard = entry.read().map_err(|_| crate::Error::PoisonedLock)?;
+            let guard = entry.read()?;
             (
                 guard
                     .handle()
@@ -508,7 +508,7 @@ impl RuntimeDevice {
             vec![0u8; size as usize]
         };
 
-        tcads_serde::to_bytes(value, &mut buf, &type_info, &*cache.types())?;
+        tcads_serde::to_bytes(value, &mut buf, &type_info, &*cache.types()?)?;
 
         self.write_bytes_by_handle(handle, buf)
             .map_err(|err| self.map_stale(err, &cache, path))
@@ -685,7 +685,7 @@ impl RuntimeDevice {
     ) -> crate::Result<(Arc<SymbolCache>, Arc<RwLock<SymbolEntry>>)> {
         let cache = self.symbol_cache()?;
 
-        if let Some(entry) = cache.get(path) {
+        if let Some(entry) = cache.get(path)? {
             let has_handle = entry
                 .read()
                 .map_err(|_| crate::Error::PoisonedLock)?
@@ -697,34 +697,30 @@ impl RuntimeDevice {
         }
 
         let info = self.get_symbol_info(path)?;
-
-        const MAX_TYPE_FETCHES: usize = 512;
+        const MAX_FETCH_LEVELS: usize = 128;
         let mut entry = None;
-        for _ in 0..=MAX_TYPE_FETCHES {
-            match cache.resolve_entry(info.type_name(), info.size()) {
-                Ok(resolved) => {
-                    entry = Some(resolved);
-                    break;
-                }
-                Err(tcads_serde::Error::TypeNotFound(missing)) => {
-                    let fetched = self.get_type_info(&missing)?;
-                    cache.insert_types([fetched]);
-                }
-                Err(err) => return Err(err.into()),
+        for _ in 0..=MAX_FETCH_LEVELS {
+            let missing = cache.missing_types(info.type_name())?;
+            if missing.is_empty() {
+                entry = Some(cache.resolve_entry(info.type_name(), info.size())?);
+                break;
             }
+            let fetched: Vec<_> = self
+                .get_multi_type_infos(&missing)?
+                .collect::<Result<_, _>>()?;
+            cache.insert_types(fetched)?;
         }
         let entry = entry.ok_or_else(|| {
             crate::Error::Serde(tcads_serde::Error::Custom(format!(
-                "type closure of '{}' exceeds {MAX_TYPE_FETCHES} types",
+                "type closure of '{}' did not resolve within {MAX_FETCH_LEVELS} fetch levels",
                 info.type_name(),
             )))
         })?;
 
         let handle = self.get_handle_by_name(path)?;
-        cache.insert(Arc::from(path), entry.with_handle(handle));
-
+        cache.insert(Arc::from(path), entry.with_handle(handle))?;
         let entry = cache
-            .get(path)
+            .get(path)?
             .expect("just inserted, or raced with a concurrent insert of the same path");
         Ok((cache, entry))
     }
