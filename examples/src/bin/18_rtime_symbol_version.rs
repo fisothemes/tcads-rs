@@ -9,6 +9,11 @@
 //! **Online Change**.
 //!
 //! By setting up a device notification, a client can detect these changes in real-time.
+//!
+//! ## PREREQUISITE
+//!
+//! Open `twincat/TcAdsExamples.sln` in TwinCAT XAE, activate the configuration
+//! on your local machine, and put the PLC into RUN mode.
 
 use tcads::client::devices::blocking::RuntimeDevice;
 use tcads::core::AmsAddr;
