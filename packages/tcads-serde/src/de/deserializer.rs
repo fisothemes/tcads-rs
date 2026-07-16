@@ -1,6 +1,5 @@
-use super::access::resolved_field::{ResolvedField, resolve_fields};
 use super::access::{AdsArrayAccess, AdsEnumAccess, AdsMapAccess, AdsStructAccess};
-use crate::resolvers::resolve_alias;
+use crate::resolvers::{ResolvedField, resolve_alias, resolve_fields};
 use crate::validators::{
     validate_exact_size, validate_integer_type_id, validate_type_category, validate_type_id,
 };

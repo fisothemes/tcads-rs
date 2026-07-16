@@ -1,7 +1,6 @@
-use super::resolved_field::{ResolvedField, resolve_fields};
 use crate::TypeProvider;
 use crate::de::AdsDeserializer;
-use crate::resolvers::resolve_alias;
+use crate::resolvers::{ResolvedField, resolve_alias, resolve_fields};
 use serde::de::{DeserializeSeed, Deserializer, SeqAccess, Visitor};
 use std::rc::Rc;
 use tcads_core::{AdsArrayInfo, AdsTypeCategory, AdsTypeInfo};

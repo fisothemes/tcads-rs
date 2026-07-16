@@ -1,6 +1,6 @@
-use super::resolved_field::ResolvedField;
 use crate::TypeProvider;
 use crate::de::AdsDeserializer;
+use crate::resolvers::ResolvedField;
 use serde::de::{DeserializeSeed, SeqAccess};
 use std::rc::Rc;
 
