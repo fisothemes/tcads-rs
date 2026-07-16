@@ -1,14 +1,16 @@
 use super::unsupported_serialize_methods;
 use crate::TypeProvider;
-use crate::resolvers::resolve_alias;
+use crate::resolvers::{ResolvedField, resolve_alias, resolve_fields};
 use crate::ser::AdsSerializer;
 use serde::ser::{Impossible, SerializeSeq, SerializeTuple, SerializeTupleStruct};
-use tcads_core::{AdsArrayInfo, AdsTypeInfo};
+use std::rc::Rc;
+use tcads_core::{AdsArrayInfo, AdsTypeCategory, AdsTypeInfo};
 
 /// Writes elements into a fixed-stride array/tuple slot of the output buffer.
 pub struct AdsArraySerializer<'ser, P: TypeProvider> {
     remaining_dims: &'ser [AdsArrayInfo],
     element_type_info: &'ser AdsTypeInfo,
+    resolved_fields: Option<Rc<[ResolvedField<'ser>]>>,
     output: &'ser mut [u8],
     provider: &'ser P,
     index: usize,
@@ -69,9 +71,24 @@ impl<'ser, P: TypeProvider> AdsArraySerializer<'ser, P> {
             });
         }
 
+        let resolved_fields = if remaining_dims.is_empty() {
+            match AdsTypeCategory::determine(element_type_info, provider.get_platform_ptr_size()) {
+                AdsTypeCategory::Struct
+                | AdsTypeCategory::FunctionBlock
+                | AdsTypeCategory::Union => Some(Rc::from(resolve_fields(
+                    element_type_info.field_infos(),
+                    provider,
+                )?)),
+                _ => None,
+            }
+        } else {
+            None
+        };
+
         Ok(Self {
             remaining_dims,
             element_type_info,
+            resolved_fields,
             output,
             provider,
             index: 0,
@@ -96,11 +113,16 @@ impl<'ser, P: TypeProvider> AdsArraySerializer<'ser, P> {
         self.index += 1;
 
         if self.remaining_dims.is_empty() {
-            value.serialize(AdsSerializer::new(
-                elem_output,
-                self.element_type_info,
-                self.provider,
-            ))
+            let serializer = match &self.resolved_fields {
+                Some(fields) => AdsSerializer::with_resolved_fields(
+                    elem_output,
+                    self.element_type_info,
+                    self.provider,
+                    fields.clone(),
+                ),
+                None => AdsSerializer::new(elem_output, self.element_type_info, self.provider),
+            };
+            value.serialize(serializer)
         } else {
             let sub_array = AdsArraySerializer::with_element_type(
                 self.remaining_dims,

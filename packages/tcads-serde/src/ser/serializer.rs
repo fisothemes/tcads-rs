@@ -2,12 +2,13 @@ use super::access::{
     AdsArraySerializer, AdsMapSerializer, AdsStructSerializer, AdsTupleSerializer,
 };
 use crate::TypeProvider;
-use crate::resolvers::resolve_alias;
+use crate::resolvers::{ResolvedField, resolve_alias, resolve_fields};
 use crate::validators::{
     validate_exact_size, validate_integer_type_id, validate_type_category, validate_type_id,
 };
 use serde::Serialize;
 use serde::ser::{Impossible, Serializer};
+use std::rc::Rc;
 use tcads_core::{AdsTypeCategory, AdsTypeId, AdsTypeInfo};
 
 /// Serializes a Rust value into a PLC memory layout, driven by `AdsTypeInfo` metadata.
@@ -19,6 +20,7 @@ pub struct AdsSerializer<'ser, P: TypeProvider> {
     output: &'ser mut [u8],
     type_info: &'ser AdsTypeInfo,
     provider: &'ser P,
+    resolved_fields: Option<Rc<[ResolvedField<'ser>]>>,
 }
 
 impl<'ser, P: TypeProvider> AdsSerializer<'ser, P> {
@@ -28,6 +30,22 @@ impl<'ser, P: TypeProvider> AdsSerializer<'ser, P> {
             output,
             type_info,
             provider,
+            resolved_fields: None,
+        }
+    }
+
+    /// Same as [`new`](Self::new), but carrying fields the caller already.
+    pub fn with_resolved_fields(
+        output: &'ser mut [u8],
+        type_info: &'ser AdsTypeInfo,
+        provider: &'ser P,
+        resolved_fields: Rc<[ResolvedField<'ser>]>,
+    ) -> Self {
+        Self {
+            output,
+            type_info,
+            provider,
+            resolved_fields: Some(resolved_fields),
         }
     }
 
@@ -340,6 +358,19 @@ impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
                 )?))
             }
             AdsTypeCategory::Struct | AdsTypeCategory::FunctionBlock | AdsTypeCategory::Union => {
+                if let Some(resolved) = &self.resolved_fields {
+                    if resolved.len() != len {
+                        return Err(crate::Error::ShapeMismatch {
+                            expected: len,
+                            got: resolved.len(),
+                        });
+                    }
+                    return Ok(AdsTupleSerializer::Struct(AdsStructSerializer::new(
+                        resolved.clone(),
+                        self.output,
+                        self.provider,
+                    )));
+                }
                 let fields = type_info.field_infos();
                 if fields.len() != len {
                     return Err(crate::Error::ShapeMismatch {
@@ -347,8 +378,10 @@ impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
                         got: fields.len(),
                     });
                 }
+                let resolved: Rc<[ResolvedField<'ser>]> =
+                    Rc::from(resolve_fields(fields, self.provider)?);
                 Ok(AdsTupleSerializer::Struct(AdsStructSerializer::new(
-                    fields,
+                    resolved,
                     self.output,
                     self.provider,
                 )))
@@ -429,7 +462,26 @@ impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
             });
         }
 
-        Ok(AdsStructSerializer::new(fields, self.output, self.provider))
+        if let Some(resolved) = &self.resolved_fields {
+            if resolved.len() != len {
+                return Err(crate::Error::ShapeMismatch {
+                    expected: len,
+                    got: resolved.len(),
+                });
+            }
+            return Ok(AdsStructSerializer::new(
+                resolved.clone(),
+                self.output,
+                self.provider,
+            ));
+        }
+
+        let resolved: Rc<[ResolvedField<'ser>]> = Rc::from(resolve_fields(fields, self.provider)?);
+        Ok(AdsStructSerializer::new(
+            resolved,
+            self.output,
+            self.provider,
+        ))
     }
 
     fn serialize_struct_variant(
