@@ -1,6 +1,7 @@
 use super::symbol_cache::{SymbolCache, SymbolEntry};
 use crate::devices::blocking::AdsDevice;
 use crate::notif_guard::blocking::NotificationGuard;
+use std::marker::PhantomData;
 use std::net::ToSocketAddrs;
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, OnceLock, RwLock};
@@ -425,6 +426,74 @@ impl RuntimeDevice {
         tcads_serde::from_bytes(&bytes, &type_info, &*cache.types()?).map_err(Into::into)
     }
 
+    /// Subscribes to value-change notifications for a symbol by instance path.
+    ///
+    /// Resolves the symbol the same way [`read_value`](Self::read_value) does
+    /// (cached after the first call), then subscribes on its handle via
+    /// [`SYMBOL_VALUE_BY_HANDLE`](IndexGroup::SYMBOL_VALUE_BY_HANDLE). `trans_mode`, `max_delay`,
+    /// and `cycle_time` are passed straight through to [`AdsNotificationAttrib`]; use
+    /// [`AdsTransMode::ServerOnChange`] for push-on-change, or
+    /// [`AdsTransMode::ServerCyclic`] with a `cycle_time` for polling at a
+    /// fixed interval, useful for fast-changing values where on-change would
+    /// flood the subscription.
+    ///
+    /// Returns a [`ValueReceiver<T>`] that decodes each sample into `T`.
+    ///
+    /// # Handle invalidation
+    ///
+    /// Unlike `read_value`/`write_value`, this subscription has no read/write
+    /// call of its own that can fail with [`AdsErrDeviceSymbolVersionInvalid`](tcads_core::AdsReturnCode::AdsErrDeviceSymbolVersionInvalid)
+    /// when a symbol version change invalidates the handle backing it: it's push,
+    /// not pull. Instead, the PLC pushes a single zero-length sample on this
+    /// subscription to signal exactly that. [`ValueReceiver`] treats a
+    /// zero-length sample as [`Error::HandleInvalidated`](crate::Error::HandleInvalidated),
+    /// flushing the symbol cache the same as a failed `read_value`/`write_value`
+    /// call would. It does **not** auto-resubscribe: the online change may have
+    /// altered the symbol's type or size, so silently reinterpreting whatever
+    /// arrives next under a possibly-changed layout would be worse than
+    /// surfacing the problem. Call `subscribe_value` again once you've decided
+    /// that's safe.
+    pub fn subscribe_value<T>(
+        &self,
+        path: impl AsRef<str>,
+        trans_mode: AdsTransMode,
+        max_delay: u32,
+        cycle_time: u32,
+    ) -> crate::Result<ValueReceiver<T>>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let path = path.as_ref();
+        let (cache, entry) = self.resolve_symbol(path)?;
+
+        let (handle, size, type_info) = {
+            let guard = entry.read()?;
+            (
+                guard
+                    .handle()
+                    .expect("resolve_symbol always attaches a handle"),
+                guard.size(),
+                guard.type_info().clone(),
+            )
+        };
+
+        let (rx, notif_handle) = self.device.add_notification(
+            self.target,
+            IndexGroup::SYMBOL_VALUE_BY_HANDLE,
+            handle.as_u32().into(),
+            AdsNotificationAttrib::new(size, trans_mode, max_delay, cycle_time),
+        )?;
+
+        let guard = NotificationGuard::new(notif_handle, self.target, self.device.clone());
+        Ok(ValueReceiver::new(
+            rx,
+            guard,
+            cache,
+            Arc::from(path),
+            type_info,
+        ))
+    }
+
     /// Writes raw bytes to a symbol directly using its absolute memory location
     /// ([`IndexGroup`] and [`IndexOffset`]) provided by its [`AdsSymbolInfo`].
     pub fn write_bytes_by_info(
@@ -834,6 +903,117 @@ impl SymbolVersionReceiver {
     /// Returns an iterator that blocks on each call, yielding new symbol versions
     /// until the subscription is cancelled or the connection is lost.
     pub fn iter(&self) -> impl Iterator<Item = crate::Result<u8>> + '_ {
+        std::iter::from_fn(move || match self.recv() {
+            Err(crate::Error::Disconnected) => None,
+            result => Some(result),
+        })
+    }
+
+    /// Explicitly cancels the subscription, returning any error from the router.
+    ///
+    /// Dropping the receiver has the same effect but discards the result; prefer this
+    /// when you want to know cancellation actually succeeded.
+    pub fn unsubscribe(self) -> crate::Result<()> {
+        self.guard.cancel()
+    }
+}
+
+/// A receiver for decoded value-change notifications on a single symbol.
+///
+/// Wraps the raw ADS notification channel and decodes each sample into `T` on
+/// demand. The subscription is cancelled automatically when this is
+/// dropped, or explicitly via [`unsubscribe`](Self::unsubscribe).
+///
+/// Obtain one by calling [`RuntimeDevice::subscribe_value`].
+pub struct ValueReceiver<T> {
+    rx: Receiver<AdsNotificationSampleOwned>,
+    guard: NotificationGuard,
+    cache: Arc<SymbolCache>,
+    path: Arc<str>,
+    type_info: Arc<AdsTypeInfo>,
+    _value: PhantomData<fn() -> T>,
+}
+
+impl<T> ValueReceiver<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    /// Creates a new instance of the [`ValueReceiver`].
+    pub fn new(
+        rx: Receiver<AdsNotificationSampleOwned>,
+        guard: NotificationGuard,
+        cache: Arc<SymbolCache>,
+        path: Arc<str>,
+        type_info: Arc<AdsTypeInfo>,
+    ) -> Self {
+        Self {
+            rx,
+            guard,
+            cache,
+            path,
+            type_info,
+            _value: PhantomData,
+        }
+    }
+
+    /// Returns the notification handle for this subscription.
+    pub fn handle(&self) -> NotificationHandle {
+        self.guard.handle()
+    }
+
+    /// Returns the symbol path this subscription was created for.
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    fn decode(&self, sample: AdsNotificationSampleOwned) -> crate::Result<T> {
+        let data = sample.data();
+        if data.is_empty() {
+            self.cache.clear();
+            return Err(crate::Error::HandleInvalidated(self.path.clone()));
+        }
+        tcads_serde::from_bytes(data, &self.type_info, &*self.cache.types()?).map_err(Into::into)
+    }
+
+    /// Blocks until the next value change.
+    ///
+    /// Returns [`Err`] when the subscription is cancelled or the connection is
+    /// lost, or [`Error::HandleInvalidated`](crate::Error::HandleInvalidated) if
+    /// an online change invalidated the handle backing this subscription (see
+    /// [`subscribe_value`](RuntimeDevice::subscribe_value)'s doc comment).
+    pub fn recv(&self) -> crate::Result<T> {
+        self.decode(self.rx.recv()?)
+    }
+
+    /// Blocks until the next value change or `timeout` elapses.
+    ///
+    /// Returns [`Err(Error::Timeout)`](crate::Error::Timeout) if the timeout expires,
+    /// [`Err(Error::Disconnected)`](crate::Error::Disconnected) if the subscription
+    /// is cancelled or the connection is lost, or
+    /// [`Error::HandleInvalidated`](crate::Error::HandleInvalidated) per [`recv`](Self::recv).
+    pub fn recv_timeout(&self, timeout: Duration) -> crate::Result<T> {
+        self.decode(self.rx.recv_timeout(timeout)?)
+    }
+
+    /// Returns the next value if a sample is immediately available, without blocking.
+    ///
+    /// Returns `Ok(None)` if no sample is currently available,
+    /// [`Err(Error::Disconnected)`](crate::Error::Disconnected) if the
+    /// subscription is cancelled or the connection is lost, or
+    /// [`Error::HandleInvalidated`](crate::Error::HandleInvalidated) per [`recv`](Self::recv).
+    pub fn try_recv(&self) -> crate::Result<Option<T>> {
+        match self.rx.try_recv() {
+            Ok(sample) => Ok(Some(self.decode(sample)?)),
+            Err(TryRecvError::Empty) => Ok(None),
+            Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
+        }
+    }
+
+    /// Returns an iterator that blocks on each call, yielding new values until
+    /// the subscription is cancelled, the connection is lost, or a handle
+    /// invalidation is observed (each ending the iterator after yielding that
+    /// final `Err`, per [`recv`](Self::recv)).
+    pub fn iter(&self) -> impl Iterator<Item = crate::Result<T>> + '_ {
         std::iter::from_fn(move || match self.recv() {
             Err(crate::Error::Disconnected) => None,
             result => Some(result),
