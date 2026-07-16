@@ -149,9 +149,7 @@ impl RuntimeDevice {
     /// Returns a [`SymbolVersionReceiver`] that decodes each notification into the new
     /// version byte. The subscription is cancelled automatically when the receiver is
     /// dropped, or explicitly via [`SymbolVersionReceiver::unsubscribe`].
-    pub async fn subscribe_symbol_version(
-        &self,
-    ) -> crate::Result<(SymbolVersionReceiver, NotificationHandle)> {
+    pub async fn subscribe_symbol_version(&self) -> crate::Result<SymbolVersionReceiver> {
         let (rx, handle) = self
             .device
             .add_notification(
@@ -163,7 +161,7 @@ impl RuntimeDevice {
             .await?;
 
         let guard = NotificationGuard::new(handle, self.target, self.device.clone());
-        Ok((SymbolVersionReceiver::new(rx, guard), handle))
+        Ok(SymbolVersionReceiver::new(rx, guard))
     }
 
     /// Fetches a symbol handle by its instance path (e.g. `"MAIN.nCount"`)
