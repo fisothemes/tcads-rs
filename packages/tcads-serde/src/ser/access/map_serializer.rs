@@ -1,23 +1,24 @@
-use super::field::write_field_bytes;
 use super::unsupported_serialize_methods;
 use crate::TypeProvider;
+use crate::resolvers::ResolvedField;
+use crate::ser::AdsSerializer;
 use serde::ser::{Impossible, SerializeMap};
-use tcads_core::AdsFieldInfo;
+use std::rc::Rc;
 
 /// Writes struct fields by name, for dynamically keyed values (`Value`, `HashMap<String, _>`)
 /// where there's no compile-time field order to fall back on.
 pub struct AdsMapSerializer<'ser, P: TypeProvider> {
     type_name: &'ser str,
-    fields: &'ser [AdsFieldInfo],
+    fields: Rc<[ResolvedField<'ser>]>,
     output: &'ser mut [u8],
     provider: &'ser P,
-    pending_field: Option<&'ser AdsFieldInfo>,
+    pending_field: Option<ResolvedField<'ser>>,
 }
 
 impl<'ser, P: TypeProvider> AdsMapSerializer<'ser, P> {
-    pub fn new(
+    pub(crate) fn new(
         type_name: &'ser str,
-        fields: &'ser [AdsFieldInfo],
+        fields: Rc<[ResolvedField<'ser>]>,
         output: &'ser mut [u8],
         provider: &'ser P,
     ) -> Self {
@@ -30,10 +31,11 @@ impl<'ser, P: TypeProvider> AdsMapSerializer<'ser, P> {
         }
     }
 
-    fn find_field(&self, name: &str) -> Result<&'ser AdsFieldInfo, crate::Error> {
+    fn find_field(&self, name: &str) -> Result<ResolvedField<'ser>, crate::Error> {
         self.fields
             .iter()
             .find(|f| f.name() == name)
+            .cloned()
             .ok_or_else(|| crate::Error::UnknownField(name.to_string(), self.type_name.to_string()))
     }
 }
@@ -59,7 +61,23 @@ impl<'ser, P: TypeProvider> SerializeMap for AdsMapSerializer<'ser, P> {
             .pending_field
             .take()
             .expect("serialize_value called before serialize_key");
-        write_field_bytes(self.output, field, self.provider, value)
+
+        let start = field.offset() as usize;
+        let end = start + field.size() as usize;
+        let len = self.output.len();
+        let field_output = self
+            .output
+            .get_mut(start..end)
+            .ok_or(crate::Error::SizeMismatch {
+                expected: end,
+                got: len,
+            })?;
+
+        value.serialize(AdsSerializer::new(
+            field_output,
+            field.type_info(),
+            self.provider,
+        ))
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {

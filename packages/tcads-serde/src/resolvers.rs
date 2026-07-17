@@ -153,10 +153,11 @@ pub fn missing_types(type_info: &AdsTypeInfo, provider: &impl TypeProvider) -> V
 
         let current = match resolve_alias(current, provider, ptr_size) {
             Ok(resolved) => resolved,
-            Err(_) => {
-                missing.push(current.type_name().into());
+            Err(crate::Error::TypeNotFound(missing_name)) => {
+                missing.push(missing_name);
                 continue;
             }
+            Err(_) => continue,
         };
 
         match AdsTypeCategory::determine(current, ptr_size) {
@@ -188,6 +189,7 @@ pub struct ResolvedField<'a> {
     offset: u32,
     size: u32,
     type_info: &'a AdsTypeInfo,
+    name: &'a str,
 }
 
 impl<'a> ResolvedField<'a> {
@@ -197,7 +199,13 @@ impl<'a> ResolvedField<'a> {
             offset,
             size,
             type_info,
+            name: "",
         }
+    }
+
+    /// Adds a field name to the resolver.
+    pub fn with_name(self, name: &'a str) -> Self {
+        Self { name, ..self }
     }
 
     /// Returns the byte offset of this field within the struct.
@@ -213,6 +221,11 @@ impl<'a> ResolvedField<'a> {
     /// Returns the resolved type info for this field.
     pub fn type_info(&self) -> &'a AdsTypeInfo {
         self.type_info
+    }
+
+    /// Returns the field name.
+    pub fn name(&self) -> &'a str {
+        self.name
     }
 }
 
@@ -231,7 +244,12 @@ pub fn resolve_fields<'a>(
                 .get_type_info(type_name)
                 .ok_or_else(|| crate::Error::TypeNotFound(type_name.to_string()))?;
             let type_info = resolve_alias(raw, provider, ptr_size)?;
-            Ok(ResolvedField::new(field.offset(), field.size(), type_info))
+            Ok(ResolvedField {
+                offset: field.offset(),
+                size: field.size(),
+                type_info,
+                name: field.name(),
+            })
         })
         .collect()
 }

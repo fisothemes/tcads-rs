@@ -491,11 +491,17 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         )?;
         validate_exact_size(self.input, type_info.size() as usize)?;
 
-        visitor.visit_map(AdsMapAccess::new(
-            type_info.field_infos(),
-            self.input,
-            self.provider,
-        ))
+        if let Some(resolved) = &self.resolved_fields {
+            return visitor.visit_map(AdsMapAccess::new(
+                resolved.clone(),
+                self.input,
+                self.provider,
+            ));
+        }
+
+        let resolved: Rc<[ResolvedField<'de>]> =
+            Rc::from(resolve_fields(type_info.field_infos(), self.provider)?);
+        visitor.visit_map(AdsMapAccess::new(resolved, self.input, self.provider))
     }
 
     fn deserialize_struct<V>(

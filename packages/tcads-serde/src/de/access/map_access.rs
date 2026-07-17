@@ -1,23 +1,28 @@
-use super::field::field_deserializer;
 use crate::TypeProvider;
+use crate::de::AdsDeserializer;
+use crate::resolvers::ResolvedField;
 use serde::de::value::StrDeserializer;
 use serde::de::{DeserializeSeed, MapAccess};
-use tcads_core::AdsFieldInfo;
+use std::rc::Rc;
 
 /// Yields struct fields as name/value pairs, for dynamically-keyed targets (`Value`,
 /// `HashMap<String, _>`) that need to know what each field is called.
 pub struct AdsMapAccess<'de, P: TypeProvider> {
-    fields: std::slice::Iter<'de, AdsFieldInfo>,
-    current: Option<&'de AdsFieldInfo>,
+    fields: Rc<[ResolvedField<'de>]>,
+    index: usize,
     input: &'de [u8],
     provider: &'de P,
 }
 
 impl<'de, P: TypeProvider> AdsMapAccess<'de, P> {
-    pub fn new(fields: &'de [AdsFieldInfo], input: &'de [u8], provider: &'de P) -> Self {
+    pub(crate) fn new(
+        fields: Rc<[ResolvedField<'de>]>,
+        input: &'de [u8],
+        provider: &'de P,
+    ) -> Self {
         Self {
-            fields: fields.iter(),
-            current: None,
+            fields,
+            index: 0,
             input,
             provider,
         }
@@ -31,12 +36,10 @@ impl<'de, P: TypeProvider> MapAccess<'de> for AdsMapAccess<'de, P> {
     where
         K: DeserializeSeed<'de>,
     {
-        match self.fields.next() {
-            Some(field) => {
-                self.current = Some(field);
-                seed.deserialize(StrDeserializer::<crate::Error>::new(field.name()))
-                    .map(Some)
-            }
+        match self.fields.get(self.index) {
+            Some(field) => seed
+                .deserialize(StrDeserializer::<crate::Error>::new(field.name()))
+                .map(Some),
             None => Ok(None),
         }
     }
@@ -45,15 +48,27 @@ impl<'de, P: TypeProvider> MapAccess<'de> for AdsMapAccess<'de, P> {
     where
         V: DeserializeSeed<'de>,
     {
-        let field = self
-            .current
-            .take()
-            .expect("next_value_seed called before next_key_seed");
+        let field = self.fields[self.index].clone();
+        self.index += 1;
 
-        seed.deserialize(field_deserializer(self.input, field, self.provider)?)
+        let start = field.offset() as usize;
+        let end = start + field.size() as usize;
+        let field_bytes = self
+            .input
+            .get(start..end)
+            .ok_or(crate::Error::SizeMismatch {
+                expected: end,
+                got: self.input.len(),
+            })?;
+
+        seed.deserialize(AdsDeserializer::new(
+            field_bytes,
+            field.type_info(),
+            self.provider,
+        ))
     }
 
     fn size_hint(&self) -> Option<usize> {
-        Some(self.fields.len())
+        Some(self.fields.len() - self.index)
     }
 }

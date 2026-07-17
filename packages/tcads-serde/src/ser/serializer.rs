@@ -427,9 +427,21 @@ impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
         )?;
         validate_exact_size(self.output, type_info.size() as usize)?;
 
+        let type_name = type_info.name();
+        if let Some(resolved) = self.resolved_fields {
+            return Ok(AdsMapSerializer::new(
+                type_name,
+                resolved,
+                self.output,
+                self.provider,
+            ));
+        }
+
+        let resolved: Rc<[ResolvedField<'ser>]> =
+            Rc::from(resolve_fields(type_info.field_infos(), self.provider)?);
         Ok(AdsMapSerializer::new(
-            type_info.name(),
-            type_info.field_infos(),
+            type_name,
+            resolved,
             self.output,
             self.provider,
         ))

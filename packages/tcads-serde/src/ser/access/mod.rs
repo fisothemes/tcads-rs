@@ -1,5 +1,4 @@
 pub mod array_serializer;
-mod field;
 pub mod map_serializer;
 pub mod struct_serializer;
 pub mod tuple_serializer;
