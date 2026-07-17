@@ -11,5 +11,5 @@ pub mod blocking {
 pub mod tokio {
     pub use super::ads_device::tokio::AdsDevice;
     pub use super::logger::tokio::{LogEntryReceiver, Logger};
-    pub use super::runtime::tokio::{RuntimeDevice, SymbolVersionReceiver};
+    pub use super::runtime::tokio::{RuntimeDevice, SymbolVersionReceiver, ValueReceiver};
 }

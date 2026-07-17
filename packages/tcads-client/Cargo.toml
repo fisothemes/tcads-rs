@@ -11,4 +11,4 @@ serde = { workspace = true }
 tcads-serde = { workspace = true }
 tcads-core = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["io-util", "net", "macros"] }
+tokio = { workspace = true, features = ["io-util", "net", "macros", "sync"] }

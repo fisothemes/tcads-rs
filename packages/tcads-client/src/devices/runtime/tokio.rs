@@ -1,6 +1,9 @@
+use super::symbol_cache::{SymbolCache, SymbolEntry};
 use crate::devices::tokio::AdsDevice;
 use crate::notif_guard::tokio::NotificationGuard;
+use std::marker::PhantomData;
 use std::net::ToSocketAddrs;
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tcads_core::{
     AdsError, AdsNotificationAttrib, AdsNotificationSampleOwned, AdsSymbolInfo,
@@ -8,12 +11,22 @@ use tcads_core::{
     AdsTypeInfo, AdsTypeInfoIteratorOwned, AmsAddr, AmsPort, IndexGroup, IndexOffset,
     NotificationHandle, SumReadRequest, SumReadWriteRequest, SumWriteRequest, SymbolHandle,
 };
+use tokio::sync::OnceCell;
 use tokio::sync::mpsc::UnboundedReceiver as Receiver;
 use tokio::sync::mpsc::error::TryRecvError;
 
+/// A high-level client for interacting with a specific TwinCAT runtime.
+///
+/// `RuntimeDevice` provides specialized methods for querying a target runtime device's memory
+/// layout, including Symbol (variable) metadata, values, and Data Type definitions.
+///
+/// It is bound to a single target address ([`AmsAddr`]). Common target ports include:
+/// - **851** (and **801–899**): PLC runtimes (851 is the default first TC3 PLC task).
+/// - **301–399**: FreeTasks.
 pub struct RuntimeDevice {
     device: AdsDevice,
     target: AmsAddr,
+    symbols: OnceCell<Arc<SymbolCache>>,
 }
 
 impl RuntimeDevice {
@@ -68,7 +81,11 @@ impl RuntimeDevice {
     /// Useful if you are sharing a connection with other ADS devices
     /// i.e. the [`Logger`](crate::devices::blocking::Logger) ADS device.
     pub const fn new(device: AdsDevice, target: AmsAddr) -> Self {
-        Self { device, target }
+        Self {
+            device,
+            target,
+            symbols: OnceCell::const_new(),
+        }
     }
 
     /// Shuts down the underlying connection.
@@ -388,6 +405,116 @@ impl RuntimeDevice {
         Ok(results.into_iter())
     }
 
+    /// Reads a symbol's value by instance path and deserializes it into `T`.
+    ///
+    /// Symbol info, type closure, and handle are resolved on first use and cached;
+    /// subsequent reads of the same path cost a single ADS read. Paths support
+    /// TwinCAT pointer dereference syntax (`"MAIN.pValue^.nValue"`); reference
+    /// (`REFERENCE TO`) symbols read as their base type automatically.
+    ///
+    /// Whenever a symbol version changes, the PLC invalidates all handles; this returns
+    /// [`Error::HandleInvalidated`](crate::Error::HandleInvalidated) after flushing
+    /// the cache, and the caller decides whether to retry.
+    ///
+    /// See [`subscribe_symbol_version`](Self::subscribe_symbol_version) for more info on version
+    /// changes.
+    pub async fn read_value<T>(&self, path: impl AsRef<str>) -> crate::Result<T>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let path = path.as_ref();
+        let (cache, entry) = self.resolve_symbol(path).await?;
+
+        let (handle, size, type_info) = {
+            let guard = entry.read()?;
+            (
+                guard
+                    .handle()
+                    .expect("resolve_symbol always attaches a handle"),
+                guard.size(),
+                guard.type_info().clone(),
+            )
+        };
+
+        let bytes = self
+            .read_bytes_by_handle(handle, size as usize)
+            .await
+            .map_err(|err| self.map_stale(err, &cache, path))?;
+
+        tcads_serde::from_bytes(&bytes, &type_info, &*cache.types()?).map_err(Into::into)
+    }
+
+    /// Subscribes to value-change notifications for a symbol by instance path.
+    ///
+    /// Resolves the symbol the same way [`read_value`](Self::read_value) does
+    /// (cached after the first call), then subscribes on its handle via
+    /// `SYMBOL_VALUE_BY_HANDLE`. `trans_mode`, `max_delay`, and `cycle_time`
+    /// are passed straight through to [`AdsNotificationAttrib`]; use
+    /// [`AdsTransMode::ServerOnChange`] for push-on-change, or
+    /// [`AdsTransMode::ServerCyclic`] with a `cycle_time` for polling at a
+    /// fixed interval, useful for fast-changing values where on-change would
+    /// flood the subscription.
+    ///
+    /// Returns a [`ValueReceiver<T>`] that decodes each sample into `T`.
+    ///
+    /// # Handle invalidation
+    ///
+    /// Unlike `read_value`/`write_value`, this subscription has no read/write
+    /// call of its own that can fail with `AdsErrDeviceSymbolVersionInvalid`
+    /// when an online change invalidates the handle backing it: it's push,
+    /// not pull. Instead, the PLC pushes a single zero-length sample on this
+    /// subscription to signal exactly that. [`ValueReceiver`] treats a
+    /// zero-length sample as [`Error::HandleInvalidated`](crate::Error::HandleInvalidated),
+    /// flushing the symbol cache the same as a failed `read_value`/`write_value`
+    /// call would. It does **not** auto-resubscribe: the online change may have
+    /// altered the symbol's type or size, so silently reinterpreting whatever
+    /// arrives next under a possibly-changed layout would be worse than
+    /// surfacing the problem. Call `subscribe_value` again once you've decided
+    /// that's safe.
+    pub async fn subscribe_value<T>(
+        &self,
+        path: impl AsRef<str>,
+        trans_mode: AdsTransMode,
+        max_delay: u32,
+        cycle_time: u32,
+    ) -> crate::Result<ValueReceiver<T>>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let path = path.as_ref();
+        let (cache, entry) = self.resolve_symbol(path).await?;
+
+        let (handle, size, type_info) = {
+            let guard = entry.read()?;
+            (
+                guard
+                    .handle()
+                    .expect("resolve_symbol always attaches a handle"),
+                guard.size(),
+                guard.type_info().clone(),
+            )
+        };
+
+        let (rx, notif_handle) = self
+            .device
+            .add_notification(
+                self.target,
+                IndexGroup::SYMBOL_VALUE_BY_HANDLE,
+                handle.as_u32().into(),
+                AdsNotificationAttrib::new(size, trans_mode, max_delay, cycle_time),
+            )
+            .await?;
+
+        let guard = NotificationGuard::new(notif_handle, self.target, self.device.clone());
+        Ok(ValueReceiver::new(
+            rx,
+            guard,
+            cache,
+            Arc::from(path),
+            type_info,
+        ))
+    }
+
     /// Writes raw bytes to a symbol directly using its absolute memory location
     /// ([`IndexGroup`] and [`IndexOffset`]) provided by its [`AdsSymbolInfo`].
     pub async fn write_bytes_by_info(
@@ -429,6 +556,98 @@ impl RuntimeDevice {
             .collect::<Vec<_>>();
 
         Ok(results.into_iter())
+    }
+
+    /// Serializes `value` and writes it to the symbol at `path`.
+    ///
+    /// `value` must cover every field of the symbol's type. For types containing
+    /// function block instances (directly, in fields, or as array elements) the
+    /// write is a read-modify-write cycle: current bytes are read, the value is
+    /// serialized over them (preserving vtable headers and any other hidden
+    /// bytes), and the result is written back. Plain structs, arrays, strings,
+    /// and primitives are written directly with no extra read.
+    ///
+    /// Pointer-typed fields are written as the opaque integer the value supplies;
+    /// preserving their contents is the caller's responsibility.
+    ///
+    /// See [`read_value`](Self::read_value) for caching and invalidation behavior.
+    pub async fn write_value<T>(&self, path: impl AsRef<str>, value: &T) -> crate::Result<()>
+    where
+        T: serde::Serialize,
+    {
+        let path = path.as_ref();
+        let (cache, entry) = self.resolve_symbol(path).await?;
+
+        let (handle, size, requires_rmw, type_info) = {
+            let guard = entry.read()?;
+            (
+                guard
+                    .handle()
+                    .expect("resolve_symbol always attaches a handle"),
+                guard.size(),
+                guard.requires_rmw(),
+                guard.type_info().clone(),
+            )
+        };
+
+        let mut buf = if requires_rmw {
+            self.read_bytes_by_handle(handle, size as usize)
+                .await
+                .map_err(|err| self.map_stale(err, &cache, path))?
+        } else {
+            vec![0u8; size as usize]
+        };
+
+        tcads_serde::to_bytes(value, &mut buf, &type_info, &*cache.types()?)?;
+
+        self.write_bytes_by_handle(handle, buf)
+            .await
+            .map_err(|err| self.map_stale(err, &cache, path))
+    }
+
+    /// Flushes the symbol cache: every cached handle, symbol entry, and type.
+    ///
+    /// Call after a symbol-version notification or reconnect. Stale handles are
+    /// not released on the PLC; it already discarded them.
+    pub fn invalidate_symbol_cache(&self) {
+        if let Some(cache) = self.symbols.get() {
+            cache.clear();
+        }
+    }
+
+    /// Fetches the entire type dictionary and symbol table in two bulk round
+    /// trips and populates the cache, so every symbol's metadata (type,
+    /// size, whether it needs read-modify-write) is resolved before any
+    /// [`read_value`](Self::read_value)/[`write_value`](Self::write_value)
+    /// call touches it.
+    ///
+    /// # Note
+    ///
+    /// Costs two bulk transfers proportional to project size (hundreds of KB
+    /// to a few MB on large projects), paid up front. Call it once after
+    /// connecting if you'd rather pay that eagerly than have each symbol's
+    /// first access pay its own smaller lazy cost.
+    pub async fn preload(&self) -> crate::Result<()> {
+        let cache = self.symbol_cache().await?;
+
+        cache.insert_types(
+            self.get_all_type_infos()
+                .await?
+                .collect::<Result<Vec<_>, _>>()?,
+        )?;
+
+        for info in self.get_all_symbol_infos().await? {
+            let info = info?;
+
+            if cache.get(info.name())?.is_some() {
+                continue;
+            }
+
+            let entry = cache.resolve_entry(info.type_name(), info.size())?;
+            cache.insert(Arc::from(info.name()), entry)?;
+        }
+
+        Ok(())
     }
 
     /// Fetches the metadata for a specific Symbol by its instance path (e.g. `"MAIN.nCount"`).
@@ -578,6 +797,99 @@ impl RuntimeDevice {
 
         Ok(AdsTypeInfoIteratorOwned::new(raw_blob).map(|res| res.map_err(crate::Error::from)))
     }
+
+    /// Returns the lazily initialised [`SymbolCache`], creating it on first use.
+    ///
+    /// Creation needs the target's platform pointer size (one `get_upload_info`
+    /// round trip). Falls back to 8 bytes if the target doesn't report one (V1/V2
+    /// upload info), matching 64-bit runtimes.
+    async fn symbol_cache(&self) -> crate::Result<Arc<SymbolCache>> {
+        self.symbols
+            .get_or_try_init(|| async {
+                let ptr_size = self
+                    .get_upload_info()
+                    .await?
+                    .platform_ptr_size()
+                    .unwrap_or(8);
+                Ok::<_, crate::Error>(Arc::new(SymbolCache::new(ptr_size)))
+            })
+            .await
+            .cloned()
+    }
+
+    /// Resolves a symbol path to a cached, handle-bearing [`SymbolEntry`],
+    /// fetching symbol info, the missing part of its type closure, and a handle
+    /// from the PLC on a cache miss.
+    async fn resolve_symbol(
+        &self,
+        path: &str,
+    ) -> crate::Result<(Arc<SymbolCache>, Arc<RwLock<SymbolEntry>>)> {
+        let cache = self.symbol_cache().await?;
+
+        if let Some(entry) = cache.get(path)? {
+            let has_handle = entry
+                .read()
+                .map_err(|_| crate::Error::PoisonedLock)?
+                .handle()
+                .is_some();
+            if has_handle {
+                return Ok((cache, entry));
+            }
+
+            let handle = self.get_handle_by_name(path).await?;
+            if cache.set_handle(path, handle)? {
+                return Ok((cache, entry));
+            }
+        }
+
+        let info = self.get_symbol_info(path).await?;
+
+        const MAX_FETCH_LEVELS: usize = 128;
+        let mut entry = None;
+        for _ in 0..=MAX_FETCH_LEVELS {
+            let missing = cache.missing_types(info.type_name())?;
+            if missing.is_empty() {
+                entry = Some(cache.resolve_entry(info.type_name(), info.size())?);
+                break;
+            }
+            let fetched: Vec<_> = self
+                .get_multi_type_infos(&missing)
+                .await?
+                .collect::<Result<_, _>>()?;
+            cache.insert_types(fetched)?;
+        }
+        let entry = entry.ok_or_else(|| {
+            crate::Error::Serde(tcads_serde::Error::Custom(format!(
+                "type closure of '{}' did not resolve within {MAX_FETCH_LEVELS} fetch levels",
+                info.type_name(),
+            )))
+        })?;
+
+        let handle = self.get_handle_by_name(path).await?;
+
+        cache.insert(Arc::from(path), entry.with_handle(handle))?;
+
+        let entry = cache
+            .get(path)?
+            .expect("just inserted, or raced with a concurrent insert of the same path");
+        Ok((cache, entry))
+    }
+
+    /// Maps a stale-symbol-version failure to [`Error::HandleInvalidated`](crate::Error::HandleInvalidated),
+    /// flushing the cache so the caller's retry re-resolves everything fresh.
+    fn map_stale(&self, err: crate::Error, cache: &SymbolCache, path: &str) -> crate::Error {
+        if matches!(
+            err,
+            crate::Error::AdsReturnCode(
+                tcads_core::AdsReturnCode::AdsErrDeviceSymbolVersionInvalid
+            )
+        ) {
+            cache.clear();
+            crate::Error::HandleInvalidated(Arc::from(path))
+        } else {
+            err
+        }
+    }
 }
 
 /// A receiver for decoded Symbol Version change notifications.
@@ -638,6 +950,98 @@ impl SymbolVersionReceiver {
     pub fn try_recv(&mut self) -> crate::Result<Option<u8>> {
         match self.rx.try_recv() {
             Ok(sample) => Ok(Some(Self::decode(sample)?)),
+            Err(TryRecvError::Empty) => Ok(None),
+            Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
+        }
+    }
+
+    /// Explicitly cancels the subscription, returning any error from the router.
+    ///
+    /// Dropping the receiver has the same effect but discards the result; prefer this
+    /// when you want to know cancellation actually succeeded.
+    pub async fn unsubscribe(self) -> crate::Result<()> {
+        self.guard.cancel().await
+    }
+}
+
+/// A receiver for decoded value-change notifications on a single symbol.
+///
+/// Wraps the raw ADS notification channel and decodes each sample into `T` on
+/// demand. The subscription is cancelled automatically when this is
+/// dropped, or explicitly via [`unsubscribe`](Self::unsubscribe).
+///
+/// Obtain one by calling [`RuntimeDevice::subscribe_value`].
+pub struct ValueReceiver<T> {
+    rx: Receiver<AdsNotificationSampleOwned>,
+    guard: NotificationGuard,
+    cache: Arc<SymbolCache>,
+    path: Arc<str>,
+    type_info: Arc<AdsTypeInfo>,
+    _value: PhantomData<fn() -> T>,
+}
+
+impl<T> ValueReceiver<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    /// Creates a new instance of the [`ValueReceiver`].
+    pub fn new(
+        rx: Receiver<AdsNotificationSampleOwned>,
+        guard: NotificationGuard,
+        cache: Arc<SymbolCache>,
+        path: Arc<str>,
+        type_info: Arc<AdsTypeInfo>,
+    ) -> Self {
+        Self {
+            rx,
+            guard,
+            cache,
+            path,
+            type_info,
+            _value: PhantomData,
+        }
+    }
+
+    /// Returns the notification handle for this subscription.
+    pub fn handle(&self) -> NotificationHandle {
+        self.guard.handle()
+    }
+
+    /// Returns the symbol path this subscription was created for.
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    fn decode(&self, sample: AdsNotificationSampleOwned) -> crate::Result<T> {
+        let data = sample.data();
+        if data.is_empty() {
+            self.cache.clear();
+            return Err(crate::Error::HandleInvalidated(self.path.clone()));
+        }
+        tcads_serde::from_bytes(data, &self.type_info, &*self.cache.types()?).map_err(Into::into)
+    }
+
+    /// Asynchronously awaits the next value change.
+    ///
+    /// Returns [`Err(Error::Disconnected)`](crate::Error::Disconnected) when the subscription is
+    /// cancelled or the connection is lost, or
+    /// [`Err(Error::HandleInvalidated)`](crate::Error::HandleInvalidated) if an online change
+    /// invalidated the handle backing this subscription (see
+    /// [`subscribe_value`](RuntimeDevice::subscribe_value)'s doc comment).
+    pub async fn recv(&mut self) -> crate::Result<T> {
+        let sample = self.rx.recv().await.ok_or(crate::Error::Disconnected)?;
+        self.decode(sample)
+    }
+
+    /// Returns the next value if a sample is immediately available, without awaiting.
+    ///
+    /// Returns `Ok(None)` if no sample is currently available,
+    /// [`Err(Error::Disconnected)`](crate::Error::Disconnected) if the
+    /// subscription is cancelled or the connection is lost, or
+    /// [`Err(Error::HandleInvalidated)`](crate::Error::HandleInvalidated) per [`recv`](Self::recv).
+    pub fn try_recv(&mut self) -> crate::Result<Option<T>> {
+        match self.rx.try_recv() {
+            Ok(sample) => Ok(Some(self.decode(sample)?)),
             Err(TryRecvError::Empty) => Ok(None),
             Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
         }

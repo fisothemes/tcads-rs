@@ -609,9 +609,11 @@ impl RuntimeDevice {
 
         for info in self.get_all_symbol_infos()? {
             let info = info?;
+
             if cache.get(info.name())?.is_some() {
                 continue;
             }
+
             let entry = cache.resolve_entry(info.type_name(), info.size())?;
             cache.insert(Arc::from(info.name()), entry)?;
         }
@@ -788,6 +790,11 @@ impl RuntimeDevice {
             if has_handle {
                 return Ok((cache, entry));
             }
+
+            let handle = self.get_handle_by_name(path)?;
+            if cache.set_handle(path, handle)? {
+                return Ok((cache, entry));
+            }
         }
 
         let info = self.get_symbol_info(path)?;
@@ -804,6 +811,7 @@ impl RuntimeDevice {
                 .collect::<Result<_, _>>()?;
             cache.insert_types(fetched)?;
         }
+
         let entry = entry.ok_or_else(|| {
             crate::Error::Serde(tcads_serde::Error::Custom(format!(
                 "type closure of '{}' did not resolve within {MAX_FETCH_LEVELS} fetch levels",
@@ -812,7 +820,9 @@ impl RuntimeDevice {
         })?;
 
         let handle = self.get_handle_by_name(path)?;
+
         cache.insert(Arc::from(path), entry.with_handle(handle))?;
+
         let entry = cache
             .get(path)?
             .expect("just inserted, or raced with a concurrent insert of the same path");
@@ -977,9 +987,10 @@ where
 
     /// Blocks until the next value change.
     ///
-    /// Returns [`Err`] when the subscription is cancelled or the connection is
-    /// lost, or [`Error::HandleInvalidated`](crate::Error::HandleInvalidated) if
-    /// an online change invalidated the handle backing this subscription (see
+    /// Returns [`Err(Error::Disconnected)`](crate::Error::Disconnected) when the subscription is
+    /// cancelled or the connection is lost, or
+    /// [`Error::HandleInvalidated`](crate::Error::HandleInvalidated) if an online change
+    /// invalidated the handle backing this subscription (see
     /// [`subscribe_value`](RuntimeDevice::subscribe_value)'s doc comment).
     pub fn recv(&self) -> crate::Result<T> {
         self.decode(self.rx.recv()?)
