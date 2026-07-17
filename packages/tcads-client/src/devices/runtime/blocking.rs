@@ -285,14 +285,21 @@ impl RuntimeDevice {
         )
     }
 
-    pub fn read_multi_as_bytes_by_handle(
+    /// Reads multiple values as bytes using their handles.
+    pub fn read_multi_as_bytes_by_handle<S: AsRef<SymbolHandle>>(
         &self,
-        infos: impl AsRef<[AdsSymbolInfo]>,
+        items: impl AsRef<[(S, usize)]>,
     ) -> crate::Result<impl Iterator<Item = crate::Result<Vec<u8>>>> {
-        let reqs: Vec<_> = infos
+        let reqs: Vec<_> = items
             .as_ref()
             .iter()
-            .map(|info| SumReadRequest::new(info.index_group(), info.index_offset(), info.size()))
+            .map(|(handle, len)| {
+                SumReadRequest::new(
+                    IndexGroup::SYMBOL_VALUE_BY_HANDLE,
+                    handle.as_ref().as_u32().into(),
+                    *len as u32,
+                )
+            })
             .collect();
 
         let resp = self.device.read_multi(self.target, &reqs)?;
