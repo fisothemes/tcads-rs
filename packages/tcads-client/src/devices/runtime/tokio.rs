@@ -23,6 +23,7 @@ use tokio::sync::mpsc::error::TryRecvError;
 /// It is bound to a single target address ([`AmsAddr`]). Common target ports include:
 /// - **851** (and **801–899**): PLC runtimes (851 is the default first TC3 PLC task).
 /// - **301–399**: FreeTasks.
+#[derive(Clone)]
 pub struct RuntimeDevice {
     device: AdsDevice,
     target: AmsAddr,
