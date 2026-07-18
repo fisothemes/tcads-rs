@@ -319,49 +319,6 @@ impl RuntimeDevice {
         Ok(results.into_iter())
     }
 
-    /// Writes a value to the symbol as raw bytes using a handle.
-    pub fn write_bytes_by_handle(
-        &self,
-        handle: SymbolHandle,
-        data: impl Into<Vec<u8>>,
-    ) -> crate::Result<()> {
-        self.device.write(
-            self.target,
-            IndexGroup::SYMBOL_VALUE_BY_HANDLE,
-            handle.as_u32().into(),
-            data,
-        )
-    }
-
-    pub fn write_multi_as_bytes_by_handle<S: AsRef<SymbolHandle>, D: AsRef<[u8]>>(
-        &self,
-        items: impl AsRef<[(S, D)]>,
-    ) -> crate::Result<impl Iterator<Item = crate::Result<()>>> {
-        let reqs: Vec<_> = items
-            .as_ref()
-            .iter()
-            .map(|(handle, data)| {
-                SumWriteRequest::new(
-                    IndexGroup::SYMBOL_VALUE_BY_HANDLE,
-                    handle.as_ref().as_u32().into(),
-                    data.as_ref(),
-                )
-            })
-            .collect();
-
-        let resp = self.device.write_multi(self.target, &reqs)?;
-
-        let results = resp
-            .into_iter()
-            .map(|res| match res {
-                Ok(()) => Ok(()),
-                Err(err) => Err(crate::Error::from(err)),
-            })
-            .collect::<Vec<_>>();
-
-        Ok(results.into_iter())
-    }
-
     /// Reads raw bytes from a symbol directly using its absolute memory location
     /// ([`IndexGroup`] and [`IndexOffset`]) provided by its [`AdsSymbolInfo`].
     pub fn read_bytes_by_info(&self, info: &AdsSymbolInfo) -> crate::Result<Vec<u8>> {
@@ -498,6 +455,49 @@ impl RuntimeDevice {
         let guard = NotificationGuard::new(notif_handle, self.target, self.device.clone());
         let rx = ValueReceiver::new(rx, guard, cache, Arc::from(path), type_info);
         Ok((rx, notif_handle))
+    }
+
+    /// Writes a value to the symbol as raw bytes using a handle.
+    pub fn write_bytes_by_handle(
+        &self,
+        handle: SymbolHandle,
+        data: impl Into<Vec<u8>>,
+    ) -> crate::Result<()> {
+        self.device.write(
+            self.target,
+            IndexGroup::SYMBOL_VALUE_BY_HANDLE,
+            handle.as_u32().into(),
+            data,
+        )
+    }
+
+    pub fn write_multi_as_bytes_by_handle<S: AsRef<SymbolHandle>, D: AsRef<[u8]>>(
+        &self,
+        items: impl AsRef<[(S, D)]>,
+    ) -> crate::Result<impl Iterator<Item = crate::Result<()>>> {
+        let reqs: Vec<_> = items
+            .as_ref()
+            .iter()
+            .map(|(handle, data)| {
+                SumWriteRequest::new(
+                    IndexGroup::SYMBOL_VALUE_BY_HANDLE,
+                    handle.as_ref().as_u32().into(),
+                    data.as_ref(),
+                )
+            })
+            .collect();
+
+        let resp = self.device.write_multi(self.target, &reqs)?;
+
+        let results = resp
+            .into_iter()
+            .map(|res| match res {
+                Ok(()) => Ok(()),
+                Err(err) => Err(crate::Error::from(err)),
+            })
+            .collect::<Vec<_>>();
+
+        Ok(results.into_iter())
     }
 
     /// Writes raw bytes to a symbol directly using its absolute memory location
