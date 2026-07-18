@@ -1,8 +1,6 @@
 use crate::devices::tokio::AdsDevice;
 use crate::notif_guard::tokio::NotificationGuard;
-use std::collections::HashSet;
 use std::net::ToSocketAddrs;
-use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tcads_core::protocol::AdsLoggerWriteRequestOwned;
 use tcads_core::{
@@ -11,53 +9,6 @@ use tcads_core::{
 };
 use tokio::sync::mpsc::UnboundedReceiver as Receiver;
 use tokio::sync::mpsc::error::TryRecvError;
-
-/// Shared state of an async [`AdsDevice`] client for the TwinCAT system logger.
-///
-/// Held behind an [`Arc`] so all [`Logger`] clones share the same connection.
-/// Exposed as `pub` for power users who need direct access to the underlying
-/// dispatchers to build custom device abstractions on top of the
-/// same connection without going through the [`Logger`] API.
-///
-/// # Lifetime
-///
-/// All [`LogEntryReceiver`]s hold an [`Arc`] clone of this inner state.
-/// The underlying connection and handle tracking remain alive as long as
-/// either a [`Logger`] clone or a [`LogEntryReceiver`] exists.
-/// When the last reference is dropped, [`Drop`] fires and all active
-/// notification handles are deleted from the router.
-pub struct LoggerInner {
-    pub device: AdsDevice,
-    pub target: AmsAddr,
-    pub handles: Mutex<HashSet<NotificationHandle>>,
-}
-
-impl Drop for LoggerInner {
-    fn drop(&mut self) {
-        let Ok(mut handles) = self.handles.lock() else {
-            return;
-        };
-
-        if handles.is_empty() {
-            return;
-        }
-
-        let device = self.device.clone();
-        let target = self.target;
-        let handles_to_delete: Vec<_> = handles.drain().collect();
-
-        // Safely check for a Tokio runtime context before spawning the clean-up task
-        if let Ok(rt) = tokio::runtime::Handle::try_current() {
-            rt.spawn(async move {
-                for handle in handles_to_delete {
-                    let _ = device.delete_notification(target, handle).await;
-                }
-            });
-        }
-        // No runtime context, this is best-effort at best, router cleans up on connection close
-        // anyway. 100% safe to ignore.
-    }
-}
 
 /// An asynchronous [`AdsDevice`] client for the TwinCAT system logger on ADS port `100`.
 ///
@@ -68,7 +19,8 @@ impl Drop for LoggerInner {
 /// entries concurrently. Clean-up only happens when the last clone is dropped.
 #[derive(Clone)]
 pub struct Logger {
-    inner: Arc<LoggerInner>,
+    device: AdsDevice,
+    target: AmsAddr,
 }
 
 impl Logger {
@@ -128,11 +80,8 @@ impl Logger {
     /// `net_id` is used to construct the logger target address (`net_id:100`).
     pub fn new(device: AdsDevice, net_id: AmsNetId) -> Self {
         Self {
-            inner: Arc::new(LoggerInner {
-                device,
-                target: AmsAddr::new(net_id, AmsPort::LOGGER),
-                handles: Mutex::new(HashSet::new()),
-            }),
+            device,
+            target: AmsAddr::new(net_id, AmsPort::LOGGER),
         }
     }
 
@@ -140,17 +89,17 @@ impl Logger {
     ///
     /// See [`AdsDevice::shutdown`] for more details.
     pub async fn shutdown(&self) {
-        self.inner.device.shutdown().await
+        self.device.shutdown().await
     }
 
     /// Returns the target address of the logger.
     pub fn target(&self) -> AmsAddr {
-        self.inner.target
+        self.target
     }
 
     /// Returns a reference to the underlying [`AdsDevice`].
     pub fn get_ref(&self) -> &AdsDevice {
-        &self.inner.device
+        &self.device
     }
 
     /// Writes a log message to the TwinCAT logger using the current system time.
@@ -208,10 +157,9 @@ impl Logger {
     /// Multiple subscriptions can be active simultaneously.
     pub async fn subscribe(&self) -> crate::Result<(LogEntryReceiver, NotificationHandle)> {
         let (rx, handle) = self
-            .inner
             .device
             .add_notification(
-                self.inner.target,
+                self.target,
                 IndexGroup::SYSTEM_LOGGER,
                 IndexOffset::SYSTEM_LOGGER,
                 AdsNotificationAttrib::new(
@@ -223,43 +171,17 @@ impl Logger {
             )
             .await?;
 
-        match self.inner.handles.lock() {
-            Ok(mut handles) => {
-                handles.insert(handle);
-            }
-            Err(e) => {
-                let _ = self
-                    .inner
-                    .device
-                    .delete_notification(self.inner.target, handle)
-                    .await;
-                return Err(e.into());
-            }
-        };
+        let guard = NotificationGuard::new(handle, self.target, self.device.clone());
 
-        let guard = NotificationGuard::new(handle, self.inner.target, self.inner.device.clone());
-
-        Ok((
-            LogEntryReceiver::new(rx, guard, Arc::clone(&self.inner)),
-            handle,
-        ))
+        Ok((LogEntryReceiver::new(rx, guard), handle))
     }
 
     /// Explicitly cancels a subscription by its handle.
     ///
     /// The [`LogEntryReceiver`] associated with this handle will return
     /// [`Err(Error::Disconnected)`](crate::Error::Disconnected) on its next call.
-    ///
-    /// Dropping the [`LogEntryReceiver`] has the same effect and is preferred
-    /// in most cases.
     pub async fn unsubscribe(&self, handle: NotificationHandle) -> crate::Result<()> {
-        if let Ok(mut handles) = self.inner.handles.lock() {
-            handles.remove(&handle);
-        }
-        self.inner
-            .device
-            .delete_notification(self.inner.target, handle)
-            .await
+        self.device.delete_notification(self.target, handle).await
     }
 }
 
@@ -272,17 +194,12 @@ impl Logger {
 pub struct LogEntryReceiver {
     rx: Receiver<AdsNotificationSampleOwned>,
     guard: NotificationGuard,
-    inner: Arc<LoggerInner>,
 }
 
 impl LogEntryReceiver {
     /// Creates a new instance of the [`LogEntryReceiver`].
-    pub fn new(
-        rx: Receiver<AdsNotificationSampleOwned>,
-        guard: NotificationGuard,
-        inner: Arc<LoggerInner>,
-    ) -> Self {
-        Self { rx, guard, inner }
+    pub fn new(rx: Receiver<AdsNotificationSampleOwned>, guard: NotificationGuard) -> Self {
+        Self { rx, guard }
     }
 
     /// Returns the notification handle for this subscription.
@@ -316,15 +233,5 @@ impl LogEntryReceiver {
             Err(TryRecvError::Empty) => Ok(None),
             Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
         }
-    }
-}
-
-impl Drop for LogEntryReceiver {
-    fn drop(&mut self) {
-        let _ = self
-            .inner
-            .handles
-            .lock()
-            .map(|mut h| h.remove(&self.guard.handle()));
     }
 }
