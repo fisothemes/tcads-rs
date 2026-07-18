@@ -164,16 +164,19 @@ impl RuntimeDevice {
     /// Returns a [`SymbolVersionReceiver`] that decodes each notification into the new
     /// version byte. The subscription is cancelled automatically when the receiver is
     /// dropped, or explicitly via [`SymbolVersionReceiver::unsubscribe`].
-    pub fn subscribe_symbol_version(&self) -> crate::Result<SymbolVersionReceiver> {
-        let (rx, handle) = self.device.add_notification(
+    pub fn subscribe_symbol_version(
+        &self,
+    ) -> crate::Result<(SymbolVersionReceiver, NotificationHandle)> {
+        let (rx, notif_handle) = self.device.add_notification(
             self.target,
             IndexGroup::SYMBOL_VERSION,
             IndexOffset::ZERO,
             AdsNotificationAttrib::new(1, AdsTransMode::ServerOnChange, 0, 0),
         )?;
 
-        let guard = NotificationGuard::new(handle, self.target, self.device.clone());
-        Ok(SymbolVersionReceiver::new(rx, guard))
+        let guard = NotificationGuard::new(notif_handle, self.target, self.device.clone());
+        let rx = SymbolVersionReceiver::new(rx, guard);
+        Ok((rx, notif_handle))
     }
 
     /// Fetches a symbol handle by its instance path (e.g. `"MAIN.nCount"`)
@@ -467,7 +470,7 @@ impl RuntimeDevice {
         trans_mode: AdsTransMode,
         max_delay: u32,
         cycle_time: u32,
-    ) -> crate::Result<ValueReceiver<T>>
+    ) -> crate::Result<(ValueReceiver<T>, NotificationHandle)>
     where
         T: serde::de::DeserializeOwned,
     {
@@ -493,13 +496,8 @@ impl RuntimeDevice {
         )?;
 
         let guard = NotificationGuard::new(notif_handle, self.target, self.device.clone());
-        Ok(ValueReceiver::new(
-            rx,
-            guard,
-            cache,
-            Arc::from(path),
-            type_info,
-        ))
+        let rx = ValueReceiver::new(rx, guard, cache, Arc::from(path), type_info);
+        Ok((rx, notif_handle))
     }
 
     /// Writes raw bytes to a symbol directly using its absolute memory location
