@@ -762,6 +762,14 @@ impl RuntimeDevice {
         Ok(AdsTypeInfoIteratorOwned::new(raw_blob).map(|res| res.map_err(crate::Error::from)))
     }
 
+    /// Explicitly cancels a subscription to any notification created by this device.
+    ///
+    /// The receiver (i.e. [`ValueReceiver`] or [`SymbolVersionReceiver`]) associated with this
+    /// handle will return [`Err(Error::Disconnected)`](crate::Error::Disconnected) on its next call.
+    pub fn unsubscribe_notification(&self, handle: NotificationHandle) -> crate::Result<()> {
+        self.device.delete_notification(self.target, handle)
+    }
+
     /// Returns the lazily initialized [`SymbolCache`], creating it on first use.
     ///
     /// Creation needs the target's platform pointer size (one `get_upload_info`
