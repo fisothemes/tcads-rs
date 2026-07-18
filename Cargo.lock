@@ -520,6 +520,7 @@ version = "0.1.0"
 dependencies = [
  "tcads-client",
  "tcads-core",
+ "tcads-serde",
  "tcads-server",
 ]
 
@@ -555,7 +556,6 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "tcads",
- "tcads-serde",
  "tokio",
 ]
 

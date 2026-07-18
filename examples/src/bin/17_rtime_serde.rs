@@ -14,10 +14,9 @@
 //! Open `twincat/TcAdsExamples.sln` in TwinCAT XAE, activate the configuration
 //! on your local machine, and put the PLC into RUN mode.
 
-use serde::{Deserialize, Serialize};
 use tcads::client::devices::blocking::RuntimeDevice;
 use tcads::core::AmsAddr;
-use tcads_serde::{AdsTypeCache, TypeProvider};
+use tcads::serde::{AdsTypeCache, Deserialize, Serialize, TypeProvider};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -73,7 +72,7 @@ fn main() -> Result<()> {
 
     // 5. Serialize the Rust struct into PLC bytes.
     println!("Serializing Recipe to PLC byte layout...");
-    let write_buf = tcads_serde::to_vec(&recipe, type_info, &provider)?;
+    let write_buf = tcads::serde::to_vec(&recipe, type_info, &provider)?;
 
     // 6. Write the payload to the PLC.
     println!("Writing Recipe to '{}'...", symbol_name);
@@ -85,7 +84,7 @@ fn main() -> Result<()> {
 
     // 8. Deserialize the raw bytes back into a new Rust struct
     println!("Deserializing raw bytes into Rust struct...");
-    let updated_recipe: Recipe = tcads_serde::from_bytes(&read_buf, type_info, &provider)?;
+    let updated_recipe: Recipe = tcads::serde::from_bytes(&read_buf, type_info, &provider)?;
 
     println!("\n--- Success! Downloaded Recipe ---");
     println!("{:#?}", updated_recipe);

@@ -9,4 +9,5 @@ repository.workspace = true
 [dependencies]
 tcads-core = { workspace = true }
 tcads-client = { workspace = true }
+tcads-serde = { workspace = true }
 tcads-server = { workspace = true }
