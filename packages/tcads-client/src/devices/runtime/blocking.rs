@@ -1,6 +1,7 @@
 use super::symbol_cache::{SymbolCache, SymbolEntry};
 use crate::devices::blocking::AdsDevice;
 use crate::notif_guard::blocking::NotificationGuard;
+use std::collections::VecDeque;
 use std::marker::PhantomData;
 use std::net::ToSocketAddrs;
 use std::sync::mpsc::{Receiver, TryRecvError};
@@ -290,9 +291,9 @@ impl RuntimeDevice {
     }
 
     /// Reads multiple values as bytes using their handles.
-    pub fn read_multi_as_bytes_by_handle<S: AsRef<SymbolHandle>>(
+    pub fn read_multi_as_bytes_by_handle(
         &self,
-        items: impl AsRef<[(S, usize)]>,
+        items: impl AsRef<[(SymbolHandle, usize)]>,
     ) -> crate::Result<impl Iterator<Item = crate::Result<Vec<u8>>>> {
         let reqs: Vec<_> = items
             .as_ref()
@@ -300,7 +301,7 @@ impl RuntimeDevice {
             .map(|(handle, len)| {
                 SumReadRequest::new(
                     IndexGroup::SYMBOL_VALUE_BY_HANDLE,
-                    handle.as_ref().as_u32().into(),
+                    handle.as_u32().into(),
                     *len as u32,
                 )
             })
@@ -394,6 +395,14 @@ impl RuntimeDevice {
         tcads_serde::from_bytes(&bytes, &type_info, &*cache.types()?).map_err(Into::into)
     }
 
+    /// Reads a batch of symbol values.
+    pub fn read_multi_values<S: AsRef<str>>(
+        &self,
+        paths: impl IntoIterator<Item = S>,
+    ) -> crate::Result<ReadMultiValues> {
+        ReadMultiValues::read(self, paths)
+    }
+
     /// Subscribes to value-change notifications for a symbol by instance path.
     ///
     /// Resolves the symbol the same way [`read_value`](Self::read_value) does
@@ -471,9 +480,9 @@ impl RuntimeDevice {
         )
     }
 
-    pub fn write_multi_as_bytes_by_handle<S: AsRef<SymbolHandle>, D: AsRef<[u8]>>(
+    pub fn write_multi_as_bytes_by_handle<D: AsRef<[u8]>>(
         &self,
-        items: impl AsRef<[(S, D)]>,
+        items: impl AsRef<[(SymbolHandle, D)]>,
     ) -> crate::Result<impl Iterator<Item = crate::Result<()>>> {
         let reqs: Vec<_> = items
             .as_ref()
@@ -481,7 +490,7 @@ impl RuntimeDevice {
             .map(|(handle, data)| {
                 SumWriteRequest::new(
                     IndexGroup::SYMBOL_VALUE_BY_HANDLE,
-                    handle.as_ref().as_u32().into(),
+                    handle.as_u32().into(),
                     data.as_ref(),
                 )
             })
@@ -1051,5 +1060,131 @@ where
     /// when you want to know cancellation actually succeeded.
     pub fn unsubscribe(self) -> crate::Result<()> {
         self.guard.cancel()
+    }
+}
+
+#[derive(Clone)]
+pub struct ReadMultiValues {
+    cache: Arc<SymbolCache>,
+    entries: VecDeque<(Vec<u8>, Arc<AdsTypeInfo>)>,
+}
+
+impl ReadMultiValues {
+    /// Resolves and reads every symbol's value in one call.
+    pub fn read<S: AsRef<str>>(
+        device: &RuntimeDevice,
+        paths: impl IntoIterator<Item = S>,
+    ) -> crate::Result<Self> {
+        let mut handle_requests = Vec::new();
+        let mut type_infos = Vec::new();
+        let mut paths_str = Vec::new();
+
+        for path in paths {
+            let path_ref = path.as_ref();
+            let (_, entry_lock) = device.resolve_symbol(path_ref)?;
+
+            let (handle, size, type_info) = {
+                let guard = entry_lock.read()?;
+                (
+                    guard
+                        .handle()
+                        .expect("resolve_symbol always attaches a handle"),
+                    guard.size(),
+                    guard.type_info().clone(),
+                )
+            };
+
+            handle_requests.push((handle, size as usize));
+            type_infos.push(type_info);
+            paths_str.push(path_ref.to_string());
+        }
+
+        let cache = device.symbol_cache()?;
+
+        if handle_requests.is_empty() {
+            return Ok(Self {
+                cache,
+                entries: VecDeque::new(),
+            });
+        }
+        let mut entries = VecDeque::with_capacity(handle_requests.len());
+
+        let results = device.read_multi_as_bytes_by_handle(&handle_requests)?;
+
+        for ((result, type_info), path) in results.zip(type_infos).zip(paths_str) {
+            match result {
+                Ok(bytes) => entries.push_back((bytes, type_info)),
+                Err(err) => {
+                    return Err(device.map_stale(err, &cache, &path));
+                }
+            }
+        }
+
+        Ok(Self { cache, entries })
+    }
+
+    /// The number of not-yet-popped entries remaining.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns `true` if there are no more entries remaining.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Decodes and removes the earliest not-yet-popped entry (declaration
+    /// order). `None` once every entry has been popped; `Some(Err(_))` if
+    /// decoding this specific entry as `T` fails (e.g. `T` doesn't match the
+    /// PLC type), which doesn't affect any other entry.
+    pub fn pop_front<T>(&mut self) -> Option<crate::Result<T>>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let (bytes, type_info) = self.entries.pop_front()?;
+        Some(self.decode(&bytes, &type_info))
+    }
+
+    /// Same as [`pop_front`](Self::pop_front), but from the latest end instead.
+    pub fn pop_back<T>(&mut self) -> Option<crate::Result<T>>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let (bytes, type_info) = self.entries.pop_back()?;
+        Some(self.decode(&bytes, &type_info))
+    }
+
+    /// Decodes the entry at `index` (declaration order) without consuming it.
+    pub fn get<T: serde::de::DeserializeOwned>(&self, index: usize) -> Option<crate::Result<T>> {
+        let (bytes, type_info) = self.entries.get(index)?;
+        Some(self.decode(bytes, type_info))
+    }
+
+    fn decode<T: serde::de::DeserializeOwned>(
+        &self,
+        bytes: &[u8],
+        type_info: &AdsTypeInfo,
+    ) -> crate::Result<T> {
+        tcads_serde::from_bytes(bytes, type_info, &*self.cache.types()?).map_err(Into::into)
+    }
+}
+
+/// Iterator adapter over a [`ReadMulti`] where every entry decodes to the same `T`.
+/// Obtained via [`ReadMultiValues::into_iter_as`].
+pub struct ReadMultiValuesIter<T> {
+    inner: ReadMultiValues,
+    _marker: PhantomData<T>,
+}
+
+impl<T: serde::de::DeserializeOwned> Iterator for ReadMultiValuesIter<T> {
+    type Item = crate::Result<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.pop_front()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.inner.len();
+        (len, Some(len))
     }
 }
