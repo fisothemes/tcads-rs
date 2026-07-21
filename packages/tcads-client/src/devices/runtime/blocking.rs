@@ -1,7 +1,9 @@
 use super::symbol_cache::{SymbolCache, SymbolEntry};
 use crate::devices::blocking::AdsDevice;
 use crate::notif_guard::blocking::NotificationGuard;
+use indexmap::IndexSet;
 use std::collections::VecDeque;
+use std::hash::Hash;
 use std::marker::PhantomData;
 use std::net::ToSocketAddrs;
 use std::sync::mpsc::{Receiver, TryRecvError};
@@ -204,13 +206,12 @@ impl RuntimeDevice {
     }
 
     /// Fetches multiple symbol handles in a single network transaction.
-    pub fn get_multi_handles_by_name<S: AsRef<str>>(
+    pub fn get_multi_handles_by_name<'a, S: AsRef<str> + 'a + ?Sized>(
         &self,
-        names: impl AsRef<[S]>,
+        names: impl IntoIterator<Item = &'a S>,
     ) -> crate::Result<impl Iterator<Item = crate::Result<SymbolHandle>>> {
         let reqs: Vec<_> = names
-            .as_ref()
-            .iter()
+            .into_iter()
             .map(|name| {
                 SumReadWriteRequest::new(
                     IndexGroup::SYMBOL_HANDLE_BY_NAME,
@@ -396,7 +397,7 @@ impl RuntimeDevice {
     }
 
     /// Reads a batch of symbol values.
-    pub fn read_multi_values<S: AsRef<str>>(
+    pub fn read_multi_values<S: AsRef<str> + Eq + Hash>(
         &self,
         paths: impl IntoIterator<Item = S>,
     ) -> crate::Result<ReadMultiValues> {
@@ -650,13 +651,12 @@ impl RuntimeDevice {
 
     /// Fetches metadata for multiple TwinCAT symbols by their instance paths in
     /// a single network transaction.
-    pub fn get_multi_symbol_infos<S: AsRef<str>>(
+    pub fn get_multi_symbol_infos<'a, S: AsRef<str> + 'a + ?Sized>(
         &self,
-        names: impl AsRef<[S]>,
+        names: impl IntoIterator<Item = &'a S>,
     ) -> crate::Result<impl Iterator<Item = crate::Result<AdsSymbolInfo>>> {
         let reqs: Vec<_> = names
-            .as_ref()
-            .iter()
+            .into_iter()
             .map(|name| {
                 SumReadWriteRequest::new(
                     IndexGroup::SYMBOL_INFO_BY_NAME_EX,
@@ -716,13 +716,12 @@ impl RuntimeDevice {
     }
 
     /// Fetches multiple Data Type definitions in a single network transaction.
-    pub fn get_multi_type_infos<S: AsRef<str>>(
+    pub fn get_multi_type_infos<'a, S: AsRef<str> + 'a + ?Sized>(
         &self,
-        names: impl AsRef<[S]>,
+        names: impl IntoIterator<Item = &'a S>,
     ) -> crate::Result<impl Iterator<Item = crate::Result<AdsTypeInfo>>> {
         let reqs: Vec<_> = names
-            .as_ref()
-            .iter()
+            .into_iter()
             .map(|name| {
                 SumReadWriteRequest::new(
                     IndexGroup::DATA_TYPE_INFO_BY_NAME_EX,
@@ -850,6 +849,99 @@ impl RuntimeDevice {
             .get(path)?
             .expect("just inserted, or raced with a concurrent insert of the same path");
         Ok((cache, entry))
+    }
+
+    /// Resolves multiple symbols in a batched manner to prevent `O(N)` network
+    /// round-trips on cold starts.
+    ///
+    /// See [`resolve_symbol`](Self::resolve_symbol) for more details.
+    fn resolve_multi_symbols<S: AsRef<str> + Eq + Hash>(
+        &self,
+        paths: impl AsRef<[S]>,
+    ) -> crate::Result<(Arc<SymbolCache>, Vec<Arc<RwLock<SymbolEntry>>>)> {
+        let paths = paths.as_ref();
+        let cache = self.symbol_cache()?;
+
+        let mut missing_info_paths = IndexSet::new();
+        let mut missing_handle_paths = IndexSet::new();
+
+        for path in paths {
+            if let Some(entry) = cache.get(path.as_ref())? {
+                let has_handle = entry.read()?.handle().is_some();
+
+                if !has_handle {
+                    missing_handle_paths.insert(path);
+                }
+            } else {
+                missing_info_paths.insert(path);
+                missing_handle_paths.insert(path);
+            }
+        }
+
+        let mut fetched_infos = Vec::new();
+        if !missing_info_paths.is_empty() {
+            let infos = self.get_multi_symbol_infos(&missing_info_paths)?;
+
+            for info_res in infos {
+                fetched_infos.push(info_res?);
+            }
+
+            const MAX_FETCH_LEVELS: usize = 128;
+            for _ in 0..=MAX_FETCH_LEVELS {
+                let mut batch_missing_types = IndexSet::new();
+
+                for info in &fetched_infos {
+                    let missing = cache.missing_types(info.type_name())?;
+                    for t in missing {
+                        batch_missing_types.insert(t);
+                    }
+                }
+
+                if batch_missing_types.is_empty() {
+                    break;
+                }
+
+                let fetched_types: Vec<_> = self
+                    .get_multi_type_infos(&batch_missing_types)?
+                    .collect::<crate::Result<_>>()?;
+
+                cache.insert_types(fetched_types)?;
+            }
+        }
+
+        let mut fetched_handles = Vec::new();
+        if !missing_handle_paths.is_empty() {
+            let handles = self.get_multi_handles_by_name(&missing_handle_paths)?;
+
+            for handle_res in handles {
+                fetched_handles.push(handle_res?);
+            }
+        }
+
+        let mut info_iter = fetched_infos.into_iter();
+        let mut handle_iter = fetched_handles.into_iter();
+
+        for path in paths {
+            if missing_info_paths.contains(&path) {
+                let info = info_iter.next().unwrap();
+                let handle = handle_iter.next().unwrap();
+                let entry = cache.resolve_entry(info.type_name(), info.size())?;
+                cache.insert(Arc::from(path.as_ref()), entry.with_handle(handle))?;
+            } else if missing_handle_paths.contains(&path) {
+                let handle = handle_iter.next().unwrap();
+                cache.set_handle(path.as_ref(), handle)?;
+            }
+        }
+
+        let mut final_entries = Vec::with_capacity(paths.len());
+        for path in paths {
+            let entry = cache
+                .get(path.as_ref())?
+                .expect("Guaranteed by insertion above");
+            final_entries.push(entry);
+        }
+
+        Ok((cache, final_entries))
     }
 
     /// Maps a stale-symbol-version failure to [`Error::HandleInvalidated`](crate::Error::HandleInvalidated),
@@ -1071,56 +1163,51 @@ pub struct ReadMultiValues {
 
 impl ReadMultiValues {
     /// Resolves and reads every symbol's value in one call.
-    pub fn read<S: AsRef<str>>(
+    pub fn read<S: AsRef<str> + Eq + Hash>(
         device: &RuntimeDevice,
         paths: impl IntoIterator<Item = S>,
     ) -> crate::Result<Self> {
-        let mut handle_requests = Vec::new();
-        let mut type_infos = Vec::new();
-        let mut paths_str = Vec::new();
+        let paths_vec: Vec<S> = paths.into_iter().collect();
 
-        for path in paths {
-            let path_ref = path.as_ref();
-            let (_, entry_lock) = device.resolve_symbol(path_ref)?;
-
-            let (handle, size, type_info) = {
-                let guard = entry_lock.read()?;
-                (
-                    guard
-                        .handle()
-                        .expect("resolve_symbol always attaches a handle"),
-                    guard.size(),
-                    guard.type_info().clone(),
-                )
-            };
-
-            handle_requests.push((handle, size as usize));
-            type_infos.push(type_info);
-            paths_str.push(path_ref.to_string());
-        }
-
-        let cache = device.symbol_cache()?;
-
-        if handle_requests.is_empty() {
+        if paths_vec.is_empty() {
             return Ok(Self {
-                cache,
+                cache: device.symbol_cache()?,
                 entries: VecDeque::new(),
             });
         }
-        let mut entries = VecDeque::with_capacity(handle_requests.len());
+
+        let (cache, entries) = device.resolve_multi_symbols(&paths_vec)?;
+
+        let mut handle_requests = Vec::with_capacity(entries.len());
+        let mut type_infos = Vec::with_capacity(entries.len());
+
+        for entry_lock in entries {
+            let guard = entry_lock.read()?;
+            let handle = guard
+                .handle()
+                .expect("resolve_multi_symbols attaches handles");
+
+            handle_requests.push((handle, guard.size() as usize));
+            type_infos.push(guard.type_info().clone());
+        }
 
         let results = device.read_multi_as_bytes_by_handle(&handle_requests)?;
 
-        for ((result, type_info), path) in results.zip(type_infos).zip(paths_str) {
+        let mut read_entries = VecDeque::with_capacity(handle_requests.len());
+
+        for ((result, type_info), path) in results.zip(type_infos).zip(&paths_vec) {
             match result {
-                Ok(bytes) => entries.push_back((bytes, type_info)),
+                Ok(bytes) => read_entries.push_back((bytes, type_info)),
                 Err(err) => {
-                    return Err(device.map_stale(err, &cache, &path));
+                    return Err(device.map_stale(err, &cache, path.as_ref()));
                 }
             }
         }
 
-        Ok(Self { cache, entries })
+        Ok(Self {
+            cache,
+            entries: read_entries,
+        })
     }
 
     /// The number of not-yet-popped entries remaining.

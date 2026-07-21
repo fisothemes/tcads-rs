@@ -212,13 +212,12 @@ impl RuntimeDevice {
     }
 
     /// Fetches multiple symbol handles in a single network transaction.
-    pub async fn get_multi_handles_by_name<S: AsRef<str>>(
+    pub async fn get_multi_handles_by_name<'a, S: AsRef<str> + 'a + ?Sized>(
         &self,
-        names: impl AsRef<[S]>,
+        names: impl IntoIterator<Item = &'a S>,
     ) -> crate::Result<impl Iterator<Item = crate::Result<SymbolHandle>>> {
         let reqs: Vec<_> = names
-            .as_ref()
-            .iter()
+            .into_iter()
             .map(|name| {
                 SumReadWriteRequest::new(
                     IndexGroup::SYMBOL_HANDLE_BY_NAME,
@@ -674,13 +673,12 @@ impl RuntimeDevice {
 
     /// Fetches metadata for multiple TwinCAT symbols by their instance paths in
     /// a single network transaction.
-    pub async fn get_multi_symbol_infos<S: AsRef<str>>(
+    pub async fn get_multi_symbol_infos<'a, S: AsRef<str> + 'a + ?Sized>(
         &self,
-        names: impl AsRef<[S]>,
+        names: impl IntoIterator<Item = &'a S>,
     ) -> crate::Result<impl Iterator<Item = crate::Result<AdsSymbolInfo>>> {
         let reqs: Vec<_> = names
-            .as_ref()
-            .iter()
+            .into_iter()
             .map(|name| {
                 SumReadWriteRequest::new(
                     IndexGroup::SYMBOL_INFO_BY_NAME_EX,
@@ -747,13 +745,12 @@ impl RuntimeDevice {
     }
 
     /// Fetches multiple Data Type definitions in a single network transaction.
-    pub async fn get_multi_type_infos<S: AsRef<str>>(
+    pub async fn get_multi_type_infos<'a, S: AsRef<str> + 'a + ?Sized>(
         &self,
-        names: impl AsRef<[S]>,
+        names: impl IntoIterator<Item = &'a S>,
     ) -> crate::Result<impl Iterator<Item = crate::Result<AdsTypeInfo>>> {
         let reqs: Vec<_> = names
-            .as_ref()
-            .iter()
+            .into_iter()
             .map(|name| {
                 SumReadWriteRequest::new(
                     IndexGroup::DATA_TYPE_INFO_BY_NAME_EX,
