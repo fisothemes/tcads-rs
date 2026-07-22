@@ -206,21 +206,23 @@ impl RuntimeDevice {
     }
 
     /// Fetches multiple symbol handles in a single network transaction.
-    pub fn get_multi_handles_by_name<'a, S: AsRef<str> + 'a + ?Sized>(
+    pub fn get_multi_handles_by_name<'a, I, S>(
         &self,
-        names: impl IntoIterator<Item = &'a S>,
-    ) -> crate::Result<impl Iterator<Item = crate::Result<SymbolHandle>>> {
-        let reqs: Vec<_> = names
-            .into_iter()
-            .map(|name| {
-                SumReadWriteRequest::new(
-                    IndexGroup::SYMBOL_HANDLE_BY_NAME,
-                    IndexOffset::ZERO,
-                    4,
-                    name.as_ref().as_bytes(),
-                )
-            })
-            .collect();
+        names: I,
+    ) -> crate::Result<impl Iterator<Item = crate::Result<SymbolHandle>>>
+    where
+        I: IntoIterator<Item = &'a S>,
+        I::IntoIter: ExactSizeIterator,
+        S: AsRef<str> + 'a + ?Sized,
+    {
+        let reqs = names.into_iter().map(|name| {
+            SumReadWriteRequest::new(
+                IndexGroup::SYMBOL_HANDLE_BY_NAME,
+                IndexOffset::ZERO,
+                4,
+                name.as_ref().as_bytes(),
+            )
+        });
 
         let resp = self.device.read_write_multi(self.target, reqs)?;
 
@@ -248,30 +250,27 @@ impl RuntimeDevice {
     }
 
     /// Releases multiple symbol handles.
-    pub fn release_multi_handles(
+    pub fn release_multi_handles<'a, I>(
         &self,
-        handles: impl AsRef<[SymbolHandle]>,
-    ) -> crate::Result<impl Iterator<Item = crate::Result<()>>> {
-        let reqs: Vec<_> = handles
-            .as_ref()
-            .iter()
-            .map(|handle| {
-                SumWriteRequest::new(
-                    IndexGroup::SYMBOL_RELEASE_HANDLE,
-                    IndexOffset::ZERO,
-                    handle.as_bytes(),
-                )
-            })
-            .collect();
+        handles: I,
+    ) -> crate::Result<impl Iterator<Item = crate::Result<()>>>
+    where
+        I: IntoIterator<Item = &'a SymbolHandle>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let reqs = handles.into_iter().map(|handle| {
+            SumWriteRequest::new(
+                IndexGroup::SYMBOL_RELEASE_HANDLE,
+                IndexOffset::ZERO,
+                handle.as_bytes(),
+            )
+        });
 
         let resp = self.device.write_multi(self.target, reqs)?;
 
         let results = resp
             .into_iter()
-            .map(|res| match res {
-                Ok(()) => Ok(()),
-                Err(err) => Err(crate::Error::from(err)),
-            })
+            .map(|res| res.map_err(crate::Error::from))
             .collect::<Vec<_>>();
 
         Ok(results.into_iter())
@@ -292,23 +291,23 @@ impl RuntimeDevice {
     }
 
     /// Reads multiple values as bytes using their handles.
-    pub fn read_multi_as_bytes_by_handle(
+    pub fn read_multi_as_bytes_by_handle<'a, I>(
         &self,
-        items: impl AsRef<[(SymbolHandle, usize)]>,
-    ) -> crate::Result<impl Iterator<Item = crate::Result<Vec<u8>>>> {
-        let reqs: Vec<_> = items
-            .as_ref()
-            .iter()
-            .map(|(handle, len)| {
-                SumReadRequest::new(
-                    IndexGroup::SYMBOL_VALUE_BY_HANDLE,
-                    handle.as_u32().into(),
-                    *len as u32,
-                )
-            })
-            .collect();
+        items: I,
+    ) -> crate::Result<impl Iterator<Item = crate::Result<Vec<u8>>>>
+    where
+        I: IntoIterator<Item = &'a (SymbolHandle, usize)>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let reqs = items.into_iter().map(|(handle, len)| {
+            SumReadRequest::new(
+                IndexGroup::SYMBOL_VALUE_BY_HANDLE,
+                handle.as_u32().into(),
+                *len as u32,
+            )
+        });
 
-        let resp = self.device.read_multi(self.target, &reqs)?;
+        let resp = self.device.read_multi(self.target, reqs)?;
 
         let results = resp
             .into_iter()
@@ -335,17 +334,19 @@ impl RuntimeDevice {
     /// Reads raw bytes from multiple symbols directly using their absolute memory locations
     /// ([`IndexGroup`] and [`IndexOffset`]) provided by their [`AdsSymbolInfo`]s in a single
     /// network transaction.
-    pub fn read_multi_as_bytes_by_info(
+    pub fn read_multi_as_bytes_by_info<'a, I>(
         &self,
-        infos: impl AsRef<[AdsSymbolInfo]>,
-    ) -> crate::Result<impl Iterator<Item = crate::Result<Vec<u8>>>> {
-        let reqs: Vec<_> = infos
-            .as_ref()
-            .iter()
-            .map(|info| SumReadRequest::new(info.index_group(), info.index_offset(), info.size()))
-            .collect();
+        infos: I,
+    ) -> crate::Result<impl Iterator<Item = crate::Result<Vec<u8>>>>
+    where
+        I: IntoIterator<Item = &'a AdsSymbolInfo>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let reqs = infos
+            .into_iter()
+            .map(|info| SumReadRequest::new(info.index_group(), info.index_offset(), info.size()));
 
-        let resp = self.device.read_multi(self.target, &reqs)?;
+        let resp = self.device.read_multi(self.target, reqs)?;
 
         let results = resp
             .into_iter()
@@ -481,21 +482,22 @@ impl RuntimeDevice {
         )
     }
 
-    pub fn write_multi_as_bytes_by_handle<D: AsRef<[u8]>>(
+    pub fn write_multi_as_bytes_by_handle<'a, I, D>(
         &self,
-        items: impl AsRef<[(SymbolHandle, D)]>,
-    ) -> crate::Result<impl Iterator<Item = crate::Result<()>>> {
-        let reqs: Vec<_> = items
-            .as_ref()
-            .iter()
-            .map(|(handle, data)| {
-                SumWriteRequest::new(
-                    IndexGroup::SYMBOL_VALUE_BY_HANDLE,
-                    handle.as_u32().into(),
-                    data.as_ref(),
-                )
-            })
-            .collect();
+        items: I,
+    ) -> crate::Result<impl Iterator<Item = crate::Result<()>>>
+    where
+        I: IntoIterator<Item = &'a (SymbolHandle, D)>,
+        I::IntoIter: ExactSizeIterator,
+        D: AsRef<[u8]> + 'a,
+    {
+        let reqs = items.into_iter().map(|(handle, data)| {
+            SumWriteRequest::new(
+                IndexGroup::SYMBOL_VALUE_BY_HANDLE,
+                handle.as_u32().into(),
+                data.as_ref(),
+            )
+        });
 
         let resp = self.device.write_multi(self.target, reqs)?;
 
@@ -523,30 +525,29 @@ impl RuntimeDevice {
 
     /// Writes raw bytes to multiple symbols directly using their absolute memory locations
     /// provided by their [`AdsSymbolInfo`] in a single network transaction.
-    pub fn write_multi_as_bytes_by_info<S: AsRef<AdsSymbolInfo>, D: AsRef<[u8]>>(
+    pub fn write_multi_as_bytes_by_info<'a, I, S, D>(
         &self,
-        items: impl AsRef<[(S, D)]>,
-    ) -> crate::Result<impl Iterator<Item = crate::Result<()>>> {
-        let reqs: Vec<_> = items
-            .as_ref()
-            .iter()
-            .map(|(info, data)| {
-                SumWriteRequest::new(
-                    info.as_ref().index_group(),
-                    info.as_ref().index_offset(),
-                    data.as_ref(),
-                )
-            })
-            .collect();
+        items: I,
+    ) -> crate::Result<impl Iterator<Item = crate::Result<()>>>
+    where
+        I: IntoIterator<Item = &'a (S, D)>,
+        I::IntoIter: ExactSizeIterator,
+        S: AsRef<AdsSymbolInfo> + 'a,
+        D: AsRef<[u8]> + 'a,
+    {
+        let reqs = items.into_iter().map(|(info, data)| {
+            SumWriteRequest::new(
+                info.as_ref().index_group(),
+                info.as_ref().index_offset(),
+                data.as_ref(),
+            )
+        });
 
         let resp = self.device.write_multi(self.target, reqs)?;
 
         let results = resp
             .into_iter()
-            .map(|res| match res {
-                Ok(()) => Ok(()),
-                Err(err) => Err(crate::Error::from(err)),
-            })
+            .map(|res| res.map_err(crate::Error::from))
             .collect::<Vec<_>>();
 
         Ok(results.into_iter())
@@ -651,21 +652,23 @@ impl RuntimeDevice {
 
     /// Fetches metadata for multiple TwinCAT symbols by their instance paths in
     /// a single network transaction.
-    pub fn get_multi_symbol_infos<'a, S: AsRef<str> + 'a + ?Sized>(
+    pub fn get_multi_symbol_infos<'a, I, S>(
         &self,
-        names: impl IntoIterator<Item = &'a S>,
-    ) -> crate::Result<impl Iterator<Item = crate::Result<AdsSymbolInfo>>> {
-        let reqs: Vec<_> = names
-            .into_iter()
-            .map(|name| {
-                SumReadWriteRequest::new(
-                    IndexGroup::SYMBOL_INFO_BY_NAME_EX,
-                    IndexOffset::ZERO,
-                    1_048_576,
-                    name.as_ref().as_bytes(),
-                )
-            })
-            .collect();
+        names: I,
+    ) -> crate::Result<impl Iterator<Item = crate::Result<AdsSymbolInfo>>>
+    where
+        I: IntoIterator<Item = &'a S>,
+        I::IntoIter: ExactSizeIterator,
+        S: AsRef<str> + 'a + ?Sized,
+    {
+        let reqs = names.into_iter().map(|name| {
+            SumReadWriteRequest::new(
+                IndexGroup::SYMBOL_INFO_BY_NAME_EX,
+                IndexOffset::ZERO,
+                1_048_576, // assumed max size of a single entry, router will return the actual size
+                name.as_ref().as_bytes(),
+            )
+        });
 
         let resp = self.device.read_write_multi(self.target, reqs)?;
 
@@ -716,31 +719,33 @@ impl RuntimeDevice {
     }
 
     /// Fetches multiple Data Type definitions in a single network transaction.
-    pub fn get_multi_type_infos<'a, S: AsRef<str> + 'a + ?Sized>(
+    pub fn get_multi_type_infos<'a, I, S>(
         &self,
-        names: impl IntoIterator<Item = &'a S>,
-    ) -> crate::Result<impl Iterator<Item = crate::Result<AdsTypeInfo>>> {
-        let reqs: Vec<_> = names
-            .into_iter()
-            .map(|name| {
-                SumReadWriteRequest::new(
-                    IndexGroup::DATA_TYPE_INFO_BY_NAME_EX,
-                    IndexOffset::ZERO,
-                    1_048_576, // assumed max size of a single entry, router will return the actual size
-                    name.as_ref().as_bytes(),
-                )
-            })
-            .collect();
+        names: I,
+    ) -> crate::Result<impl Iterator<Item = crate::Result<AdsTypeInfo>>>
+    where
+        I: IntoIterator<Item = &'a S>,
+        I::IntoIter: ExactSizeIterator,
+        S: AsRef<str> + 'a + ?Sized,
+    {
+        let reqs = names.into_iter().map(|name| {
+            SumReadWriteRequest::new(
+                IndexGroup::DATA_TYPE_INFO_BY_NAME_EX,
+                IndexOffset::ZERO,
+                1_048_576, // assumed max size of a single entry, router will return the actual size
+                name.as_ref().as_bytes(),
+            )
+        });
 
-        let results: Vec<crate::Result<AdsTypeInfo>> = self
-            .device
-            .read_write_multi(self.target, reqs)?
-            .iter()
+        let resp = self.device.read_write_multi(self.target, reqs)?;
+
+        let results = resp
+            .into_iter()
             .map(|res| match res {
                 Ok(chunk) => AdsTypeInfo::try_from(chunk).map_err(crate::Error::from),
                 Err(err) => Err(crate::Error::from(err)),
             })
-            .collect();
+            .collect::<Vec<_>>();
 
         Ok(results.into_iter())
     }
@@ -1247,6 +1252,14 @@ impl ReadMultiValues {
         Some(self.decode(bytes, type_info))
     }
 
+    /// Adapts this into a plain [`Iterator`] for the common case where every
+    /// entry is the same type `T`. Backed by repeated [`pop_front`](Self::pop_front).
+    pub fn into_iter_as<T: serde::de::DeserializeOwned>(
+        self,
+    ) -> impl Iterator<Item = crate::Result<T>> {
+        ReadMultiValuesIter::new(self)
+    }
+
     fn decode<T: serde::de::DeserializeOwned>(
         &self,
         bytes: &[u8],
@@ -1261,6 +1274,16 @@ impl ReadMultiValues {
 pub struct ReadMultiValuesIter<T> {
     inner: ReadMultiValues,
     _marker: PhantomData<T>,
+}
+
+impl<T> ReadMultiValuesIter<T> {
+    /// Creates a new instance of [`ReadMultiValuesIter`].
+    pub fn new(r: ReadMultiValues) -> Self {
+        Self {
+            inner: r,
+            _marker: PhantomData,
+        }
+    }
 }
 
 impl<T: serde::de::DeserializeOwned> Iterator for ReadMultiValuesIter<T> {
