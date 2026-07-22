@@ -1,4 +1,4 @@
-//! Example 13: Batch requests (Sum Commands).
+//! Example 09: Batch requests (Sum Commands).
 //! Run with: `cargo run --bin 09_batch_requests`
 //!
 //! This example demonstrates how to use the `SumDevice` to resolve multiple symbol
@@ -40,7 +40,7 @@ fn main() -> Result<()> {
 
     println!("Resolving symbol handles...");
     let handles: Vec<u32> = device
-        .read_write_multi(target, &reqs)?
+        .read_write_multi(target, reqs)?
         .iter()
         .enumerate()
         .map(|(i, res)| {

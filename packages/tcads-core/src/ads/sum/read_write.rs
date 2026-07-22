@@ -181,10 +181,10 @@ pub struct SumReadWriteResponse<'a> {
 
 impl<'a> SumReadWriteResponse<'a> {
     /// Creates a new [`SumReadWriteResponse`] from a raw buffer and a slice of requests.
-    pub fn new(buffer: &'a [u8], requests: &[SumReadWriteRequest<'_>]) -> Self {
+    pub fn new(buffer: &'a [u8], request_count: usize) -> Self {
         Self {
             buffer,
-            request_count: requests.len(),
+            request_count,
         }
     }
 
@@ -240,10 +240,10 @@ pub struct SumReadWriteResponseOwned {
 
 impl SumReadWriteResponseOwned {
     /// Creates a new [`SumReadWriteResponseOwned`] from a raw buffer and a slice of requests.
-    pub const fn new(buffer: Vec<u8>, requests: &[SumReadWriteRequest<'_>]) -> Self {
+    pub const fn new(buffer: Vec<u8>, request_count: usize) -> Self {
         Self {
             buffer,
-            request_count: requests.len(),
+            request_count,
         }
     }
 
@@ -408,7 +408,7 @@ mod tests {
             SumReadWriteRequest::new(0xF003.into(), 0.into(), 4, b"GOOD\0"),
         ];
 
-        let response = SumReadWriteResponse::new(&buffer, &reqs);
+        let response = SumReadWriteResponse::new(&buffer, reqs.len());
         let mut iter = response.iter();
 
         assert_eq!(

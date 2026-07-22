@@ -154,19 +154,10 @@ impl SumAddNotificationResponse {
         }
 
         let offset = index * Self::ITEM_LENGTH;
-        let code = u32::from_le_bytes([
-            self.buffer[offset],
-            self.buffer[offset + 1],
-            self.buffer[offset + 2],
-            self.buffer[offset + 3],
-        ]);
+        let chunk = &self.buffer[offset..offset + Self::ITEM_LENGTH];
 
-        let handle_val = u32::from_le_bytes([
-            self.buffer[offset + 4],
-            self.buffer[offset + 5],
-            self.buffer[offset + 6],
-            self.buffer[offset + 7],
-        ]);
+        let code = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+        let handle_val = u32::from_le_bytes([chunk[4], chunk[5], chunk[6], chunk[7]]);
 
         match AdsReturnCode::from(code) {
             AdsReturnCode::Ok => Some(Ok(NotificationHandle::from(handle_val))),

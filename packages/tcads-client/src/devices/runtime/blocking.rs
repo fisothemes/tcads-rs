@@ -222,7 +222,7 @@ impl RuntimeDevice {
             })
             .collect();
 
-        let resp = self.device.read_write_multi(self.target, &reqs)?;
+        let resp = self.device.read_write_multi(self.target, reqs)?;
 
         let results = resp
             .into_iter()
@@ -264,7 +264,7 @@ impl RuntimeDevice {
             })
             .collect();
 
-        let resp = self.device.write_multi(self.target, &reqs)?;
+        let resp = self.device.write_multi(self.target, reqs)?;
 
         let results = resp
             .into_iter()
@@ -497,7 +497,7 @@ impl RuntimeDevice {
             })
             .collect();
 
-        let resp = self.device.write_multi(self.target, &reqs)?;
+        let resp = self.device.write_multi(self.target, reqs)?;
 
         let results = resp
             .into_iter()
@@ -539,7 +539,7 @@ impl RuntimeDevice {
             })
             .collect();
 
-        let resp = self.device.write_multi(self.target, &reqs)?;
+        let resp = self.device.write_multi(self.target, reqs)?;
 
         let results = resp
             .into_iter()
@@ -667,7 +667,7 @@ impl RuntimeDevice {
             })
             .collect();
 
-        let resp = self.device.read_write_multi(self.target, &reqs)?;
+        let resp = self.device.read_write_multi(self.target, reqs)?;
 
         let results = resp
             .into_iter()
@@ -734,7 +734,7 @@ impl RuntimeDevice {
 
         let results: Vec<crate::Result<AdsTypeInfo>> = self
             .device
-            .read_write_multi(self.target, &reqs)?
+            .read_write_multi(self.target, reqs)?
             .iter()
             .map(|res| match res {
                 Ok(chunk) => AdsTypeInfo::try_from(chunk).map_err(crate::Error::from),

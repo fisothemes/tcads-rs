@@ -228,7 +228,7 @@ impl RuntimeDevice {
             })
             .collect();
 
-        let resp = self.device.read_write_multi(self.target, &reqs).await?;
+        let resp = self.device.read_write_multi(self.target, reqs).await?;
 
         let results = resp
             .into_iter()
@@ -272,7 +272,7 @@ impl RuntimeDevice {
             })
             .collect();
 
-        let resp = self.device.write_multi(self.target, &reqs).await?;
+        let resp = self.device.write_multi(self.target, reqs).await?;
 
         let results = resp
             .into_iter()
@@ -507,7 +507,7 @@ impl RuntimeDevice {
             })
             .collect();
 
-        let resp = self.device.write_multi(self.target, &reqs).await?;
+        let resp = self.device.write_multi(self.target, reqs).await?;
 
         let results = resp
             .into_iter()
@@ -550,7 +550,7 @@ impl RuntimeDevice {
             })
             .collect();
 
-        let resp = self.device.write_multi(self.target, &reqs).await?;
+        let resp = self.device.write_multi(self.target, reqs).await?;
 
         let results = resp
             .into_iter()
@@ -691,7 +691,7 @@ impl RuntimeDevice {
 
         let results: Vec<crate::Result<AdsSymbolInfo>> = self
             .device
-            .read_write_multi(self.target, &reqs)
+            .read_write_multi(self.target, reqs)
             .await?
             .iter()
             .map(|res| match res {
@@ -763,7 +763,7 @@ impl RuntimeDevice {
 
         let results: Vec<crate::Result<AdsTypeInfo>> = self
             .device
-            .read_write_multi(self.target, &reqs)
+            .read_write_multi(self.target, reqs)
             .await?
             .iter()
             .map(|res| match res {

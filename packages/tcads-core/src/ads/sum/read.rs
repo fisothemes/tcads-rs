@@ -101,11 +101,11 @@ pub struct SumReadResponse<'a> {
 }
 
 impl<'a> SumReadResponse<'a> {
-    /// Creates a new [`SumReadResponse`] from a raw buffer and a slice of requests.
-    pub const fn new(buffer: &'a [u8], requests: &'a [SumReadRequest]) -> Self {
+    /// Creates a new [`SumReadResponse`] from a raw buffer and a request count.
+    pub const fn new(buffer: &'a [u8], request_count: usize) -> Self {
         Self {
             buffer,
-            request_count: requests.len(),
+            request_count,
         }
     }
 
@@ -167,11 +167,11 @@ pub struct SumReadResponseOwned {
 }
 
 impl SumReadResponseOwned {
-    /// Creates a new [`SumReadResponseOwned`] from a raw buffer and a slice of requests.
-    pub const fn new(buffer: Vec<u8>, requests: &[SumReadRequest]) -> Self {
+    /// Creates a new [`SumReadResponseOwned`] from a raw buffer and the number of requests.
+    pub fn new(buffer: Vec<u8>, request_count: usize) -> Self {
         Self {
             buffer,
-            request_count: requests.len(),
+            request_count,
         }
     }
 
@@ -250,21 +250,26 @@ impl<'a> Iterator for SumReadResponseIter<'a> {
         }
 
         let header = self.current_idx * 8;
+
+        let header_slice = self.buffer.get(header..header + 8)?;
+
         let err_code = AdsReturnCode::from_bytes([
-            self.buffer[header],
-            self.buffer[header + 1],
-            self.buffer[header + 2],
-            self.buffer[header + 3],
+            header_slice[0],
+            header_slice[1],
+            header_slice[2],
+            header_slice[3],
         ]);
         let returned_len = u32::from_le_bytes([
-            self.buffer[header + 4],
-            self.buffer[header + 5],
-            self.buffer[header + 6],
-            self.buffer[header + 7],
+            header_slice[4],
+            header_slice[5],
+            header_slice[6],
+            header_slice[7],
         ]) as usize;
 
-        let chunk = &self.buffer[self.data_offset..self.data_offset + returned_len];
-        self.data_offset += returned_len;
+        let chunk_end = self.data_offset.checked_add(returned_len)?;
+        let chunk = self.buffer.get(self.data_offset..chunk_end)?;
+
+        self.data_offset = chunk_end;
         self.current_idx += 1;
 
         match err_code {
@@ -301,7 +306,7 @@ mod tests {
             SumReadRequest::new(0x4020.into(), 4.into(), 4),
         ];
 
-        let response = SumReadResponse::new(&buffer, &reqs);
+        let response = SumReadResponse::new(&buffer, reqs.len());
         let mut iter = response.iter();
 
         assert_eq!(
