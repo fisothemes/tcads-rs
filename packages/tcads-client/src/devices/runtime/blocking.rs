@@ -860,7 +860,7 @@ impl RuntimeDevice {
     /// round-trips on cold starts.
     ///
     /// See [`resolve_symbol`](Self::resolve_symbol) for more details.
-    fn resolve_multi_symbols<S: AsRef<str> + Eq + Hash>(
+    fn resolve_multi_symbols<S: AsRef<str>>(
         &self,
         paths: impl AsRef<[S]>,
     ) -> crate::Result<(Arc<SymbolCache>, Vec<Arc<RwLock<SymbolEntry>>>)> {
@@ -875,11 +875,11 @@ impl RuntimeDevice {
                 let has_handle = entry.read()?.handle().is_some();
 
                 if !has_handle {
-                    missing_handle_paths.insert(path);
+                    missing_handle_paths.insert(path.as_ref());
                 }
             } else {
-                missing_info_paths.insert(path);
-                missing_handle_paths.insert(path);
+                missing_info_paths.insert(path.as_ref());
+                missing_handle_paths.insert(path.as_ref());
             }
         }
 
@@ -923,19 +923,29 @@ impl RuntimeDevice {
             }
         }
 
-        let mut info_iter = fetched_infos.into_iter();
-        let mut handle_iter = fetched_handles.into_iter();
+        let mut info_map = std::collections::HashMap::new();
+        for (path, info) in missing_info_paths.iter().zip(fetched_infos) {
+            info_map.insert(*path, info);
+        }
 
-        for path in paths {
-            if missing_info_paths.contains(&path) {
-                let info = info_iter.next().unwrap();
-                let handle = handle_iter.next().unwrap();
-                let entry = cache.resolve_entry(info.type_name(), info.size())?;
-                cache.insert(Arc::from(path.as_ref()), entry.with_handle(handle))?;
-            } else if missing_handle_paths.contains(&path) {
-                let handle = handle_iter.next().unwrap();
-                cache.set_handle(path.as_ref(), handle)?;
+        let mut handle_map = std::collections::HashMap::new();
+        for (path, handle) in missing_handle_paths.iter().zip(fetched_handles) {
+            handle_map.insert(*path, handle);
+        }
+
+        for path in &missing_info_paths {
+            let info = info_map.remove(path).expect("Matched zip");
+            let handle = handle_map.get(path).expect("Matched zip");
+            let entry = cache.resolve_entry(info.type_name(), info.size())?;
+            cache.insert(Arc::from(*path), entry.with_handle(*handle))?;
+        }
+
+        for path in &missing_handle_paths {
+            if missing_info_paths.contains(path) {
+                continue;
             }
+            let handle = handle_map.get(path).expect("Matched zip");
+            cache.set_handle(*path, *handle)?;
         }
 
         let mut final_entries = Vec::with_capacity(paths.len());
