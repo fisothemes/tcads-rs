@@ -497,7 +497,7 @@ impl RuntimeDevice {
         items: I,
     ) -> crate::Result<impl Iterator<Item = crate::Result<()>>>
     where
-        I: IntoIterator<Item = &'a (SymbolHandle, &'a [u8])>,
+        I: IntoIterator<Item = (SymbolHandle, &'a [u8])>,
         I::IntoIter: ExactSizeIterator,
     {
         let reqs = items.into_iter().map(|(handle, data)| {
