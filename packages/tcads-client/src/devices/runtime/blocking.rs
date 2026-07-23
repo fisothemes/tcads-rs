@@ -594,6 +594,11 @@ impl RuntimeDevice {
             .map_err(|err| self.map_stale(err, &cache, path))
     }
 
+    /// Creates a builder to write a batch of values.
+    pub fn write_multi_values(&self) -> WriteMultiValues<'_> {
+        WriteMultiValues::new(self)
+    }
+
     /// Flushes the symbol cache: every cached handle, symbol entry, and type.
     ///
     /// Call after a symbol-version notification or reconnect. Stale handles are
@@ -1302,5 +1307,172 @@ impl<T: serde::de::DeserializeOwned> Iterator for ReadMultiValuesIter<T> {
     fn size_hint(&self) -> (usize, Option<usize>) {
         let len = self.inner.len();
         (len, Some(len))
+    }
+}
+
+/// A type-erased closure that takes PLC type metadata, a reference to the cache,
+/// and optional RMW bytes, returning the serialized buffer.
+type SerializerFn<'a> =
+    Box<dyn FnOnce(&AdsTypeInfo, &SymbolCache, &mut [u8]) -> crate::Result<()> + 'a>;
+
+/// A builder for executing a heterogeneous batch write operation.
+pub struct WriteMultiValues<'a> {
+    device: &'a RuntimeDevice,
+    paths: Vec<String>,
+    serializers: Vec<SerializerFn<'a>>,
+}
+
+impl<'a> WriteMultiValues<'a> {
+    /// Creates a new instance of [`WriteMultiValues`].
+    pub fn new(device: &'a RuntimeDevice) -> Self {
+        Self {
+            device,
+            paths: Vec::new(),
+            serializers: Vec::new(),
+        }
+    }
+
+    /// Adds a symbol path and its value to the batch.
+    pub fn push<T: serde::Serialize + ?Sized>(
+        mut self,
+        path: impl Into<String>,
+        value: &'a T,
+    ) -> Self {
+        self.paths.push(path.into());
+
+        let serialize_fn: SerializerFn<'a> = Box::new(move |type_info, cache, buf| {
+            tcads_serde::to_bytes(value, buf, type_info, &*cache.types()?)?;
+            Ok(())
+        });
+
+        self.serializers.push(serialize_fn);
+        self
+    }
+
+    /// Executes the batch write operation.
+    ///
+    /// Returns `Ok(())` only if all variables were successfully read (for RMW),
+    /// serialized, and written.
+    pub fn execute(self) -> crate::Result<()> {
+        if self.paths.is_empty() {
+            return Ok(());
+        }
+
+        let (cache, entries) = self.device.resolve_multi_symbols(&self.paths)?;
+
+        struct Resolved {
+            handle: SymbolHandle,
+            size: usize,
+            type_info: Arc<AdsTypeInfo>,
+            requires_rmw: bool,
+        }
+
+        let mut final_results: Vec<Option<crate::Result<()>>> = vec![None; self.paths.len()];
+
+        let mut resolved: Vec<Option<Resolved>> = Vec::with_capacity(entries.len());
+        for entry_lock in &entries {
+            match entry_lock.read() {
+                Ok(guard) => resolved.push(Some(Resolved {
+                    handle: guard
+                        .handle()
+                        .expect("resolve_multi_symbols attaches handles"),
+                    size: guard.size() as usize,
+                    type_info: guard.type_info().clone(),
+                    requires_rmw: guard.requires_rmw(),
+                })),
+                Err(_) => resolved.push(None),
+            }
+        }
+
+        for (i, r) in resolved.iter().enumerate() {
+            if r.is_none() {
+                final_results[i] = Some(Err(crate::Error::PoisonedLock));
+            }
+        }
+
+        let mut slots: Vec<Option<(usize, usize)>> = vec![None; entries.len()];
+        let mut total_size = 0usize;
+        for (i, r) in resolved.iter().enumerate() {
+            if final_results[i].is_some() {
+                continue;
+            }
+            let r = r.as_ref().unwrap();
+            slots[i] = Some((total_size, r.size));
+            total_size += r.size;
+        }
+
+        let mut buf = vec![0u8; total_size];
+
+        let mut rmw_requests = Vec::new();
+        let mut rmw_indices = Vec::new();
+        for (i, r) in resolved.iter().enumerate() {
+            if final_results[i].is_some() {
+                continue;
+            }
+            let r = r.as_ref().unwrap();
+            if r.requires_rmw {
+                rmw_requests.push((r.handle, r.size));
+                rmw_indices.push(i);
+            }
+        }
+
+        if !rmw_requests.is_empty() {
+            let rmw_results = self
+                .device
+                .read_multi_as_bytes_by_handle(rmw_requests.iter().copied())?;
+            for (result, index) in rmw_results.zip(rmw_indices) {
+                match result {
+                    Ok(bytes) => {
+                        let (offset, size) = slots[index].expect("not marked failed above");
+                        buf[offset..offset + size].copy_from_slice(&bytes);
+                    }
+                    Err(e) => {
+                        final_results[index] =
+                            Some(Err(self.device.map_stale(e, &cache, &self.paths[index])));
+                    }
+                }
+            }
+        }
+
+        for (i, serializer) in self.serializers.into_iter().enumerate() {
+            if final_results[i].is_some() {
+                continue;
+            }
+            let r = resolved[i].as_ref().unwrap();
+            let (offset, size) = slots[i].expect("not marked failed above");
+            if let Err(e) = serializer(&r.type_info, &cache, &mut buf[offset..offset + size]) {
+                final_results[i] = Some(Err(e));
+            }
+        }
+
+        let mut write_items: Vec<(SymbolHandle, &[u8], usize)> = Vec::new();
+        for (i, r) in resolved.iter().enumerate() {
+            if final_results[i].is_some() {
+                continue;
+            }
+            let r = r.as_ref().unwrap();
+            let (offset, size) = slots[i].expect("not marked failed above");
+            write_items.push((r.handle, &buf[offset..offset + size], i));
+        }
+
+        if !write_items.is_empty() {
+            let write_results = self
+                .device
+                .write_multi_as_bytes_by_handle(write_items.iter().map(|(h, b, _)| (*h, *b)))?;
+            for (result, (_, _, idx)) in write_results.zip(&write_items) {
+                if let Err(e) = result {
+                    final_results[*idx] =
+                        Some(Err(self.device.map_stale(e, &cache, &self.paths[*idx])));
+                }
+            }
+        }
+
+        for result in final_results {
+            if let Some(Err(e)) = result {
+                return Err(e);
+            }
+        }
+
+        Ok(())
     }
 }
