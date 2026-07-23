@@ -17,7 +17,7 @@ pub fn to_bytes<T, P>(
     provider: &P,
 ) -> crate::Result<()>
 where
-    T: Serialize,
+    T: Serialize + ?Sized,
     P: TypeProvider,
 {
     let serializer = AdsSerializer::new(buf, type_info, provider);
@@ -28,7 +28,7 @@ where
 /// Serializes a Rust value into a byte vector, using the given PLC type metadata.
 pub fn to_vec<T, P>(value: &T, type_info: &AdsTypeInfo, provider: &P) -> crate::Result<Vec<u8>>
 where
-    T: Serialize,
+    T: Serialize + ?Sized,
     P: TypeProvider,
 {
     let mut buf = vec![0u8; type_info.size() as usize];
