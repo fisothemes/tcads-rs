@@ -301,19 +301,19 @@ impl RuntimeDevice {
     }
 
     /// Reads multiple values as bytes using their handles.
-    pub async fn read_multi_as_bytes_by_handle<'a, I>(
+    pub async fn read_multi_as_bytes_by_handle<I>(
         &self,
         items: I,
     ) -> crate::Result<impl Iterator<Item = crate::Result<Vec<u8>>>>
     where
-        I: IntoIterator<Item = &'a (SymbolHandle, usize)>,
+        I: IntoIterator<Item = (SymbolHandle, usize)>,
         I::IntoIter: ExactSizeIterator,
     {
         let reqs = items.into_iter().map(|(handle, len)| {
             SumReadRequest::new(
                 IndexGroup::SYMBOL_VALUE_BY_HANDLE,
                 handle.as_u32().into(),
-                *len as u32,
+                len as u32,
             )
         });
 
@@ -492,20 +492,19 @@ impl RuntimeDevice {
             .await
     }
 
-    pub async fn write_multi_as_bytes_by_handle<'a, I, D>(
+    pub async fn write_multi_as_bytes_by_handle<'a, I>(
         &self,
         items: I,
     ) -> crate::Result<impl Iterator<Item = crate::Result<()>>>
     where
-        I: IntoIterator<Item = &'a (SymbolHandle, D)>,
+        I: IntoIterator<Item = &'a (SymbolHandle, &'a [u8])>,
         I::IntoIter: ExactSizeIterator,
-        D: AsRef<[u8]> + 'a,
     {
         let reqs = items.into_iter().map(|(handle, data)| {
             SumWriteRequest::new(
                 IndexGroup::SYMBOL_VALUE_BY_HANDLE,
                 handle.as_u32().into(),
-                data.as_ref(),
+                data,
             )
         });
 
@@ -576,7 +575,7 @@ impl RuntimeDevice {
     /// See [`read_value`](Self::read_value) for caching and invalidation behavior.
     pub async fn write_value<T>(&self, path: impl AsRef<str>, value: &T) -> crate::Result<()>
     where
-        T: serde::Serialize,
+        T: serde::Serialize + ?Sized,
     {
         let path = path.as_ref();
         let (cache, entry) = self.resolve_symbol(path).await?;

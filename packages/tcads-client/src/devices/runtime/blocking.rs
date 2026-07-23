@@ -291,19 +291,19 @@ impl RuntimeDevice {
     }
 
     /// Reads multiple values as bytes using their handles.
-    pub fn read_multi_as_bytes_by_handle<'a, I>(
+    pub fn read_multi_as_bytes_by_handle<I>(
         &self,
         items: I,
     ) -> crate::Result<impl Iterator<Item = crate::Result<Vec<u8>>>>
     where
-        I: IntoIterator<Item = &'a (SymbolHandle, usize)>,
+        I: IntoIterator<Item = (SymbolHandle, usize)>,
         I::IntoIter: ExactSizeIterator,
     {
         let reqs = items.into_iter().map(|(handle, len)| {
             SumReadRequest::new(
                 IndexGroup::SYMBOL_VALUE_BY_HANDLE,
                 handle.as_u32().into(),
-                *len as u32,
+                len as u32,
             )
         });
 
@@ -482,20 +482,19 @@ impl RuntimeDevice {
         )
     }
 
-    pub fn write_multi_as_bytes_by_handle<'a, I, D>(
+    pub fn write_multi_as_bytes_by_handle<'a, I>(
         &self,
         items: I,
     ) -> crate::Result<impl Iterator<Item = crate::Result<()>>>
     where
-        I: IntoIterator<Item = &'a (SymbolHandle, D)>,
+        I: IntoIterator<Item = (SymbolHandle, &'a [u8])>,
         I::IntoIter: ExactSizeIterator,
-        D: AsRef<[u8]> + 'a,
     {
         let reqs = items.into_iter().map(|(handle, data)| {
             SumWriteRequest::new(
                 IndexGroup::SYMBOL_VALUE_BY_HANDLE,
                 handle.as_u32().into(),
-                data.as_ref(),
+                data,
             )
         });
 
@@ -503,10 +502,7 @@ impl RuntimeDevice {
 
         let results = resp
             .into_iter()
-            .map(|res| match res {
-                Ok(()) => Ok(()),
-                Err(err) => Err(crate::Error::from(err)),
-            })
+            .map(|res| res.map_err(crate::Error::from))
             .collect::<Vec<_>>();
 
         Ok(results.into_iter())
@@ -568,7 +564,7 @@ impl RuntimeDevice {
     /// See [`read_value`](Self::read_value) for caching and invalidation behavior.
     pub fn write_value<T>(&self, path: impl AsRef<str>, value: &T) -> crate::Result<()>
     where
-        T: serde::Serialize,
+        T: serde::Serialize + ?Sized,
     {
         let path = path.as_ref();
         let (cache, entry) = self.resolve_symbol(path)?;
@@ -1206,7 +1202,7 @@ impl ReadMultiValues {
             type_infos.push(guard.type_info().clone());
         }
 
-        let results = device.read_multi_as_bytes_by_handle(&handle_requests)?;
+        let results = device.read_multi_as_bytes_by_handle(handle_requests.iter().copied())?;
 
         let mut read_entries = VecDeque::with_capacity(handle_requests.len());
 
