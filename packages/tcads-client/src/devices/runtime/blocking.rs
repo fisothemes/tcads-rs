@@ -1179,7 +1179,7 @@ pub struct ReadMultiValues {
 
 impl ReadMultiValues {
     /// Resolves and reads every symbol's value in one call.
-    pub fn read<S: AsRef<str> + Eq + Hash>(
+    pub fn read<S: AsRef<str>>(
         device: &RuntimeDevice,
         paths: impl IntoIterator<Item = S>,
     ) -> crate::Result<Self> {
