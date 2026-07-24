@@ -1,6 +1,8 @@
+use super::multi;
 use super::symbol_cache::{SymbolCache, SymbolEntry};
 use crate::devices::tokio::AdsDevice;
 use crate::notif_guard::tokio::NotificationGuard;
+use std::collections::VecDeque;
 use std::marker::PhantomData;
 use std::net::ToSocketAddrs;
 use std::sync::{Arc, RwLock};
@@ -410,6 +412,16 @@ impl RuntimeDevice {
         tcads_serde::from_bytes(&bytes, &type_info, &*cache.types()?).map_err(Into::into)
     }
 
+    /// Reads a batch of symbol values.
+    ///
+    /// See [`read_value`](Self::read_value) for more details.
+    pub async fn read_multi_values<S: AsRef<str>>(
+        &self,
+        paths: impl IntoIterator<Item = S>,
+    ) -> crate::Result<ReadMultiValues> {
+        ReadMultiValues::read(self, paths).await
+    }
+
     /// Subscribes to value-change notifications for a symbol by instance path.
     ///
     /// Resolves the symbol the same way [`read_value`](Self::read_value) does
@@ -605,6 +617,14 @@ impl RuntimeDevice {
         self.write_bytes_by_handle(handle, buf)
             .await
             .map_err(|err| self.map_stale(err, &cache, path))
+    }
+
+    /// Creates a new instance of [`WriteMultiValues`] for executing a
+    /// heterogeneous batch write operation.
+    ///
+    /// See [`write_value`](Self::write_value) for more details.
+    pub fn write_multi_values(&self) -> WriteMultiValues<'_> {
+        WriteMultiValues::new(self)
     }
 
     /// Flushes the symbol cache: every cached handle, symbol entry, and type.
@@ -854,9 +874,8 @@ impl RuntimeDevice {
 
         let info = self.get_symbol_info(path).await?;
 
-        const MAX_FETCH_LEVELS: usize = 128;
         let mut entry = None;
-        for _ in 0..=MAX_FETCH_LEVELS {
+        for _ in 0..=multi::MAX_FETCH_LEVELS {
             let missing = cache.missing_types(info.type_name())?;
             if missing.is_empty() {
                 entry = Some(cache.resolve_entry(info.type_name(), info.size())?);
@@ -870,8 +889,9 @@ impl RuntimeDevice {
         }
         let entry = entry.ok_or_else(|| {
             crate::Error::Serde(tcads_serde::Error::Custom(format!(
-                "type closure of '{}' did not resolve within {MAX_FETCH_LEVELS} fetch levels",
+                "type closure of '{}' did not resolve within {} fetch levels",
                 info.type_name(),
+                multi::MAX_FETCH_LEVELS
             )))
         })?;
 
@@ -883,6 +903,60 @@ impl RuntimeDevice {
             .get(path)?
             .expect("just inserted, or raced with a concurrent insert of the same path");
         Ok((cache, entry))
+    }
+
+    /// Resolves multiple symbols in a batched manner to prevent O(N) network
+    /// round-trips on cold starts.
+    ///
+    /// See [`resolve_symbol`](Self::resolve_symbol) for more details.
+    async fn resolve_multi_symbols<S: AsRef<str>>(
+        &self,
+        paths: impl AsRef<[S]>,
+    ) -> crate::Result<(Arc<SymbolCache>, Vec<Arc<RwLock<SymbolEntry>>>)> {
+        let paths = paths.as_ref();
+        let cache = self.symbol_cache().await?;
+
+        let (missing_info_paths, missing_handle_paths) = multi::partition_missing(&cache, paths)?;
+
+        let mut fetched_infos = Vec::new();
+        if !missing_info_paths.is_empty() {
+            for info_res in self.get_multi_symbol_infos(&missing_info_paths).await? {
+                fetched_infos.push(info_res?);
+            }
+
+            for _ in 0..=multi::MAX_FETCH_LEVELS {
+                let missing = multi::batch_missing_types(&cache, &fetched_infos)?;
+                if missing.is_empty() {
+                    break;
+                }
+                let fetched_types: Vec<_> = self
+                    .get_multi_type_infos(&missing)
+                    .await?
+                    .collect::<crate::Result<_>>()?;
+                cache.insert_types(fetched_types)?;
+            }
+        }
+
+        let mut fetched_handles = Vec::new();
+        if !missing_handle_paths.is_empty() {
+            for handle_res in self
+                .get_multi_handles_by_name(&missing_handle_paths)
+                .await?
+            {
+                fetched_handles.push(handle_res?);
+            }
+        }
+
+        multi::apply_resolved(
+            &cache,
+            &missing_info_paths,
+            &missing_handle_paths,
+            fetched_infos,
+            fetched_handles,
+        )?;
+
+        let entries = multi::collect_entries(&cache, paths)?;
+        Ok((cache, entries))
     }
 
     /// Maps a stale-symbol-version failure to [`Error::HandleInvalidated`](crate::Error::HandleInvalidated),
@@ -1063,5 +1137,244 @@ where
     /// when you want to know cancellation actually succeeded.
     pub async fn unsubscribe(self) -> crate::Result<()> {
         self.guard.cancel().await
+    }
+}
+
+/// The result of a batch read obtained by calling [`RuntimeDevice::read_multi_values`]
+/// or [`ReadMultiValues::read`].
+#[derive(Clone)]
+pub struct ReadMultiValues {
+    cache: Arc<SymbolCache>,
+    entries: VecDeque<(Vec<u8>, Arc<AdsTypeInfo>)>,
+}
+
+impl ReadMultiValues {
+    /// Resolves and reads every symbol's value in one call.
+    pub async fn read<S: AsRef<str>>(
+        device: &RuntimeDevice,
+        paths: impl IntoIterator<Item = S>,
+    ) -> crate::Result<Self> {
+        let paths_vec: Vec<S> = paths.into_iter().collect();
+
+        if paths_vec.is_empty() {
+            return Ok(Self {
+                cache: device.symbol_cache().await?,
+                entries: VecDeque::new(),
+            });
+        }
+
+        let (cache, entries) = device.resolve_multi_symbols(&paths_vec).await?;
+
+        let mut handle_requests = Vec::with_capacity(entries.len());
+        let mut type_infos = Vec::with_capacity(entries.len());
+
+        for entry_lock in entries {
+            let guard = entry_lock.read()?;
+            let handle = guard
+                .handle()
+                .expect("resolve_multi_symbols attaches handles");
+
+            handle_requests.push((handle, guard.size() as usize));
+            type_infos.push(guard.type_info().clone());
+        }
+
+        let results = device
+            .read_multi_as_bytes_by_handle(handle_requests.iter().copied())
+            .await?;
+
+        let mut read_entries = VecDeque::with_capacity(handle_requests.len());
+
+        for ((result, type_info), path) in results.zip(type_infos).zip(&paths_vec) {
+            match result {
+                Ok(bytes) => read_entries.push_back((bytes, type_info)),
+                Err(err) => {
+                    return Err(device.map_stale(err, &cache, path.as_ref()));
+                }
+            }
+        }
+
+        Ok(Self {
+            cache,
+            entries: read_entries,
+        })
+    }
+
+    /// The number of not-yet-popped entries remaining.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Returns `true` if there are no more entries remaining.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Decodes and removes the earliest not-yet-popped entry (declaration
+    /// order). `None` once every entry has been popped; `Some(Err(_))` if
+    /// decoding this specific entry as `T` fails (e.g. `T` doesn't match the
+    /// PLC type), which doesn't affect any other entry.
+    pub fn pop_front<T>(&mut self) -> Option<crate::Result<T>>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let (bytes, type_info) = self.entries.pop_front()?;
+        Some(self.decode(&bytes, &type_info))
+    }
+
+    /// Same as [`pop_front`](Self::pop_front), but from the latest end instead.
+    pub fn pop_back<T>(&mut self) -> Option<crate::Result<T>>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let (bytes, type_info) = self.entries.pop_back()?;
+        Some(self.decode(&bytes, &type_info))
+    }
+
+    /// Decodes the entry at `index` (declaration order) without consuming it.
+    pub fn get<T: serde::de::DeserializeOwned>(&self, index: usize) -> Option<crate::Result<T>> {
+        let (bytes, type_info) = self.entries.get(index)?;
+        Some(self.decode(bytes, type_info))
+    }
+
+    /// Adapts this into a plain [`Iterator`] for the common case where every
+    /// entry is the same type `T`. Backed by repeated [`pop_front`](Self::pop_front).
+    pub fn into_iter_as<T: serde::de::DeserializeOwned>(
+        self,
+    ) -> impl Iterator<Item = crate::Result<T>> {
+        ReadMultiValuesIter::new(self)
+    }
+
+    fn decode<T: serde::de::DeserializeOwned>(
+        &self,
+        bytes: &[u8],
+        type_info: &AdsTypeInfo,
+    ) -> crate::Result<T> {
+        multi::decode(&self.cache, bytes, type_info)
+    }
+}
+
+/// Iterator adapter over a [`ReadMultiValues`] where every entry decodes to the same `T`.
+/// Obtained via [`ReadMultiValues::into_iter_as`].
+pub struct ReadMultiValuesIter<T> {
+    inner: ReadMultiValues,
+    _marker: PhantomData<T>,
+}
+
+impl<T> ReadMultiValuesIter<T> {
+    /// Creates a new instance of [`ReadMultiValuesIter`].
+    pub fn new(r: ReadMultiValues) -> Self {
+        Self {
+            inner: r,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<T: serde::de::DeserializeOwned> Iterator for ReadMultiValuesIter<T> {
+    type Item = crate::Result<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.pop_front()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.inner.len();
+        (len, Some(len))
+    }
+}
+
+/// A builder for executing a heterogeneous batch write operation.
+pub struct WriteMultiValues<'a> {
+    device: &'a RuntimeDevice,
+    paths: Vec<String>,
+    serializers: Vec<multi::SerializerFn<'a>>,
+}
+
+impl<'a> WriteMultiValues<'a> {
+    /// Creates a new instance of [`WriteMultiValues`].
+    pub fn new(device: &'a RuntimeDevice) -> Self {
+        Self {
+            device,
+            paths: Vec::new(),
+            serializers: Vec::new(),
+        }
+    }
+
+    /// Adds a symbol path and its value to the batch.
+    pub fn push<T: serde::Serialize + ?Sized>(
+        mut self,
+        path: impl Into<String>,
+        value: &'a T,
+    ) -> Self {
+        self.paths.push(path.into());
+        self.serializers.push(multi::make_serializer(value));
+        self
+    }
+
+    /// Adds many symbol paths and values of the same type in one call.
+    /// Equivalent to calling [`push`](Self::push) in a loop.
+    pub fn push_all<S, T>(self, items: impl IntoIterator<Item = (S, &'a T)>) -> Self
+    where
+        S: Into<String>,
+        T: serde::Serialize + ?Sized + 'a,
+    {
+        items
+            .into_iter()
+            .fold(self, |acc, (path, value)| acc.push(path, value))
+    }
+
+    /// Executes the batch write operation.
+    ///
+    /// Returns `Ok(())` only if all variables were successfully read (for RMW),
+    /// serialized, and written.
+    pub async fn execute(self) -> crate::Result<()> {
+        if self.paths.is_empty() {
+            return Ok(());
+        }
+
+        let (cache, entries) = self.device.resolve_multi_symbols(&self.paths).await?;
+        let (resolved, mut failures) = multi::gather_resolved(&entries);
+        let (mut buf, slots) = multi::plan_write_buffer(&resolved, &failures);
+
+        let (rmw_requests, rmw_indices) = multi::collect_rmw_requests(&resolved, &failures);
+        if !rmw_requests.is_empty() {
+            let rmw_results = self
+                .device
+                .read_multi_as_bytes_by_handle(rmw_requests.iter().copied())
+                .await?;
+            for (result, index) in rmw_results.zip(rmw_indices) {
+                match result {
+                    Ok(bytes) => multi::apply_rmw_bytes(&mut buf, &slots, index, &bytes),
+                    Err(e) => {
+                        failures[index] =
+                            Some(Err(self.device.map_stale(e, &cache, &self.paths[index])));
+                    }
+                }
+            }
+        }
+
+        multi::serialize_all(
+            self.serializers,
+            &resolved,
+            &slots,
+            &cache,
+            &mut buf,
+            &mut failures,
+        );
+
+        let write_items = multi::collect_write_items(&resolved, &failures, &slots, &buf);
+        if !write_items.is_empty() {
+            let write_results = self
+                .device
+                .write_multi_as_bytes_by_handle(write_items.iter().map(|(h, b, _)| (*h, *b)))
+                .await?;
+            for (result, (_, _, idx)) in write_results.zip(&write_items) {
+                if let Err(e) = result {
+                    failures[*idx] = Some(Err(self.device.map_stale(e, &cache, &self.paths[*idx])));
+                }
+            }
+        }
+
+        multi::first_failure(failures)
     }
 }

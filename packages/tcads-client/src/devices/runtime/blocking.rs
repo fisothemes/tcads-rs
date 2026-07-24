@@ -1,7 +1,7 @@
+use super::multi;
 use super::symbol_cache::{SymbolCache, SymbolEntry};
 use crate::devices::blocking::AdsDevice;
 use crate::notif_guard::blocking::NotificationGuard;
-use indexmap::IndexSet;
 use std::collections::VecDeque;
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -398,6 +398,8 @@ impl RuntimeDevice {
     }
 
     /// Reads a batch of symbol values.
+    ///
+    /// See [`read_value`](Self::read_value) for more details.
     pub fn read_multi_values<S: AsRef<str> + Eq + Hash>(
         &self,
         paths: impl IntoIterator<Item = S>,
@@ -594,7 +596,10 @@ impl RuntimeDevice {
             .map_err(|err| self.map_stale(err, &cache, path))
     }
 
-    /// Creates a builder to write a batch of values.
+    /// Creates a new instance of [`WriteMultiValues`] for executing a
+    /// heterogeneous batch write operation.
+    ///
+    /// See [`write_value`](Self::write_value) for more details.
     pub fn write_multi_values(&self) -> WriteMultiValues<'_> {
         WriteMultiValues::new(self)
     }
@@ -826,9 +831,9 @@ impl RuntimeDevice {
         }
 
         let info = self.get_symbol_info(path)?;
-        const MAX_FETCH_LEVELS: usize = 128;
+
         let mut entry = None;
-        for _ in 0..=MAX_FETCH_LEVELS {
+        for _ in 0..=multi::MAX_FETCH_LEVELS {
             let missing = cache.missing_types(info.type_name())?;
             if missing.is_empty() {
                 entry = Some(cache.resolve_entry(info.type_name(), info.size())?);
@@ -842,8 +847,9 @@ impl RuntimeDevice {
 
         let entry = entry.ok_or_else(|| {
             crate::Error::Serde(tcads_serde::Error::Custom(format!(
-                "type closure of '{}' did not resolve within {MAX_FETCH_LEVELS} fetch levels",
+                "type closure of '{}' did not resolve within {} fetch levels",
                 info.type_name(),
+                multi::MAX_FETCH_LEVELS,
             )))
         })?;
 
@@ -868,96 +874,43 @@ impl RuntimeDevice {
         let paths = paths.as_ref();
         let cache = self.symbol_cache()?;
 
-        let mut missing_info_paths = IndexSet::new();
-        let mut missing_handle_paths = IndexSet::new();
-
-        for path in paths {
-            if let Some(entry) = cache.get(path.as_ref())? {
-                let has_handle = entry.read()?.handle().is_some();
-
-                if !has_handle {
-                    missing_handle_paths.insert(path.as_ref());
-                }
-            } else {
-                missing_info_paths.insert(path.as_ref());
-                missing_handle_paths.insert(path.as_ref());
-            }
-        }
+        let (missing_info_paths, missing_handle_paths) = multi::partition_missing(&cache, paths)?;
 
         let mut fetched_infos = Vec::new();
         if !missing_info_paths.is_empty() {
-            let infos = self.get_multi_symbol_infos(&missing_info_paths)?;
-
-            for info_res in infos {
+            for info_res in self.get_multi_symbol_infos(&missing_info_paths)? {
                 fetched_infos.push(info_res?);
             }
 
-            const MAX_FETCH_LEVELS: usize = 128;
-            for _ in 0..=MAX_FETCH_LEVELS {
-                let mut batch_missing_types = IndexSet::new();
-
-                for info in &fetched_infos {
-                    let missing = cache.missing_types(info.type_name())?;
-                    for t in missing {
-                        batch_missing_types.insert(t);
-                    }
-                }
-
-                if batch_missing_types.is_empty() {
+            for _ in 0..=multi::MAX_FETCH_LEVELS {
+                let missing = multi::batch_missing_types(&cache, &fetched_infos)?;
+                if missing.is_empty() {
                     break;
                 }
-
                 let fetched_types: Vec<_> = self
-                    .get_multi_type_infos(&batch_missing_types)?
+                    .get_multi_type_infos(&missing)?
                     .collect::<crate::Result<_>>()?;
-
                 cache.insert_types(fetched_types)?;
             }
         }
 
         let mut fetched_handles = Vec::new();
         if !missing_handle_paths.is_empty() {
-            let handles = self.get_multi_handles_by_name(&missing_handle_paths)?;
-
-            for handle_res in handles {
+            for handle_res in self.get_multi_handles_by_name(&missing_handle_paths)? {
                 fetched_handles.push(handle_res?);
             }
         }
 
-        let mut info_map = std::collections::HashMap::new();
-        for (path, info) in missing_info_paths.iter().zip(fetched_infos) {
-            info_map.insert(*path, info);
-        }
+        multi::apply_resolved(
+            &cache,
+            &missing_info_paths,
+            &missing_handle_paths,
+            fetched_infos,
+            fetched_handles,
+        )?;
 
-        let mut handle_map = std::collections::HashMap::new();
-        for (path, handle) in missing_handle_paths.iter().zip(fetched_handles) {
-            handle_map.insert(*path, handle);
-        }
-
-        for path in &missing_info_paths {
-            let info = info_map.remove(path).expect("Matched zip");
-            let handle = handle_map.get(path).expect("Matched zip");
-            let entry = cache.resolve_entry(info.type_name(), info.size())?;
-            cache.insert(Arc::from(*path), entry.with_handle(*handle))?;
-        }
-
-        for path in &missing_handle_paths {
-            if missing_info_paths.contains(path) {
-                continue;
-            }
-            let handle = handle_map.get(path).expect("Matched zip");
-            cache.set_handle(*path, *handle)?;
-        }
-
-        let mut final_entries = Vec::with_capacity(paths.len());
-        for path in paths {
-            let entry = cache
-                .get(path.as_ref())?
-                .expect("Guaranteed by insertion above");
-            final_entries.push(entry);
-        }
-
-        Ok((cache, final_entries))
+        let entries = multi::collect_entries(&cache, paths)?;
+        Ok((cache, entries))
     }
 
     /// Maps a stale-symbol-version failure to [`Error::HandleInvalidated`](crate::Error::HandleInvalidated),
@@ -1171,6 +1124,8 @@ where
     }
 }
 
+/// The result of a batch read obtained by calling [`RuntimeDevice::read_multi_values`]
+/// or [`ReadMultiValues::read`].
 #[derive(Clone)]
 pub struct ReadMultiValues {
     cache: Arc<SymbolCache>,
@@ -1276,7 +1231,7 @@ impl ReadMultiValues {
         bytes: &[u8],
         type_info: &AdsTypeInfo,
     ) -> crate::Result<T> {
-        tcads_serde::from_bytes(bytes, type_info, &*self.cache.types()?).map_err(Into::into)
+        multi::decode(&self.cache, bytes, type_info)
     }
 }
 
@@ -1310,16 +1265,11 @@ impl<T: serde::de::DeserializeOwned> Iterator for ReadMultiValuesIter<T> {
     }
 }
 
-/// A type-erased closure that takes PLC type metadata, a reference to the cache,
-/// and optional RMW bytes, returning the serialized buffer.
-type SerializerFn<'a> =
-    Box<dyn FnOnce(&AdsTypeInfo, &SymbolCache, &mut [u8]) -> crate::Result<()> + 'a>;
-
 /// A builder for executing a heterogeneous batch write operation.
 pub struct WriteMultiValues<'a> {
     device: &'a RuntimeDevice,
     paths: Vec<String>,
-    serializers: Vec<SerializerFn<'a>>,
+    serializers: Vec<multi::SerializerFn<'a>>,
 }
 
 impl<'a> WriteMultiValues<'a> {
@@ -1339,14 +1289,20 @@ impl<'a> WriteMultiValues<'a> {
         value: &'a T,
     ) -> Self {
         self.paths.push(path.into());
-
-        let serialize_fn: SerializerFn<'a> = Box::new(move |type_info, cache, buf| {
-            tcads_serde::to_bytes(value, buf, type_info, &*cache.types()?)?;
-            Ok(())
-        });
-
-        self.serializers.push(serialize_fn);
+        self.serializers.push(multi::make_serializer(value));
         self
+    }
+
+    //// Adds many symbol paths and values of the same type in one call.
+    /// Equivalent to calling [`push`](Self::push) in a loop.
+    pub fn push_all<S, T>(self, items: impl IntoIterator<Item = (S, &'a T)>) -> Self
+    where
+        S: Into<String>,
+        T: serde::Serialize + ?Sized + 'a,
+    {
+        items
+            .into_iter()
+            .fold(self, |acc, (path, value)| acc.push(path, value))
     }
 
     /// Executes the batch write operation.
@@ -1359,120 +1315,46 @@ impl<'a> WriteMultiValues<'a> {
         }
 
         let (cache, entries) = self.device.resolve_multi_symbols(&self.paths)?;
+        let (resolved, mut failures) = multi::gather_resolved(&entries);
+        let (mut buf, slots) = multi::plan_write_buffer(&resolved, &failures);
 
-        struct Resolved {
-            handle: SymbolHandle,
-            size: usize,
-            type_info: Arc<AdsTypeInfo>,
-            requires_rmw: bool,
-        }
-
-        let mut final_results: Vec<Option<crate::Result<()>>> = vec![None; self.paths.len()];
-
-        let mut resolved: Vec<Option<Resolved>> = Vec::with_capacity(entries.len());
-        for entry_lock in &entries {
-            match entry_lock.read() {
-                Ok(guard) => resolved.push(Some(Resolved {
-                    handle: guard
-                        .handle()
-                        .expect("resolve_multi_symbols attaches handles"),
-                    size: guard.size() as usize,
-                    type_info: guard.type_info().clone(),
-                    requires_rmw: guard.requires_rmw(),
-                })),
-                Err(_) => resolved.push(None),
-            }
-        }
-
-        for (i, r) in resolved.iter().enumerate() {
-            if r.is_none() {
-                final_results[i] = Some(Err(crate::Error::PoisonedLock));
-            }
-        }
-
-        let mut slots: Vec<Option<(usize, usize)>> = vec![None; entries.len()];
-        let mut total_size = 0usize;
-        for (i, r) in resolved.iter().enumerate() {
-            if final_results[i].is_some() {
-                continue;
-            }
-            let r = r.as_ref().unwrap();
-            slots[i] = Some((total_size, r.size));
-            total_size += r.size;
-        }
-
-        let mut buf = vec![0u8; total_size];
-
-        let mut rmw_requests = Vec::new();
-        let mut rmw_indices = Vec::new();
-        for (i, r) in resolved.iter().enumerate() {
-            if final_results[i].is_some() {
-                continue;
-            }
-            let r = r.as_ref().unwrap();
-            if r.requires_rmw {
-                rmw_requests.push((r.handle, r.size));
-                rmw_indices.push(i);
-            }
-        }
-
+        let (rmw_requests, rmw_indices) = multi::collect_rmw_requests(&resolved, &failures);
         if !rmw_requests.is_empty() {
             let rmw_results = self
                 .device
                 .read_multi_as_bytes_by_handle(rmw_requests.iter().copied())?;
             for (result, index) in rmw_results.zip(rmw_indices) {
                 match result {
-                    Ok(bytes) => {
-                        let (offset, size) = slots[index].expect("not marked failed above");
-                        buf[offset..offset + size].copy_from_slice(&bytes);
-                    }
+                    Ok(bytes) => multi::apply_rmw_bytes(&mut buf, &slots, index, &bytes),
                     Err(e) => {
-                        final_results[index] =
+                        failures[index] =
                             Some(Err(self.device.map_stale(e, &cache, &self.paths[index])));
                     }
                 }
             }
         }
 
-        for (i, serializer) in self.serializers.into_iter().enumerate() {
-            if final_results[i].is_some() {
-                continue;
-            }
-            let r = resolved[i].as_ref().unwrap();
-            let (offset, size) = slots[i].expect("not marked failed above");
-            if let Err(e) = serializer(&r.type_info, &cache, &mut buf[offset..offset + size]) {
-                final_results[i] = Some(Err(e));
-            }
-        }
+        multi::serialize_all(
+            self.serializers,
+            &resolved,
+            &slots,
+            &cache,
+            &mut buf,
+            &mut failures,
+        );
 
-        let mut write_items: Vec<(SymbolHandle, &[u8], usize)> = Vec::new();
-        for (i, r) in resolved.iter().enumerate() {
-            if final_results[i].is_some() {
-                continue;
-            }
-            let r = r.as_ref().unwrap();
-            let (offset, size) = slots[i].expect("not marked failed above");
-            write_items.push((r.handle, &buf[offset..offset + size], i));
-        }
-
+        let write_items = multi::collect_write_items(&resolved, &failures, &slots, &buf);
         if !write_items.is_empty() {
             let write_results = self
                 .device
                 .write_multi_as_bytes_by_handle(write_items.iter().map(|(h, b, _)| (*h, *b)))?;
             for (result, (_, _, idx)) in write_results.zip(&write_items) {
                 if let Err(e) = result {
-                    final_results[*idx] =
-                        Some(Err(self.device.map_stale(e, &cache, &self.paths[*idx])));
+                    failures[*idx] = Some(Err(self.device.map_stale(e, &cache, &self.paths[*idx])));
                 }
             }
         }
 
-        for result in final_results {
-            if let Some(Err(e)) = result {
-                return Err(e);
-            }
-        }
-
-        Ok(())
+        multi::first_failure(failures)
     }
 }
