@@ -1,4 +1,4 @@
-//! Example 10: Advanced Shared Logger
+//! Example 11: Advanced Shared Logger
 //! Run with: `cargo run --bin 11_advanced_system_logger`
 //!
 //! Demonstrates multiplexing: sharing a single AMS connection between a

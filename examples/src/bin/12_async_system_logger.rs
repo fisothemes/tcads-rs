@@ -1,4 +1,4 @@
-//! Example 11: Async TwinCAT System Logger
+//! Example 12: Async TwinCAT System Logger
 //! Run with: `cargo run --bin 12_async_system_logger`
 //!
 //! Demonstrates how to share a single AMS connection between an async `Logger`
