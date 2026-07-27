@@ -775,7 +775,7 @@ impl RuntimeDevice {
         cache.insert_types(
             self.get_all_type_infos()
                 .await?
-                .collect::<Result<Vec<_>, _>>()?,
+                .collect::<crate::Result<Vec<_>>>()?,
         )?;
 
         for info in self.get_all_symbol_infos().await? {

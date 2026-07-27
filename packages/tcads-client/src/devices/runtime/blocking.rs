@@ -742,7 +742,10 @@ impl RuntimeDevice {
     pub fn preload(&self) -> crate::Result<()> {
         let cache = self.symbol_cache()?;
 
-        cache.insert_types(self.get_all_type_infos()?.filter_map(|res| res.ok()))?;
+        cache.insert_types(
+            self.get_all_type_infos()?
+                .collect::<crate::Result<Vec<_>>>()?,
+        )?;
 
         for info in self.get_all_symbol_infos()? {
             let info = info?;
