@@ -6,6 +6,9 @@
 //! metadata is shared through an inner [`AdsTypeCache`] so that a thousand
 //! symbols of the same function block type reference one type description.
 //!
+//! Each [`SymbolEntry`] also caches RPC method handles resolved on that
+//! instance, keyed by bare method name, for reuse across repeated calls.
+//!
 //! All entries go stale together when the symbol version changes; call [`SymbolCache::clear`]
 //! when [`AdsReturnCode::AdsErrDeviceSymbolVersionInvalid`](tcads_core::AdsReturnCode)
 //! is observed or a symbol-version notification fires. Stale handles need no
@@ -13,16 +16,17 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
-
 use tcads_core::{AdsTypeInfo, SymbolHandle};
 use tcads_serde::{AdsTypeCache, TypeProvider, resolvers};
 
-/// A fully resolved symbol: type metadata plus an optionally acquired handle.
+/// A fully resolved symbol: type metadata, an optionally acquired handle, and any RPC method
+/// handles resolved for this instance so far.
 pub struct SymbolEntry {
     type_info: Arc<AdsTypeInfo>,
     size: u32,
     requires_rmw: bool,
     handle: Option<SymbolHandle>,
+    method_handles: HashMap<String, SymbolHandle>,
 }
 
 impl SymbolEntry {
@@ -33,6 +37,7 @@ impl SymbolEntry {
             size,
             requires_rmw,
             handle: None,
+            method_handles: HashMap::new(),
         }
     }
 
@@ -46,24 +51,34 @@ impl SymbolEntry {
         }
     }
 
-    /// The symbol's resolved type description.
+    /// Cache a resolved RPC method handle on this instance.
+    pub fn set_method_handle(&mut self, method_name: impl Into<String>, handle: SymbolHandle) {
+        self.method_handles.insert(method_name.into(), handle);
+    }
+
+    /// Returns the cached handle for the named RPC method on this instance, if any.
+    pub fn method_handle(&self, method_name: &str) -> Option<SymbolHandle> {
+        self.method_handles.get(method_name).copied()
+    }
+
+    /// Returns the symbol's resolved type description.
     pub fn type_info(&self) -> &Arc<AdsTypeInfo> {
         &self.type_info
     }
 
-    /// The symbol's size in bytes on the PLC.
+    /// Returns the symbol's size in bytes on the PLC.
     pub fn size(&self) -> u32 {
         self.size
     }
 
-    /// Whether writing this symbol requires a read-modify-write cycle.
+    /// Returns `true` if writing this symbol requires a read-modify-write cycle.
     ///
     /// See [`resolvers::requires_read_modify_write`] for the rules.
     pub fn requires_rmw(&self) -> bool {
         self.requires_rmw
     }
 
-    /// The acquired symbol handle, if any.
+    /// Returns the acquired symbol handle, if any.
     pub fn handle(&self) -> Option<SymbolHandle> {
         self.handle
     }

@@ -1,5 +1,6 @@
 use super::access::{
-    AdsArraySerializer, AdsMapSerializer, AdsStructSerializer, AdsTupleSerializer,
+    AdsArraySerializer, AdsMapSerializer, AdsRpcFieldSerializer, AdsStructSerializer,
+    AdsTupleSerializer, unsupported_serialize_methods,
 };
 use crate::TypeProvider;
 use crate::resolvers::{ResolvedField, resolve_alias, resolve_fields};
@@ -506,5 +507,95 @@ impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
         Err(crate::Error::TypeMismatch {
             expected: "unit enum variant (PLC enums carry no payload)".into(),
         })
+    }
+}
+
+/// Serializes a plain Rust tuple (or `()`) directly into a caller-supplied,
+/// positional field list, with no wrapping PLC type involved at all.
+///
+/// Accepts exactly a plain tuple whose arity matches `fields.len()`, or `()`
+/// when `fields` is empty. Anything else (a named struct, a bare scalar, a
+/// seq) is rejected outright: a [`ShapeMismatch`](crate::Error::ShapeMismatch)
+/// on an arity mismatch, or an explicit "not supported here" error for a
+/// fundamentally different shape, never silently accepted or coerced.
+pub struct AdsRpcSerializer<'ser, P: TypeProvider> {
+    fields: Rc<[ResolvedField<'ser>]>,
+    output: &'ser mut [u8],
+    provider: &'ser P,
+}
+
+impl<'ser, P: TypeProvider> AdsRpcSerializer<'ser, P> {
+    /// Creates a new instance of the [`AdsRpcSerializer`].
+    pub fn new(
+        fields: Rc<[ResolvedField<'ser>]>,
+        output: &'ser mut [u8],
+        provider: &'ser P,
+    ) -> Self {
+        Self {
+            fields,
+            output,
+            provider,
+        }
+    }
+
+    fn not_supported() -> crate::Error {
+        crate::Error::InvalidRpcShape {
+            got: "a scalar, sequence, map, or named-struct value".into(),
+        }
+    }
+}
+
+impl<'ser, P: TypeProvider> Serializer for AdsRpcSerializer<'ser, P> {
+    type Ok = ();
+    type Error = crate::Error;
+
+    type SerializeSeq = Impossible<(), crate::Error>;
+    type SerializeTuple = AdsRpcFieldSerializer<'ser, P>;
+    type SerializeTupleStruct = Impossible<(), crate::Error>;
+    type SerializeTupleVariant = Impossible<(), crate::Error>;
+    type SerializeMap = Impossible<(), crate::Error>;
+    type SerializeStruct = Impossible<(), crate::Error>;
+    type SerializeStructVariant = Impossible<(), crate::Error>;
+
+    fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
+        if !self.fields.is_empty() {
+            return Err(crate::Error::ShapeMismatch {
+                expected: self.fields.len(),
+                got: 0,
+            });
+        }
+        Ok(())
+    }
+
+    fn serialize_newtype_struct<T>(
+        self,
+        _name: &'static str,
+        _value: &T,
+    ) -> Result<Self::Ok, Self::Error>
+    where
+        T: ?Sized + serde::Serialize,
+    {
+        Err(Self::not_supported())
+    }
+
+    fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
+        if self.fields.len() != len {
+            return Err(crate::Error::ShapeMismatch {
+                expected: self.fields.len(),
+                got: len,
+            });
+        }
+        Ok(AdsRpcFieldSerializer::new(
+            self.fields,
+            self.output,
+            self.provider,
+        ))
+    }
+
+    unsupported_serialize_methods! {
+        Self::not_supported =>
+        bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str bytes none some
+        unit_struct unit_variant newtype_variant seq
+        tuple_struct tuple_variant map r#struct struct_variant
     }
 }

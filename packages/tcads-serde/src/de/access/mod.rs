@@ -7,3 +7,5 @@ pub use array_access::AdsArrayAccess;
 pub use enum_access::AdsEnumAccess;
 pub use map_access::AdsMapAccess;
 pub use struct_access::AdsStructAccess;
+
+pub type AdsRpcFieldAccess<'de, P> = AdsStructAccess<'de, P>;

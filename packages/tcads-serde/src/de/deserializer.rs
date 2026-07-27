@@ -1,4 +1,6 @@
-use super::access::{AdsArrayAccess, AdsEnumAccess, AdsMapAccess, AdsStructAccess};
+use super::access::{
+    AdsArrayAccess, AdsEnumAccess, AdsMapAccess, AdsRpcFieldAccess, AdsStructAccess,
+};
 use crate::resolvers::{ResolvedField, resolve_alias, resolve_fields};
 use crate::validators::{
     validate_exact_size, validate_integer_type_id, validate_type_category, validate_type_id,
@@ -600,5 +602,75 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         V: Visitor<'de>,
     {
         visitor.visit_unit()
+    }
+}
+
+/// Deserializes a plain Rust tuple (or `()`) directly out of a caller-supplied,
+/// positional field list.
+///
+/// The read-side mirror of [`AdsRpcSerializer`](crate::ser::AdsRpcSerializer).
+pub struct AdsRpcDeserializer<'de, P: TypeProvider> {
+    fields: Rc<[ResolvedField<'de>]>,
+    input: &'de [u8],
+    provider: &'de P,
+}
+
+impl<'de, P: TypeProvider> AdsRpcDeserializer<'de, P> {
+    /// Creates a new instance of the [`AdsRpcDeserializer`].
+    pub fn new(fields: Rc<[ResolvedField<'de>]>, input: &'de [u8], provider: &'de P) -> Self {
+        Self {
+            fields,
+            input,
+            provider,
+        }
+    }
+}
+
+impl<'de, P: TypeProvider> Deserializer<'de> for AdsRpcDeserializer<'de, P> {
+    type Error = crate::Error;
+
+    fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        Err(crate::Error::InvalidRpcShape {
+            got: "a scalar, sequence, map, or named-struct value".into(),
+        })
+    }
+
+    fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        if !self.fields.is_empty() {
+            return Err(crate::Error::ShapeMismatch {
+                expected: self.fields.len(),
+                got: 0,
+            });
+        }
+        visitor.visit_unit()
+    }
+
+    fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        if self.fields.len() != len {
+            return Err(crate::Error::ShapeMismatch {
+                expected: self.fields.len(),
+                got: len,
+            });
+        }
+        visitor.visit_seq(AdsRpcFieldAccess::new(
+            self.fields,
+            self.input,
+            self.provider,
+        ))
+    }
+
+    serde::forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str string bytes byte_buf
+        option unit_struct newtype_struct seq tuple_struct map struct
+        enum identifier ignored_any
     }
 }

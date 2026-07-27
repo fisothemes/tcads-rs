@@ -8,6 +8,8 @@ pub use map_serializer::AdsMapSerializer;
 pub use struct_serializer::AdsStructSerializer;
 pub use tuple_serializer::AdsTupleSerializer;
 
+pub type AdsRpcFieldSerializer<'ser, P> = AdsStructSerializer<'ser, P>;
+
 macro_rules! unsupported_serialize_methods {
     ($err:path => $($method:ident)+) => {
         $(unsupported_serialize_methods!(@one $err, $method);)+

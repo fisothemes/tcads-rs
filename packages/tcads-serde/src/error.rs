@@ -31,6 +31,8 @@ pub enum Error {
     NoneNotRepresentable(String),
     #[error("Value too large for field: {value} bytes does not fit in {expected} bytes")]
     ValueTooLarge { expected: usize, value: usize },
+    #[error("RPC call inputs/outputs must be a plain tuple (or `()` for none), got {got}")]
+    InvalidRpcShape { got: String },
     #[error("I/O or encoding error: {0}")]
     Custom(String),
     #[error(transparent)]

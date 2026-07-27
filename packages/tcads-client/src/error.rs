@@ -38,6 +38,13 @@ pub enum Error {
     Serde(#[from] tcads_serde::Error),
     #[error("Handle for symbol '{0}' is no longer valid")]
     HandleInvalidated(Arc<str>),
+    #[error("method '{method_name}' not found on type '{type_name}'")]
+    MethodNotFound {
+        type_name: Arc<str>,
+        method_name: Arc<str>,
+    },
+    #[error("method '{method_name}' exists but is not callable over ADS")]
+    MethodNotCallable { method_name: Arc<str> },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

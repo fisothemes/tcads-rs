@@ -231,9 +231,9 @@ pub mod validators;
 /// Dynamic typing and high-precision numeric enums for parsing unknown PLC memory layouts.
 pub mod value;
 
-pub use de::{AdsDeserializer, from_bytes};
+pub use de::{from_bytes, from_rpc_fields};
 pub use error::{Error, Result};
-pub use ser::{AdsSerializer, to_bytes, to_vec};
+pub use ser::{to_bytes, to_rpc_fields, to_vec};
 pub use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
 pub use type_cache::AdsTypeCache;
 pub use type_provider::TypeProvider;
