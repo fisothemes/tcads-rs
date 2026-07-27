@@ -1,5 +1,5 @@
 //! Example 12: Async TwinCAT System Logger
-//! Run with: `cargo run --bin 12_async_system_logger`
+//! Run with: `cargo run --bin 12_logger_async`
 //!
 //! Demonstrates how to share a single AMS connection between an async `Logger`
 //! (for subscribing and writing) and a background listener task, using Tokio.

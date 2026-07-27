@@ -1,5 +1,5 @@
 //! Example 14: Symbol Information Exploration
-//! Run with: `cargo run --bin 14_symbol_info_exploration`
+//! Run with: `cargo run --bin 14_rtime_symbol_info_exploration`
 //!
 //! Demonstrates how to query symbol metadata from a TwinCAT PLC runtime.
 //! It shows how to fetch upload statistics, look up a single symbol by name,

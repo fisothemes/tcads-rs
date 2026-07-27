@@ -1,5 +1,5 @@
 //! Example 10: Basic TwinCAT System Logger
-//! Run with: `cargo run --bin 10_basic_system_logger`
+//! Run with: `cargo run --bin 10_logger_basic`
 //!
 //! Demonstrates how to connect to the TwinCAT Event Logger (Port 100),
 //! subscribe to system messages, and write our own custom log messages.
