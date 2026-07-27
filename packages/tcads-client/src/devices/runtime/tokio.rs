@@ -1,10 +1,11 @@
-use super::multi;
 use super::symbol_cache::{SymbolCache, SymbolEntry};
+use super::{multi, rpc};
 use crate::devices::tokio::AdsDevice;
 use crate::notif_guard::tokio::NotificationGuard;
 use std::collections::VecDeque;
 use std::marker::PhantomData;
 use std::net::ToSocketAddrs;
+use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tcads_core::{
@@ -625,6 +626,125 @@ impl RuntimeDevice {
     /// See [`write_value`](Self::write_value) for more details.
     pub fn write_multi_values(&self) -> WriteMultiValues<'_> {
         WriteMultiValues::new(self)
+    }
+
+    /// Calls an RPC method on a Function Block or Interface instance.
+    ///
+    /// `fb_path` is the instance's path (e.g. `"MAIN.fbSomeInterface"`), not
+    /// the method itself; `method_name` is looked up case-insensitively
+    /// against that instance's type. Requires the method to have
+    /// `{attribute 'TcRpcEnable'}` in its PLC declaration.
+    ///
+    /// `I`/`O` are plain tuples (or a bare value when only one element is
+    /// relevant on that side):
+    /// - `I`: one element per `IN` or `IN_OUT` parameter, in declared order.
+    /// - `O`: the return value first (if the method has one), then one
+    ///   element per `OUT` or `IN_OUT` parameter, in declared order.
+    ///
+    /// An `IN_OUT` parameter appears on *both* sides: you send a value in
+    /// `I`, and get the PLC's (possibly different) value for it back out
+    /// through `O`, at its own declared position among the parameters
+    /// relevant to each side, not necessarily the same position on both.
+    ///
+    /// A method with no relevant parameters on a side uses `()` for that
+    /// side, e.g. a method with no return and no `OUT`/`IN_OUT` parameters
+    /// has `O = ()`.
+    pub async fn rpc<I, O>(
+        &self,
+        fb_path: impl AsRef<str>,
+        method_name: impl AsRef<str>,
+        inputs: &I,
+    ) -> crate::Result<O>
+    where
+        I: serde::Serialize,
+        O: serde::de::DeserializeOwned,
+    {
+        let fb_path = fb_path.as_ref();
+        let method_name = method_name.as_ref();
+
+        let (cache, entry) = self.resolve_symbol(fb_path).await?;
+        let type_info = { entry.read()?.type_info().clone() };
+
+        let method = rpc::find_method(&type_info, method_name)?;
+
+        let mut frontier = rpc::missing_method_types(&cache, method)?;
+        for _ in 0..=multi::MAX_FETCH_LEVELS {
+            if frontier.is_empty() {
+                break;
+            }
+            let fetched: Vec<_> = self
+                .get_multi_type_infos(&frontier)
+                .await?
+                .collect::<crate::Result<_>>()?;
+            cache.insert_types(fetched)?;
+
+            let mut next = rpc::missing_nested_types(&cache, frontier.iter().map(String::as_str))?;
+            next.extend(rpc::missing_rpc_indirections(
+                &cache,
+                frontier.iter().map(String::as_str),
+            )?);
+            frontier = next;
+        }
+
+        let types_guard = cache.types()?;
+        let in_fields = rpc::input_fields(method, &*types_guard)?;
+        let out_fields = rpc::output_fields(method, &*types_guard)?;
+
+        let input_bytes: Vec<u8> = if in_fields.len() == 1 {
+            let field = &in_fields[0];
+            let mut buf = vec![0u8; field.size() as usize];
+            tcads_serde::to_bytes(inputs, &mut buf, field.type_info(), &*types_guard)?;
+            buf
+        } else {
+            let total: u32 = in_fields.iter().map(|f| f.size()).sum();
+            let mut buf = vec![0u8; total as usize];
+            tcads_serde::to_rpc_fields(inputs, &mut buf, Rc::from(in_fields), &*types_guard)?;
+            buf
+        };
+
+        let output_size: u32 = out_fields.iter().map(|f| f.size()).sum();
+
+        let cached_handle = { entry.read()?.method_handle(method.name()) };
+        let handle = match cached_handle {
+            Some(handle) => handle,
+            None => {
+                let handle = self
+                    .get_handle_by_name(format!("{fb_path}#{}", method.name()))
+                    .await?;
+                entry
+                    .write()
+                    .map_err(|_| crate::Error::PoisonedLock)?
+                    .set_method_handle(method.name(), handle);
+                handle
+            }
+        };
+
+        let response = self
+            .device
+            .read_write(
+                self.target,
+                IndexGroup::SYMBOL_VALUE_BY_HANDLE,
+                handle.as_u32().into(),
+                output_size,
+                input_bytes.as_slice(),
+            )
+            .await
+            .map_err(|err| self.map_stale(err, &cache, fb_path))?;
+
+        if out_fields.len() == 1 {
+            let field = &out_fields[0];
+            Ok(tcads_serde::from_bytes(
+                &response,
+                field.type_info(),
+                &*types_guard,
+            )?)
+        } else {
+            Ok(tcads_serde::from_rpc_fields(
+                &response,
+                Rc::from(out_fields),
+                &*types_guard,
+            )?)
+        }
     }
 
     /// Flushes the symbol cache: every cached handle, symbol entry, and type.
