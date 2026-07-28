@@ -1,3 +1,4 @@
+use crate::notif_guard::blocking::NotificationGuard;
 use crate::tasks::blocking::{
     AdsNotificationDispatcher, AmsRequestDispatchKey, AmsRequestDispatcher, AmsRequestWriter,
     AmsResponseReader, RouterNotificationDispatcher,
@@ -7,7 +8,7 @@ use std::io::{Read, Write};
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Receiver, TryRecvError};
 use std::time::Duration;
 use tcads_core::io::blocking::{AmsReader, AmsStream, AmsWriter};
 use tcads_core::protocol::{
@@ -20,11 +21,12 @@ use tcads_core::protocol::{
     GetLocalNetIdResponse, PortCloseRequest, PortConnectRequest, PortConnectResponse,
 };
 use tcads_core::{
-    AdsDeviceVersion, AdsError, AdsHeader, AdsNotificationAttrib, AdsReturnCode, AdsState, AmsAddr,
-    AmsCommand, AmsFrame, AmsNetId, DeviceState, IndexGroup, IndexOffset, InvokeId,
-    NotificationHandle, RouterState, SumAddNotificationRequest, SumAddNotificationResponse,
-    SumDeleteNotificationResponse, SumReadRequest, SumReadResponseOwned, SumReadWriteRequest,
-    SumReadWriteResponseOwned, SumWriteRequest, SumWriteResponse,
+    AdsDeviceVersion, AdsError, AdsHeader, AdsNotificationAttrib, AdsReturnCode, AdsState,
+    AdsTransMode, AmsAddr, AmsCommand, AmsFrame, AmsNetId, DeviceState, IndexGroup, IndexOffset,
+    InvokeId, NotificationHandle, RouterState, SumAddNotificationRequest,
+    SumAddNotificationResponse, SumDeleteNotificationResponse, SumReadRequest,
+    SumReadResponseOwned, SumReadWriteRequest, SumReadWriteResponseOwned, SumWriteRequest,
+    SumWriteResponse,
 };
 
 /// Shared state for an [`AdsDevice`] connection.
@@ -928,5 +930,90 @@ impl AdsDevice {
         }
 
         Ok(resp)
+    }
+
+    /// Subscribes to ADS State and Device State change notifications.
+    ///
+    /// This notification fires whenever the target PLC transitions between
+    /// execution states (e.g. from `RUN` to `STOP` or `CONFIG`).
+    pub fn subscribe_state(
+        &self,
+        target: AmsAddr,
+    ) -> crate::Result<(StateReceiver, NotificationHandle)> {
+        let (rx, notif_handle) = self.add_notification(
+            target,
+            IndexGroup::DEVICE_DATA,
+            IndexOffset::ZERO,
+            AdsNotificationAttrib::new(4, AdsTransMode::ServerOnChange, 0, 0),
+        )?;
+
+        let guard = NotificationGuard::new(notif_handle, target, self.clone());
+        Ok((StateReceiver::new(rx, guard), notif_handle))
+    }
+}
+
+/// A receiver for [`AdsState`] change notifications.
+pub struct StateReceiver {
+    rx: Receiver<AdsNotificationSampleOwned>,
+    guard: NotificationGuard,
+}
+
+impl StateReceiver {
+    /// Creates a new instance of the [`StateReceiver`].
+    pub fn new(rx: Receiver<AdsNotificationSampleOwned>, guard: NotificationGuard) -> Self {
+        Self { rx, guard }
+    }
+
+    /// Returns the notification handle for this subscription.
+    pub fn handle(&self) -> NotificationHandle {
+        self.guard.handle()
+    }
+
+    fn decode(sample: AdsNotificationSampleOwned) -> crate::Result<(AdsState, DeviceState)> {
+        let data = sample.data();
+        if data.len() < 4 {
+            return Err(AdsError::UnexpectedDataLength {
+                expected: 4,
+                got: data.len(),
+            }
+            .into());
+        }
+
+        let ads_state = AdsState::from_bytes([data[0], data[1]]);
+        let device_state = DeviceState::from_le_bytes([data[2], data[3]]);
+
+        Ok((ads_state, device_state))
+    }
+
+    /// Blocks until the state changes.
+    pub fn recv(&self) -> crate::Result<(AdsState, DeviceState)> {
+        Self::decode(self.rx.recv()?)
+    }
+
+    /// Blocks until the state changes or `timeout` elapses.
+    pub fn recv_timeout(&self, timeout: Duration) -> crate::Result<(AdsState, DeviceState)> {
+        Self::decode(self.rx.recv_timeout(timeout)?)
+    }
+
+    /// Returns the new state if a change is immediately available, without blocking.
+    pub fn try_recv(&self) -> crate::Result<Option<(AdsState, DeviceState)>> {
+        match self.rx.try_recv() {
+            Ok(sample) => Ok(Some(Self::decode(sample)?)),
+            Err(TryRecvError::Empty) => Ok(None),
+            Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
+        }
+    }
+
+    /// Returns an iterator that blocks on each call, yielding new states.
+    pub fn iter(&self) -> impl Iterator<Item = crate::Result<(AdsState, DeviceState)>> + '_ {
+        std::iter::from_fn(move || match self.recv() {
+            Err(crate::Error::Disconnected) => None,
+            result => Some(result),
+        })
+    }
+
+    /// Explicitly cancels the subscription.
+    pub fn unsubscribe(self) -> crate::Result<()> {
+        self.guard.cancel()
     }
 }

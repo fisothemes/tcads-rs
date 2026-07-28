@@ -1,3 +1,4 @@
+use crate::notif_guard::tokio::NotificationGuard;
 use crate::tasks::tokio::{
     AdsNotificationDispatcher, AmsRequestDispatchKey, AmsRequestDispatcher, AmsRequestWriter,
     AmsResponseReader, RouterNotificationDispatcher,
@@ -18,14 +19,16 @@ use tcads_core::protocol::{
     GetLocalNetIdResponse, PortCloseRequest, PortConnectRequest, PortConnectResponse,
 };
 use tcads_core::{
-    AdsDeviceVersion, AdsError, AdsHeader, AdsNotificationAttrib, AdsReturnCode, AdsState, AmsAddr,
-    AmsCommand, AmsFrame, AmsNetId, DeviceState, IndexGroup, IndexOffset, InvokeId,
-    NotificationHandle, RouterState, SumAddNotificationRequest, SumAddNotificationResponse,
-    SumDeleteNotificationResponse, SumReadRequest, SumReadResponseOwned, SumReadWriteRequest,
-    SumReadWriteResponseOwned, SumWriteRequest, SumWriteResponse,
+    AdsDeviceVersion, AdsError, AdsHeader, AdsNotificationAttrib, AdsReturnCode, AdsState,
+    AdsTransMode, AmsAddr, AmsCommand, AmsFrame, AmsNetId, DeviceState, IndexGroup, IndexOffset,
+    InvokeId, NotificationHandle, RouterState, SumAddNotificationRequest,
+    SumAddNotificationResponse, SumDeleteNotificationResponse, SumReadRequest,
+    SumReadResponseOwned, SumReadWriteRequest, SumReadWriteResponseOwned, SumWriteRequest,
+    SumWriteResponse,
 };
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::mpsc::UnboundedReceiver as Receiver;
+use tokio::sync::mpsc::error::TryRecvError;
 
 /// Shared state for an [`AdsDevice`] connection.
 ///
@@ -963,5 +966,79 @@ impl AdsDevice {
         }
 
         Ok(resp)
+    }
+
+    /// Subscribes to ADS State and Device State change notifications.
+    ///
+    /// This notification fires whenever the target PLC transitions between
+    /// execution states (e.g. from `RUN` to `STOP` or `CONFIG`).
+    pub async fn subscribe_state(
+        &self,
+        target: AmsAddr,
+    ) -> crate::Result<(StateReceiver, NotificationHandle)> {
+        let (rx, notif_handle) = self
+            .add_notification(
+                target,
+                IndexGroup::DEVICE_DATA,
+                IndexOffset::ZERO,
+                AdsNotificationAttrib::new(4, AdsTransMode::ServerOnChange, 0, 0),
+            )
+            .await?;
+
+        let guard = NotificationGuard::new(notif_handle, target, self.clone());
+        Ok((StateReceiver::new(rx, guard), notif_handle))
+    }
+}
+
+pub struct StateReceiver {
+    rx: Receiver<AdsNotificationSampleOwned>,
+    guard: NotificationGuard,
+}
+
+impl StateReceiver {
+    /// Creates a new instance of the [`StateReceiver`].
+    pub fn new(rx: Receiver<AdsNotificationSampleOwned>, guard: NotificationGuard) -> Self {
+        Self { rx, guard }
+    }
+
+    /// Returns the notification handle for this subscription.
+    pub fn handle(&self) -> NotificationHandle {
+        self.guard.handle()
+    }
+
+    fn decode(sample: AdsNotificationSampleOwned) -> crate::Result<(AdsState, DeviceState)> {
+        let data = sample.data();
+        if data.len() < 4 {
+            return Err(AdsError::UnexpectedDataLength {
+                expected: 4,
+                got: data.len(),
+            }
+            .into());
+        }
+
+        let ads_state = AdsState::from_bytes([data[0], data[1]]);
+        let device_state = DeviceState::from_le_bytes([data[2], data[3]]);
+
+        Ok((ads_state, device_state))
+    }
+
+    /// Await until state changes.
+    pub async fn recv(&mut self) -> crate::Result<(AdsState, DeviceState)> {
+        let sample = self.rx.recv().await.ok_or(crate::Error::Disconnected)?;
+        Self::decode(sample)
+    }
+
+    /// Returns the new state if a change is immediately available, without blocking.
+    pub fn try_recv(&mut self) -> crate::Result<Option<(AdsState, DeviceState)>> {
+        match self.rx.try_recv() {
+            Ok(sample) => Ok(Some(Self::decode(sample)?)),
+            Err(TryRecvError::Empty) => Ok(None),
+            Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
+        }
+    }
+
+    /// Explicitly cancels the subscription.
+    pub async fn unsubscribe(self) -> crate::Result<()> {
+        self.guard.cancel().await
     }
 }
