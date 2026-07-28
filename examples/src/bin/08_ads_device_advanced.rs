@@ -1,5 +1,5 @@
 //! Example 8: Advanced AdsDevice (Multithreading & Notifications)
-//! Run with: `cargo run --bin 08_advanced_ads_device`
+//! Run with: `cargo run --bin 08_ads_device_advanced`
 //!
 //! This example demonstrates the `Send + Sync` capabilities of `AdsDevice`.
 //! It uses `std::thread` to spawn concurrent reader and writer threads

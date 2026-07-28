@@ -1,5 +1,5 @@
 //! Example 6: Basic AdsDevice Usage
-//! Run with: `cargo run --bin 06_basic_ads_device`
+//! Run with: `cargo run --bin 06_ads_device_basic`
 //!
 //! This example shows the absolute basics of using the high-level `AdsDevice` client.
 //! Notice how it eliminates the need to manage TCP sockets,

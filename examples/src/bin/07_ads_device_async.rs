@@ -1,5 +1,5 @@
 //! Example 7: Basic Asynchronous AdsDevice (Tokio)
-//! Run with: `cargo run --bin 07_basic_ads_device_async`
+//! Run with: `cargo run --bin 07_ads_device_async`
 //!
 //! This example mirrors Example 6 exactly but utilizes the `tokio`
 //! asynchronous runtime. Notice how the API shape remains identical;
