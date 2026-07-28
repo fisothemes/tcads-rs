@@ -4,8 +4,8 @@
     <Declaration><![CDATA[{attribute 'no_explicit_call' := 'direct call for this function block is not allowed'}
 FUNCTION_BLOCK FB_Recipe IMPLEMENTS  __SYSTEM.IQueryInterface
 VAR
-	Id 			: T_RecipeId;
-	arSteps 		: ARRAY[0..4] OF T_RecipeStep;
+	Id 		: T_RecipeId;
+	arSteps : ARRAY[0..4] OF T_RecipeStep;
 END_VAR
 ]]></Declaration>
     <Implementation>

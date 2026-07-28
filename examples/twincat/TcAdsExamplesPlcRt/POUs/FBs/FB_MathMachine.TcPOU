@@ -1,0 +1,74 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.15">
+  <POU Name="FB_MathMachine" Id="{bb1278ac-4e17-40b6-8919-426e05c4676c}" SpecialFunc="None">
+    <Declaration><![CDATA[{attribute 'no_explicit_call' := 'direct call for this function block is not allowed'}
+FUNCTION_BLOCK FB_MathMachine
+VAR
+	_nValue : DINT;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="DivideValues" Id="{b33507e4-e5b5-4046-ba42-b67bce270c2e}">
+      <Declaration><![CDATA[{attribute 'TcRpcEnable'}
+METHOD DivideValues : DINT
+VAR_INPUT
+	nNumerator, 
+	nDenominator : DINT;
+END_VAR
+VAR_OUTPUT
+	nRemainder   : DINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF nDenominator <> 0 THEN
+	DivideValues := nNumerator / nDenominator;
+	nRemainder   := nNumerator MOD nDenominator;
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="GetValue" Id="{93b38f2b-0b4e-4a95-a0bb-8f5035ef869e}">
+      <Declaration><![CDATA[{attribute 'TcRpcEnable'}
+METHOD GetValue : DINT
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[GetValue := THIS^._nValue;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Reset" Id="{d1c73aae-7c11-4a69-9422-86211b8b5102}">
+      <Declaration><![CDATA[{attribute 'TcRpcEnable'}
+METHOD Reset
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ THIS^._nValue := 0;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SetValue" Id="{1540aca3-3be9-4d9f-9e83-8166da4e56ca}">
+      <Declaration><![CDATA[{attribute 'TcRpcEnable'}
+METHOD SetValue
+VAR_INPUT
+	nValue : DINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^._nValue := nValue;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="SumValues" Id="{e74e39bd-9ed2-4049-988d-b3509be6be4b}">
+      <Declaration><![CDATA[{attribute 'TcRpcEnable'}
+METHOD SumValues : DINT
+VAR_INPUT
+	nValue1, nValue2 : DINT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[SumValues := nValue1 + nValue2;]]></ST>
+      </Implementation>
+    </Method>
+  </POU>
+</TcPlcObject>

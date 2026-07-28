@@ -72,6 +72,9 @@
     <Compile Include="POUs\FBs\FB_EmptyWithImplRPC.TcPOU">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="POUs\FBs\FB_MathMachine.TcPOU">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="POUs\FBs\FB_Recipe.TcPOU">
       <SubType>Code</SubType>
     </Compile>

@@ -10,7 +10,7 @@
 		</System>
 		<Plc>
 			<Project GUID="{A30889D2-7BD9-4264-BDCD-37B03F63F7C4}" Name="TcAdsExamplesPlcRt" PrjFilePath="TcAdsExamplesPlcRt\TcAdsExamplesPlcRt.plcproj" TmcFilePath="TcAdsExamplesPlcRt\TcAdsExamplesPlcRt.tmc" ReloadTmc="true" AmsPort="851" FileArchiveSettings="#x000e" CopyTmcToTarget="true" SymbolicMapping="true">
-				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="TcAdsExamplesPlcRt\TcAdsExamplesPlcRt.tmc" TmcHash="{F6D7A5A7-4703-65C6-41CF-004E09219B4E}">
+				<Instance Id="#x08502000" TcSmClass="TComPlcObjDef" KeepUnrestoredLinks="2" TmcPath="TcAdsExamplesPlcRt\TcAdsExamplesPlcRt.tmc" TmcHash="{ABFBA7BE-13F5-5AC3-A5EB-18A755A49276}">
 					<Name>TcAdsExamplesPlcRt Instance</Name>
 					<CLSID ClassFactory="TcPlc30">{08500001-0000-0000-F000-000000000064}</CLSID>
 					<Contexts>

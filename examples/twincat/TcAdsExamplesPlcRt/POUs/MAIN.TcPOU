@@ -9,6 +9,7 @@ VAR
 	bDecrement 		: BOOL;
 	
 	fbCurrentRecipe	: FB_Recipe;
+	fbMath 			: FB_MathMachine;
 END_VAR
 ]]></Declaration>
     <Implementation>
