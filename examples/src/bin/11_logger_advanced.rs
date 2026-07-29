@@ -9,7 +9,7 @@
 //! Open `examples/twincat/TcAdsExamples.sln` and put the PLC into RUN mode.
 
 use std::time::Duration;
-use tcads::client::devices::blocking::{AdsDevice, Logger};
+use tcads::client::devices::blocking::{AdsDevice, AdsLogger};
 use tcads::core::{AmsAddr, IndexGroup, IndexOffset};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -23,7 +23,7 @@ fn main() -> Result<()> {
 
     // 2. Wrap the existing connection in our Logger client!
     // This does NOT open a new socket; it reuses the dispatcher.
-    let logger = Logger::new(device.clone(), local_net_id);
+    let logger = AdsLogger::new(device.clone(), local_net_id);
     let (logger_rx, _handle) = logger.subscribe()?;
 
     // 3. Resolve the handle for our trigger variable

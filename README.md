@@ -40,7 +40,7 @@ command set. [`tcads-client`](packages/tcads-client) and [`tcads-server`](packag
 Building a native protocol implementation from scratch requires standing on the shoulders of giants. This project was made possible by, and draws heavy inspiration from, the following projects and resources:
 
 - **[Beckhoff/ADS](https://github.com/Beckhoff/ADS)**: The official open-source C++ ADS library provided by Beckhoff. It served as the primary reference for the AMS/ADS protocol routing, device states, and C++ header translations.
-- **[jisotalo/ads-client](https://github.com/jisotalo/ads-client)**: An incredible, full-featured Node.js ADS client. Jussi Isotalo's reverse-engineering efforts, specifically documented in his blog post [Subscribing to TwinCAT logger in Node.js](https://jisotalo.fi/subscribing-to-twincat-logger-in-nodejs/), were instrumental in building the `Logger` device and deciphering the undocumented `ADSLOGSTR` wire format.
+- **[jisotalo/ads-client](https://github.com/jisotalo/ads-client)**: An incredible, full-featured Node.js ADS client. Jussi Isotalo's reverse-engineering efforts, specifically documented in his blog post [Subscribing to TwinCAT logger in Node.js](https://jisotalo.fi/subscribing-to-twincat-logger-in-nodejs/), were instrumental in building the `AdsLogger` device and deciphering the undocumented `ADSLOGSTR` wire format.
 - **[birkenfeld/ads-rs](https://github.com/birkenfeld/ads-rs)**: An earlier Rust implementation of the ADS protocol that provided excellent prior art and inspiration for modeling ADS concepts in idiomatic Rust.
 - **[Beckhoff Information System (InfoSys)](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/index.html)**: The official TwinCAT 3 documentation and ADS specification portal.
 

@@ -4,18 +4,18 @@ pub mod runtime;
 
 pub mod blocking {
     pub use super::ads_device::blocking::{AdsDevice, AdsSubsystem, StateReceiver};
-    pub use super::logger::blocking::{LogEntryReceiver, Logger};
+    pub use super::logger::blocking::{AdsLogger, LogEntryReceiver};
     pub use super::runtime::blocking::{
-        ReadMultiValues, ReadMultiValuesIter, RuntimeDevice, SymbolVersionReceiver, ValueReceiver,
+        AdsRuntime, ReadMultiValues, ReadMultiValuesIter, SymbolVersionReceiver, ValueReceiver,
         WriteMultiValues,
     };
 }
 
 pub mod tokio {
     pub use super::ads_device::tokio::{AdsDevice, AdsSubsystem, StateReceiver};
-    pub use super::logger::tokio::{LogEntryReceiver, Logger};
+    pub use super::logger::tokio::{AdsLogger, LogEntryReceiver};
     pub use super::runtime::tokio::{
-        ReadMultiValues, ReadMultiValuesIter, RuntimeDevice, SymbolVersionReceiver, ValueReceiver,
+        AdsRuntime, ReadMultiValues, ReadMultiValuesIter, SymbolVersionReceiver, ValueReceiver,
         WriteMultiValues,
     };
 }

@@ -11,7 +11,7 @@
 //! Open `twincat/TcAdsExamples.sln` in TwinCAT XAE,
 //! activate the configuration on your local machine, and put the PLC into RUN mode.
 
-use tcads::client::devices::tokio::RuntimeDevice;
+use tcads::client::devices::tokio::AdsRuntime;
 use tcads::core::AmsAddr;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -19,7 +19,7 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 #[tokio::main]
 async fn main() -> Result<()> {
     println!("Connecting to the PLC runtime...");
-    let device = RuntimeDevice::connect(AmsAddr::from_local(851), None).await?;
+    let device = AdsRuntime::connect(AmsAddr::from_local(851), None).await?;
 
     // 2. Ask the server for a symbol's information.
     let symbol_name = "MAIN.nCount";

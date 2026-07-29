@@ -14,16 +14,16 @@ use tokio::sync::mpsc::error::TryRecvError;
 ///
 /// # Thread Safety
 ///
-/// `Logger` is [`Clone`], so all clones share the same underlying connection.
+/// [`AdsLogger`] is [`Clone`], so all clones share the same underlying connection.
 /// It is also [`Send`] + [`Sync`], so multiple tasks can write or receive log
 /// entries concurrently. Clean-up only happens when the last clone is dropped.
 #[derive(Clone)]
-pub struct Logger {
+pub struct AdsLogger {
     device: AdsDevice,
     target: AmsAddr,
 }
 
-impl Logger {
+impl AdsLogger {
     /// Connects to the Logger (Port 100) of the local AMS router at `127.0.0.1:48898`.
     ///
     /// Automatically discovers the local Net ID and targets `local_net_id:100`.
@@ -74,7 +74,7 @@ impl Logger {
         Ok(Self::new(device, net_id))
     }
 
-    /// Creates a `Logger` from an existing [`AdsDevice`] and router Net ID.
+    /// Creates an [`AdsLogger`] from an existing [`AdsDevice`] and router Net ID.
     ///
     /// Use this when sharing an existing connection with other device clients.
     /// `net_id` is used to construct the logger target address (`net_id:100`).
@@ -185,7 +185,7 @@ impl Logger {
 /// Wraps the raw ADS notification channel and decodes each sample on demand.
 /// The subscription is cancelled automatically when this is dropped.
 ///
-/// Obtain one by calling [`Logger::subscribe`].
+/// Obtain one by calling [`AdsLogger::subscribe`].
 pub struct LogEntryReceiver {
     rx: Receiver<AdsNotificationSampleOwned>,
     guard: NotificationGuard,
@@ -231,7 +231,7 @@ impl LogEntryReceiver {
     }
 }
 
-impl AdsSubsystem for Logger {
+impl AdsSubsystem for AdsLogger {
     fn device(&self) -> &AdsDevice {
         &self.device
     }

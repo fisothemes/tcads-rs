@@ -13,16 +13,16 @@ use tcads_core::{
 ///
 /// # Thread Safety
 ///
-/// The `Logger` device is [`Clone`], so all clones share the same underlying connection.
+/// The [`AdsLogger`] device is [`Clone`], so all clones share the same underlying connection.
 /// It is also [`Send`] + [`Sync`], so multiple tasks can receive log entries
 /// concurrently. Clean-up only happens when the last clone is dropped.
 #[derive(Clone)]
-pub struct Logger {
+pub struct AdsLogger {
     device: AdsDevice,
     target: AmsAddr,
 }
 
-impl Logger {
+impl AdsLogger {
     /// Connects to the Logger (Port 100) of the local AMS router at `127.0.0.1:48898`.
     ///
     /// Automatically discovers the local Net ID and targets `local_net_id:100`.
@@ -40,7 +40,7 @@ impl Logger {
         Ok(Self::new(device, net_id))
     }
 
-    /// Connects to the Logger (Port 100) of a specific `net_id` using the local AMS router.
+    /// Connects to the ADS logger (Port 100) of a specific `net_id` using the local AMS router.
     ///
     /// Use this when targeting a specific device on the same router that has a
     /// different AMS Net ID (e.g., a UMRT or a specific PLC instance connected to the
@@ -53,7 +53,7 @@ impl Logger {
         Ok(Self::new(device, net_id))
     }
 
-    /// Connects directly to the Logger of a remote AMS router without a local router.
+    /// Connects directly to the Ads logger (Port 100) of a remote AMS router without a local router.
     ///
     /// The `source` address must be pre-configured as a static route on the
     /// remote router. The `net_id` is the Net ID of the remote target.
@@ -70,7 +70,7 @@ impl Logger {
         Ok(Self::new(device, net_id))
     }
 
-    /// Creates a `Logger` from an existing [`AdsDevice`] and router Net ID.
+    /// Creates an [`AdsLogger`] from an existing [`AdsDevice`] and router Net ID.
     ///
     /// Use this when sharing an existing connection with other device clients.
     /// `net_id` is used to construct the logger target address (`net_id:100`).
@@ -173,7 +173,7 @@ impl Logger {
 /// Wraps the raw ADS notification channel and decodes each sample on demand.
 /// The subscription is cancelled automatically when this is dropped.
 ///
-/// Obtain one by calling [`Logger::subscribe`].
+/// Obtain one by calling [`AdsLogger::subscribe`].
 pub struct LogEntryReceiver {
     rx: Receiver<AdsNotificationSampleOwned>,
     guard: NotificationGuard,
@@ -232,7 +232,7 @@ impl LogEntryReceiver {
     }
 }
 
-impl AdsSubsystem for Logger {
+impl AdsSubsystem for AdsLogger {
     fn device(&self) -> &AdsDevice {
         &self.device
     }

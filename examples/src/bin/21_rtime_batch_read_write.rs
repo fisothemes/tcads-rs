@@ -17,13 +17,13 @@
 
 use serde::{Deserialize, Serialize};
 use tcads::client::Result;
-use tcads::client::devices::blocking::RuntimeDevice;
+use tcads::client::devices::blocking::AdsRuntime;
 use tcads::core::AmsAddr;
 
 fn main() -> Result<()> {
     println!("Connecting to the PLC runtime...");
     // 1. Connect to the local PLC runtime (Port 851)
-    let device = RuntimeDevice::connect(AmsAddr::from_local(851), None)?;
+    let device = AdsRuntime::connect(AmsAddr::from_local(851), None)?;
 
     // 2. Build the recipe steps to be written.
     let partial_steps: Vec<(String, RecipeStep)> = (0..3)

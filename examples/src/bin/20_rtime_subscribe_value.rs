@@ -13,7 +13,7 @@
 //! on your local machine, and put the PLC into RUN mode.
 
 use std::time::Duration;
-use tcads::client::devices::tokio::RuntimeDevice;
+use tcads::client::devices::tokio::AdsRuntime;
 use tcads::client::{Error, Result};
 use tcads::core::*;
 
@@ -21,7 +21,7 @@ use tcads::core::*;
 async fn main() -> Result<()> {
     println!("Connecting to the PLC runtime...");
     // 1. Connect to the local PLC runtime (Port 851)
-    let device = RuntimeDevice::connect(AmsAddr::from_local(851), None).await?;
+    let device = AdsRuntime::connect(AmsAddr::from_local(851), None).await?;
 
     let sym_name = "MAIN.nCount";
 

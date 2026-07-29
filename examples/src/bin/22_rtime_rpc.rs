@@ -14,12 +14,12 @@
 //! on your local machine, and put the PLC into RUN mode.
 
 use tcads::client::Result;
-use tcads::client::devices::blocking::RuntimeDevice;
+use tcads::client::devices::blocking::AdsRuntime;
 use tcads::core::AmsAddr;
 
 fn main() -> Result<()> {
     println!("Connecting to the PLC runtime...");
-    let device = RuntimeDevice::connect(AmsAddr::from_local(851), None)?;
+    let device = AdsRuntime::connect(AmsAddr::from_local(851), None)?;
 
     let fb_path = "MAIN.fbMath";
 

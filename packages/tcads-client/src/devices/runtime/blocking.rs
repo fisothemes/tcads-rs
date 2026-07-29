@@ -19,20 +19,20 @@ use tcads_core::{
 
 /// A high-level client for interacting with a specific TwinCAT runtime.
 ///
-/// `RuntimeDevice` provides specialized methods for querying a target runtime device's memory
+/// [`AdsRuntime`] provides specialized methods for querying a target runtime device's memory
 /// layout, including Symbol (variable) metadata, values, and Data Type definitions.
 ///
 /// It is bound to a single target address ([`AmsAddr`]). Common target ports include:
 /// - **851** (and **801–899**): PLC runtimes (851 is the default first TC3 PLC task).
 /// - **301–399**: FreeTasks.
 #[derive(Clone)]
-pub struct RuntimeDevice {
+pub struct AdsRuntime {
     device: AdsDevice,
     target: AmsAddr,
     symbols: OnceLock<Arc<SymbolCache>>,
 }
 
-impl RuntimeDevice {
+impl AdsRuntime {
     /// Connects to the target run-time ADS device using its AMS address via the local AMS router.
     ///
     /// See [`AdsDevice::connect`] for further details.
@@ -48,7 +48,7 @@ impl RuntimeDevice {
     ///
     /// This is usually the case when you have configured the Target System on TwinCAT to be
     /// `<Local>`. This will not work for UmRT (User-Mode Runtime) or other target systems. Use
-    /// [`RuntimeDevice::connect`] for those.
+    /// [`AdsRuntime::connect`] for those.
     ///
     /// See [`AdsDevice::connect`] and [`AdsDevice::get_local_net_id`] for more details.
     pub fn connect_local(
@@ -79,11 +79,11 @@ impl RuntimeDevice {
         ))
     }
 
-    /// Creates an instance of the [`RuntimeDevice`] by wrapping an existing [`AdsDevice`] and
+    /// Creates an instance of the [`AdsRuntime`] by wrapping an existing [`AdsDevice`] and
     /// target address.
     ///
     /// Useful if you are sharing a connection with other ADS devices
-    /// i.e. the [`Logger`](crate::devices::blocking::Logger) ADS device.
+    /// i.e. the [`Logger`](crate::devices::blocking::AdsLogger) ADS device.
     pub const fn new(device: AdsDevice, target: AmsAddr) -> Self {
         Self {
             device,
@@ -1047,7 +1047,7 @@ impl RuntimeDevice {
 /// Wraps the raw ADS notification channel and decodes each sample into the new version
 /// byte on demand. The subscription is cancelled automatically when this is dropped.
 ///
-/// Obtain one by calling [`RuntimeDevice::subscribe_symbol_version`].
+/// Obtain one by calling [`AdsRuntime::subscribe_symbol_version`].
 pub struct SymbolVersionReceiver {
     rx: Receiver<AdsNotificationSampleOwned>,
     guard: NotificationGuard,
@@ -1130,7 +1130,7 @@ impl SymbolVersionReceiver {
 /// demand. The subscription is cancelled automatically when this is
 /// dropped, or explicitly via [`unsubscribe`](Self::unsubscribe).
 ///
-/// Obtain one by calling [`RuntimeDevice::subscribe_value`].
+/// Obtain one by calling [`AdsRuntime::subscribe_value`].
 pub struct ValueReceiver<T> {
     rx: Receiver<AdsNotificationSampleOwned>,
     guard: NotificationGuard,
@@ -1187,7 +1187,7 @@ where
     /// cancelled or the connection is lost, or
     /// [`Error::HandleInvalidated`](crate::Error::HandleInvalidated) if an online change
     /// invalidated the handle backing this subscription (see
-    /// [`subscribe_value`](RuntimeDevice::subscribe_value)'s doc comment).
+    /// [`subscribe_value`](AdsRuntime::subscribe_value)'s doc comment).
     pub fn recv(&self) -> crate::Result<T> {
         self.decode(self.rx.recv()?)
     }
@@ -1236,7 +1236,7 @@ where
     }
 }
 
-/// The result of a batch read obtained by calling [`RuntimeDevice::read_multi_values`]
+/// The result of a batch read obtained by calling [`AdsRuntime::read_multi_values`]
 /// or [`ReadMultiValues::read`].
 #[derive(Clone)]
 pub struct ReadMultiValues {
@@ -1247,7 +1247,7 @@ pub struct ReadMultiValues {
 impl ReadMultiValues {
     /// Resolves and reads every symbol's value in one call.
     pub fn read<S: AsRef<str>>(
-        device: &RuntimeDevice,
+        device: &AdsRuntime,
         paths: impl IntoIterator<Item = S>,
     ) -> crate::Result<Self> {
         let paths_vec: Vec<S> = paths.into_iter().collect();
@@ -1379,14 +1379,14 @@ impl<T: serde::de::DeserializeOwned> Iterator for ReadMultiValuesIter<T> {
 
 /// A builder for executing a heterogeneous batch write operation.
 pub struct WriteMultiValues<'a> {
-    device: &'a RuntimeDevice,
+    device: &'a AdsRuntime,
     paths: Vec<String>,
     serializers: Vec<multi::SerializerFn<'a>>,
 }
 
 impl<'a> WriteMultiValues<'a> {
     /// Creates a new instance of [`WriteMultiValues`].
-    pub fn new(device: &'a RuntimeDevice) -> Self {
+    pub fn new(device: &'a AdsRuntime) -> Self {
         Self {
             device,
             paths: Vec::new(),
@@ -1471,7 +1471,7 @@ impl<'a> WriteMultiValues<'a> {
     }
 }
 
-impl AdsSubsystem for RuntimeDevice {
+impl AdsSubsystem for AdsRuntime {
     fn device(&self) -> &AdsDevice {
         &self.device
     }

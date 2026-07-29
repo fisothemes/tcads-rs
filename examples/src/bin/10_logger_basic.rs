@@ -10,7 +10,7 @@
 //! start/stop the PLC to see system state logs.
 
 use std::time::Duration;
-use tcads::client::devices::blocking::Logger;
+use tcads::client::devices::blocking::AdsLogger;
 use tcads::core::LogMessageType;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -20,7 +20,7 @@ fn main() -> Result<()> {
 
     // 1. Connect directly to the logger
     // This handles the port handshake and targets Port 100 automatically.
-    let logger = Logger::connect_local(Duration::from_secs(5))?;
+    let logger = AdsLogger::connect_local(Duration::from_secs(5))?;
 
     // 2. Subscribe to the logger notification stream
     let (rx, handle) = logger.subscribe()?;

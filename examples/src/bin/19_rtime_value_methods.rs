@@ -12,14 +12,14 @@
 //! on your local machine, and put the PLC into RUN mode.
 
 use serde::{Deserialize, Serialize};
-use tcads::client::devices::blocking::RuntimeDevice;
+use tcads::client::devices::blocking::AdsRuntime;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 fn main() -> Result<()> {
     println!("Connecting to the PLC runtime...");
     // 1. Connect to the local PLC runtime (Port 851)
-    let device = RuntimeDevice::connect_local(851, None)?;
+    let device = AdsRuntime::connect_local(851, None)?;
     let symbol_name = "MAIN.fbCurrentRecipe";
 
     // 2. Read the value directly from the PLC
