@@ -338,7 +338,7 @@ impl AdsDevice {
         self.inner.router_notifs.subscribe()
     }
 
-    /// Reads the device name and version from `target`.
+    /// Reads the device version and name from `target`.
     pub fn read_device_info(&self, target: AmsAddr) -> crate::Result<(AdsDeviceVersion, String)> {
         let invoke_id = self.next_invoke_id();
 
@@ -1015,5 +1015,35 @@ impl StateReceiver {
     /// Explicitly cancels the subscription.
     pub fn unsubscribe(self) -> crate::Result<()> {
         self.guard.cancel()
+    }
+}
+
+/// A universal trait for high-level devices that represent a specific TwinCAT subsystem.
+pub trait AdsSubsystem {
+    /// Returns a reference to the underlying transport device.
+    fn device(&self) -> &AdsDevice;
+
+    /// Returns the target address for this specific subsystem.
+    fn target(&self) -> AmsAddr;
+
+    /// Reads the current execution state of this subsystem.
+    fn read_state(&self) -> crate::Result<(AdsState, DeviceState)> {
+        self.device().read_state(self.target())
+    }
+
+    /// Reads the device info (version and name) of this subsystem.
+    fn read_device_info(&self) -> crate::Result<(AdsDeviceVersion, String)> {
+        self.device().read_device_info(self.target())
+    }
+
+    /// Subscribes to state changes for this subsystem.
+    fn subscribe_state(&self) -> crate::Result<(StateReceiver, NotificationHandle)> {
+        self.device().subscribe_state(self.target())
+    }
+
+    /// Changes the ADS state (e.g. Run, Stop, Config) of the subsystem.
+    fn write_control(&self, ads_state: AdsState, device_state: DeviceState) -> crate::Result<()> {
+        self.device()
+            .write_control(self.target(), ads_state, device_state, &[])
     }
 }

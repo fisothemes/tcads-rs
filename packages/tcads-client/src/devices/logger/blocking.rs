@@ -1,4 +1,4 @@
-use crate::devices::blocking::AdsDevice;
+use crate::devices::blocking::{AdsDevice, AdsSubsystem};
 use crate::notif_guard::blocking::NotificationGuard;
 use std::net::ToSocketAddrs;
 use std::sync::mpsc::{Receiver, TryRecvError};
@@ -93,11 +93,6 @@ impl Logger {
         self.target
     }
 
-    /// Returns a reference to the underlying [`AdsDevice`].
-    pub fn get_ref(&self) -> &AdsDevice {
-        &self.device
-    }
-
     /// Writes a log message to the TwinCAT logger using the current system time.
     ///
     /// `task_name` is encoded as Windows-1252 and truncated to
@@ -112,7 +107,7 @@ impl Logger {
         self.write_entry(LogEntry::new(
             WindowsFileTime::now(),
             message_type,
-            self.get_ref().source().port(),
+            self.device.source().port(),
             task_name.as_ref().to_owned(),
             message.as_ref().to_owned(),
         ))
@@ -133,7 +128,7 @@ impl Logger {
     pub fn write_entry(&self, entry: LogEntry) -> crate::Result<()> {
         let frame = AdsLoggerWriteRequestOwned::new(
             self.target(),
-            self.get_ref().source(),
+            self.device.source(),
             entry.timestamp(),
             entry.message_type(),
             entry.sender(),
@@ -141,7 +136,7 @@ impl Logger {
             "",
         )
         .into();
-        unsafe { self.get_ref().write_frame_only(frame) }
+        unsafe { self.device.write_frame_only(frame) }
     }
 
     // Subscribes to logger notifications.
@@ -234,5 +229,15 @@ impl LogEntryReceiver {
             Err(crate::Error::Disconnected) => None,
             result => Some(result),
         })
+    }
+}
+
+impl AdsSubsystem for Logger {
+    fn device(&self) -> &AdsDevice {
+        &self.device
+    }
+
+    fn target(&self) -> AmsAddr {
+        self.target
     }
 }

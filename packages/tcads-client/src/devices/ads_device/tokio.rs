@@ -4,6 +4,7 @@ use crate::tasks::tokio::{
     AmsResponseReader, RouterNotificationDispatcher,
 };
 use std::borrow::Borrow;
+use std::future::Future;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -1040,5 +1041,45 @@ impl StateReceiver {
     /// Explicitly cancels the subscription.
     pub async fn unsubscribe(self) -> crate::Result<()> {
         self.guard.cancel().await
+    }
+}
+
+/// A universal trait for high-level devices that represent a specific TwinCAT subsystem.
+pub trait AdsSubsystem: Send + Sync {
+    /// Returns a reference to the underlying transport device.
+    fn device(&self) -> &AdsDevice;
+
+    /// Returns the target address for this specific subsystem.
+    fn target(&self) -> AmsAddr;
+
+    /// Reads the current execution state of this subsystem.
+    fn read_state(
+        &self,
+    ) -> impl Future<Output = crate::Result<(AdsState, DeviceState)>> + Send + '_ {
+        self.device().read_state(self.target())
+    }
+
+    /// Reads the device info (version and name) of this subsystem.
+    fn read_device_info(
+        &self,
+    ) -> impl Future<Output = crate::Result<(AdsDeviceVersion, String)>> + Send + '_ {
+        self.device().read_device_info(self.target())
+    }
+
+    /// Subscribes to state changes for this subsystem.
+    fn subscribe_state(
+        &self,
+    ) -> impl Future<Output = crate::Result<(StateReceiver, NotificationHandle)>> + Send + '_ {
+        self.device().subscribe_state(self.target())
+    }
+
+    /// Changes the ADS state (e.g. Run, Stop, Config) of the subsystem.
+    fn write_control(
+        &self,
+        ads_state: AdsState,
+        device_state: DeviceState,
+    ) -> impl Future<Output = crate::Result<()>> + Send + '_ {
+        self.device()
+            .write_control(self.target(), ads_state, device_state, &[])
     }
 }

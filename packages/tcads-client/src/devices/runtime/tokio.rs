@@ -1,6 +1,6 @@
 use super::symbol_cache::{SymbolCache, SymbolEntry};
 use super::{multi, rpc};
-use crate::devices::tokio::AdsDevice;
+use crate::devices::tokio::{AdsDevice, AdsSubsystem};
 use crate::notif_guard::tokio::NotificationGuard;
 use std::collections::VecDeque;
 use std::marker::PhantomData;
@@ -102,11 +102,6 @@ impl RuntimeDevice {
     /// Returns the target AMS Address.
     pub fn target(&self) -> AmsAddr {
         self.target
-    }
-
-    /// Returns a reference to the underlying [`AdsDevice`].
-    pub fn get_ref(&self) -> &AdsDevice {
-        &self.device
     }
 
     /// Fetches and caches the symbol upload metadata from the PLC.
@@ -1496,5 +1491,15 @@ impl<'a> WriteMultiValues<'a> {
         }
 
         multi::first_failure(failures)
+    }
+}
+
+impl AdsSubsystem for RuntimeDevice {
+    fn device(&self) -> &AdsDevice {
+        &self.device
+    }
+
+    fn target(&self) -> AmsAddr {
+        self.target
     }
 }
