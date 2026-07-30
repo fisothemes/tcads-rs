@@ -3,6 +3,7 @@ pub mod device_state;
 pub mod device_version;
 pub mod error;
 pub mod file_flag;
+pub mod file_handle;
 pub mod filetime;
 pub mod header;
 pub mod index_group;
@@ -30,6 +31,7 @@ pub use error::{
     WindowsFileTimeError,
 };
 pub use file_flag::AdsFileFlags;
+pub use file_handle::AdsFileHandle;
 pub use filetime::WindowsFileTime;
 pub use header::AdsHeader;
 pub use index_group::IndexGroup;
