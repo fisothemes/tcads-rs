@@ -2,6 +2,7 @@ pub mod command;
 pub mod device_state;
 pub mod device_version;
 pub mod error;
+pub mod file_flag;
 pub mod filetime;
 pub mod header;
 pub mod index_group;
@@ -16,6 +17,7 @@ pub mod string;
 pub mod sum;
 pub mod symbol;
 pub mod trans_mode;
+pub mod windows_registry;
 
 pub use command::AdsCommand;
 pub use device_state::{AdsState, DeviceState};
@@ -27,6 +29,7 @@ pub use error::{
     GuidParseError, LogEntryError, LogMessageTypeError, StateFlagError, SumError,
     WindowsFileTimeError,
 };
+pub use file_flag::AdsFileFlags;
 pub use filetime::WindowsFileTime;
 pub use header::AdsHeader;
 pub use index_group::IndexGroup;
@@ -54,5 +57,6 @@ pub use symbol::{
     AdsTypeInfo, AdsTypeInfoIterator, AdsTypeInfoIteratorOwned, Guid, SymbolHandle,
 };
 pub use trans_mode::AdsTransMode;
+pub use windows_registry::WinRegistryValueType;
 
 pub type InvokeId = u32;

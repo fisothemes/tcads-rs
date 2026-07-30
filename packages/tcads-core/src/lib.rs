@@ -137,9 +137,9 @@ pub mod protocol;
 
 pub use ads::{
     AdsArrayInfo, AdsAttribute, AdsCommand, AdsDeviceVersion, AdsEnumInfo, AdsError, AdsFieldInfo,
-    AdsHeader, AdsMethodFlags, AdsMethodInfo, AdsMethodParamFlags, AdsMethodParamInfo,
-    AdsMethodReturnTypeInfo, AdsNotificationAttrib, AdsRefactorInfo, AdsReturnCode, AdsState,
-    AdsSymbol2Flags, AdsSymbolFlags, AdsSymbolInfo, AdsSymbolInfoIterator,
+    AdsFileFlags, AdsHeader, AdsMethodFlags, AdsMethodInfo, AdsMethodParamFlags,
+    AdsMethodParamInfo, AdsMethodReturnTypeInfo, AdsNotificationAttrib, AdsRefactorInfo,
+    AdsReturnCode, AdsState, AdsSymbol2Flags, AdsSymbolFlags, AdsSymbolInfo, AdsSymbolInfoIterator,
     AdsSymbolInfoIteratorOwned, AdsSymbolUploadFlags, AdsSymbolUploadInfo, AdsSymbolUploadInfoV1,
     AdsSymbolUploadInfoV2, AdsSymbolUploadInfoV3, AdsTransMode, AdsTypeCategory, AdsTypeFlags,
     AdsTypeId, AdsTypeInfo, AdsTypeInfoIterator, AdsTypeInfoIteratorOwned, DeviceState, Guid,
@@ -148,7 +148,7 @@ pub use ads::{
     SumDeleteNotificationIter, SumDeleteNotificationResponse, SumReadRequest, SumReadResponse,
     SumReadResponseIter, SumReadResponseOwned, SumReadWriteRequest, SumReadWriteRequestOwned,
     SumReadWriteResponse, SumReadWriteResponseIter, SumReadWriteResponseOwned, SumWriteIter,
-    SumWriteRequest, SumWriteResponse, SymbolHandle, WindowsFileTime,
+    SumWriteRequest, SumWriteResponse, SymbolHandle, WinRegistryValueType, WindowsFileTime,
 };
 pub use ams::{
     AmsAddr, AmsCommand, AmsError, AmsNetId, AmsPort, AmsTcpHeader, RouterState, RuntimeType,
