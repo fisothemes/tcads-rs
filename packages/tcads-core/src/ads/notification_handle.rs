@@ -48,6 +48,11 @@ impl NotificationHandle {
     pub fn as_u32(&self) -> u32 {
         u32::from_le_bytes(self.0)
     }
+
+    /// Returns the handle value as a byte slice.
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
 }
 
 impl From<u32> for NotificationHandle {
