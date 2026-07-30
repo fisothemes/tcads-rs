@@ -99,11 +99,6 @@ impl AdsRuntime {
         self.device.shutdown()
     }
 
-    /// Returns the target AMS Address.
-    pub fn target(&self) -> AmsAddr {
-        self.target
-    }
-
     /// Fetches and caches the symbol upload metadata from the PLC.
     ///
     /// This is metadata describing the symbols and data types available on a PLC runtime.

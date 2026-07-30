@@ -92,11 +92,6 @@ impl AdsLogger {
         self.device.shutdown().await
     }
 
-    /// Returns the target address of the logger.
-    pub fn target(&self) -> AmsAddr {
-        self.target
-    }
-
     /// Writes a log message to the TwinCAT logger using the current system time.
     ///
     /// `task_name` is encoded as Windows-1252 and truncated to
