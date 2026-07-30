@@ -27,6 +27,13 @@ impl IndexOffset {
     /// Bit address = `IO_IMAGE_OUTPUT_BIT_BASE + byte_offset * 8 + bit_number`. (`0x001F4000`)
     pub const IO_IMAGE_OUTPUT_BIT_BASE: Self = Self(0x001F_4000);
 
+    /// Registry enumeration flag for listing subkeys. (`0x00000000`)
+    pub const SYSTEM_SERVICE_REG_ENUM_KEYS: Self = Self(0x0000_0000);
+    /// Registry enumeration flag for listing values with their type and data. (`0xC0000000`)
+    pub const SYSTEM_SERVICE_REG_ENUM_VALUE_VTD: Self = Self(0xC000_0000);
+    /// Registry enumeration mask. (`0xC0000000`)
+    pub const SYSTEM_SERVICE_REG_ENUM_VALUE_MASK: Self = Self(0xC000_0000);
+
     /// Create a new index offset instance.
     pub const fn new(index_offset: u32) -> Self {
         Self(index_offset)

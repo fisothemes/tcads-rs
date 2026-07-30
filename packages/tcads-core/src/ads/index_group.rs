@@ -123,6 +123,35 @@ impl IndexGroup {
     /// Read device-specific data. (`0xF100`)
     pub const DEVICE_DATA: Self = Self(0xF100);
 
+    /// Open/create a file via the System Service. (`120`)
+    pub const SYSTEM_SERVICE_FOPEN: Self = Self(120);
+    /// Close a file via the System Service. (`121`)
+    pub const SYSTEM_SERVICE_FCLOSE: Self = Self(121);
+    /// Read a file via the System Service. (`122`)
+    pub const SYSTEM_SERVICE_FREAD: Self = Self(122);
+    /// Write a file via the System Service. (`123`)
+    pub const SYSTEM_SERVICE_FWRITE: Self = Self(123);
+    /// Delete a file via the System Service. (`131`)
+    pub const SYSTEM_SERVICE_FDELETE: Self = Self(131);
+    /// Browse a directory via the System Service. (`133`)
+    pub const SYSTEM_SERVICE_FFILEFIND: Self = Self(133);
+    /// Access `HKEY_LOCAL_MACHINE`. (`200`)
+    pub const SYSTEM_SERVICE_REG_HKEY_LOCAL_MACHINE: Self = Self(200);
+    /// Access `HKEY_CURRENT_USER`. (`201`)
+    pub const SYSTEM_SERVICE_REG_HKEY_CURRENT_USER: Self = Self(201);
+    /// Access `HKEY_CLASSES_ROOT`. (`202`)
+    pub const SYSTEM_SERVICE_REG_HKEY_CLASSES_ROOT: Self = Self(202);
+    /// Delete from `HKEY_LOCAL_MACHINE`. (`206`)
+    pub const SYSTEM_SERVICE_REG_DELETE_HKEY_LOCAL_MACHINE: Self = Self(206);
+    /// Delete from `HKEY_CURRENT_USER`. (`207`)
+    pub const SYSTEM_SERVICE_REG_DELETE_HKEY_CURRENT_USER: Self = Self(207);
+    /// Delete from `HKEY_CLASSES_ROOT`. (`208`)
+    pub const SYSTEM_SERVICE_REG_DELETE_HKEY_CLASSES_ROOT: Self = Self(208);
+    /// Start a process via the System Service. (`500`)
+    pub const SYSTEM_SERVICE_START_PROCESS: Self = Self(500);
+    /// Set the number of shared CPU cores via the System Service. (`1200`)
+    pub const SYSTEM_SERVICE_SET_NUM_PROC: Self = Self(1200);
+
     /// Creates a new index group instance.
     pub const fn new(index_group: u32) -> Self {
         Self(index_group)
