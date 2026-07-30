@@ -32,7 +32,7 @@ and [more](examples/src/bin/).
 > [!WARNING]
 > This project is currently under active development. APIs are subject to change.
 
-[`tcads-core`](packages/tcads-core) is the most mature component and covers the full AMS/ADS
+[`tcads-core`](packages/tcads-core) and [`tcads-serde`](packages/tcads-serde) are the most mature components.
 command set. [`tcads-client`](packages/tcads-client) and [`tcads-server`](packages/tcads-server) are in progress.
 
 ## Acknowledgments & Prior Art
