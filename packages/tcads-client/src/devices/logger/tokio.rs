@@ -24,6 +24,22 @@ pub struct AdsLogger {
 }
 
 impl AdsLogger {
+    /// Connects to the Logger (Port 100) of a specific `net_id` using the local AMS router.
+    ///
+    /// Use this when targeting a specific device on the same router that has a
+    /// different AMS Net ID (e.g., a UMRT or a specific PLC instance connected to the
+    /// local AMS Router).
+    ///
+    /// Performs a [`PortConnect`](tcads_core::protocol::PortConnectRequest) handshake
+    /// to obtain a dynamically assigned source address from the local router
+    pub async fn connect(
+        net_id: AmsNetId,
+        timeout: impl Into<Option<Duration>>,
+    ) -> crate::Result<Self> {
+        let device = AdsDevice::connect(timeout).await?;
+        Ok(Self::new(device, net_id))
+    }
+
     /// Connects to the Logger (Port 100) of the local AMS router at `127.0.0.1:48898`.
     ///
     /// Automatically discovers the local Net ID and targets `local_net_id:100`.
@@ -38,22 +54,6 @@ impl AdsLogger {
     pub async fn connect_local(timeout: impl Into<Option<Duration>>) -> crate::Result<Self> {
         let device = AdsDevice::connect(timeout).await?;
         let net_id = device.get_local_net_id().await?;
-        Ok(Self::new(device, net_id))
-    }
-
-    /// Connects to the Logger (Port 100) of a specific `net_id` using the local AMS router.
-    ///
-    /// Use this when targeting a specific device on the same router that has a
-    /// different AMS Net ID (e.g., a UMRT or a specific PLC instance connected to the
-    /// local AMS Router).
-    ///
-    /// Performs a [`PortConnect`](tcads_core::protocol::PortConnectRequest) handshake
-    /// to obtain a dynamically assigned source address from the local router
-    pub async fn connect(
-        net_id: AmsNetId,
-        timeout: impl Into<Option<Duration>>,
-    ) -> crate::Result<Self> {
-        let device = AdsDevice::connect(timeout).await?;
         Ok(Self::new(device, net_id))
     }
 
