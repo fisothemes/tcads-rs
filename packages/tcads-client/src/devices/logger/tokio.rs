@@ -232,6 +232,6 @@ impl AdsSubsystem for AdsLogger {
     }
 
     fn target(&self) -> AmsAddr {
-        self.target()
+        self.target
     }
 }
