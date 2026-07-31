@@ -93,6 +93,12 @@ impl AdsSystemService {
         self.device
             .write_control(self.target, AdsState::Shutdown, 1, &timeout.to_le_bytes())
     }
+
+    /// Instructs the ADS device's host operating system to abort the shutdown process.
+    pub fn abort_host_os_shutdown(&self) -> crate::Result<()> {
+        self.device
+            .write_control(self.target, AdsState::PowerGood, 0, [])
+    }
 }
 
 impl AdsSubsystem for AdsSystemService {
