@@ -1,6 +1,6 @@
 use crate::devices::tokio::{AdsDevice, AdsSubsystem};
 use std::time::Duration;
-use tcads_core::{AdsState, AmsAddr, AmsNetId, AmsPort};
+use tcads_core::{AdsState, AmsAddr, AmsNetId, AmsPort, IndexGroup, IndexOffset};
 
 /// Interacts with the TwinCAT System Service (Port 10000).
 ///
@@ -87,7 +87,7 @@ impl AdsSystemService {
     pub async fn shutdown_host_os(&self, timeout: Duration) -> crate::Result<()> {
         let timeout: u32 = timeout.as_secs() as u32;
         self.device
-            .write_control(self.target, AdsState::Shutdown, 0, &timeout.to_le_bytes())
+            .write_control(self.target, AdsState::Shutdown, 0, timeout.to_le_bytes())
             .await
     }
 
@@ -95,7 +95,7 @@ impl AdsSystemService {
     pub async fn restart_host_os(&self, timeout: Duration) -> crate::Result<()> {
         let timeout: u32 = timeout.as_secs() as u32;
         self.device
-            .write_control(self.target, AdsState::Shutdown, 1, &timeout.to_le_bytes())
+            .write_control(self.target, AdsState::Shutdown, 1, timeout.to_le_bytes())
             .await
     }
 
@@ -104,6 +104,20 @@ impl AdsSystemService {
         self.device
             .write_control(self.target, AdsState::PowerGood, 0, [])
             .await
+    }
+
+    /// Configures the number of shared CPU cores on the target device's host machine.
+    pub async fn set_host_shared_cores(&self, shared_cores: u32) -> crate::Result<()> {
+        self.device
+            .read_write(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_SET_NUM_PROC,
+                IndexOffset::ZERO,
+                0,
+                shared_cores.to_le_bytes(),
+            )
+            .await?;
+        Ok(())
     }
 }
 
