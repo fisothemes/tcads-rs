@@ -1,5 +1,5 @@
 use super::error::WindowsFileTimeError;
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use std::fmt::Debug;
 
 /// A timestamp encoded in the Windows FILETIME format.
@@ -98,6 +98,21 @@ impl WindowsFileTime {
 
         Self(Self::FILETIME_TO_UNIX_EPOCH_TICKS + ticks_since_unix)
     }
+
+    /// Converts to a [`NaiveDateTime`] (a date-time with no associated
+    /// timezone).
+    ///
+    /// Use this instead of [`WindowsFileTime::to_datetime`] when the tick count
+    /// does not represent a true UTC instant.
+    pub fn to_naive_datetime(self) -> NaiveDateTime {
+        self.to_datetime().naive_utc()
+    }
+
+    /// Converts from a [`NaiveDateTime`] (a date-time with no associated timezone). The inverse
+    /// of [`WindowsFileTime::to_naive_datetime`].
+    pub fn from_naive_datetime(dt: NaiveDateTime) -> Self {
+        Self::from_datetime(Utc.from_utc_datetime(&dt))
+    }
 }
 
 impl From<u64> for WindowsFileTime {
@@ -133,6 +148,18 @@ impl From<DateTime<Utc>> for WindowsFileTime {
 impl From<WindowsFileTime> for DateTime<Utc> {
     fn from(value: WindowsFileTime) -> Self {
         value.to_datetime()
+    }
+}
+
+impl From<NaiveDateTime> for WindowsFileTime {
+    fn from(value: NaiveDateTime) -> Self {
+        Self::from_naive_datetime(value)
+    }
+}
+
+impl From<WindowsFileTime> for NaiveDateTime {
+    fn from(value: WindowsFileTime) -> Self {
+        value.to_naive_datetime()
     }
 }
 
@@ -288,6 +315,31 @@ mod tests {
         let earlier = WindowsFileTime::from_raw(KNOWN_TICKS);
         let later = WindowsFileTime::from_raw(KNOWN_TICKS + 10_000_000); // 1 second later
         assert!(later > earlier);
+    }
+
+    #[test]
+    fn test_to_naive_datetime_drops_timezone_claim() {
+        let ft = WindowsFileTime::from_raw(KNOWN_TICKS);
+        let naive = ft.to_naive_datetime();
+        // Same wall-clock numbers as to_datetime(), just no attached zone.
+        assert_eq!(naive, ft.to_datetime().naive_utc());
+        assert_eq!(naive.to_string(), "2026-02-21 12:00:00");
+    }
+
+    #[test]
+    fn test_from_naive_datetime_roundtrip() {
+        let original = WindowsFileTime::from_raw(KNOWN_TICKS);
+        let naive = original.to_naive_datetime();
+        let roundtripped = WindowsFileTime::from_naive_datetime(naive);
+        assert_eq!(original, roundtripped);
+    }
+
+    #[test]
+    fn test_naive_datetime_from_impl_roundtrip() {
+        let original = WindowsFileTime::from_raw(KNOWN_TICKS);
+        let naive: NaiveDateTime = original.into();
+        let back: WindowsFileTime = naive.into();
+        assert_eq!(original, back);
     }
 
     #[test]
