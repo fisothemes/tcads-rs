@@ -36,6 +36,33 @@ impl IndexOffset {
     /// Flag bit for [`IndexGroup::SYSTEM_SERVICE_START_PROCESS`](super::IndexGroup::SYSTEM_SERVICE_START_PROCESS)
     /// requests. Set this bit to start the process with a hidden window. (`0x00010000`)
     pub const SYSTEM_SERVICE_START_PROCESS_HIDDEN: Self = Self(0x0001_0000);
+    /// Offset for [`IndexGroup::SYSTEM_SERVICE_TIME_SERVICES`](super::IndexGroup::SYSTEM_SERVICE_TIME_SERVICES)
+    /// requests reading/writing the local system time. (`5`)
+    pub const SYSTEM_SERVICE_TIME_LOCAL: Self = Self(5);
+    /// Offset for [`IndexGroup::SYSTEM_SERVICE_TIME_SERVICES`](super::IndexGroup::SYSTEM_SERVICE_TIME_SERVICES)
+    /// requests reading/writing the UTC system time. (`7`)
+    pub const SYSTEM_SERVICE_TIME_UTC: Self = Self(7);
+    /// Offset for [`IndexGroup::SYSTEM_SERVICE_TARGET_INFO`](super::IndexGroup::SYSTEM_SERVICE_TARGET_INFO)
+    /// requests reading the full target info XML blob. (`1`)
+    pub const SYSTEM_SERVICE_TARGET_INFO_XML: Self = Self(1);
+    /// Offset for [`IndexGroup::SYSTEM_SERVICE_TARGET_INFO`](super::IndexGroup::SYSTEM_SERVICE_TARGET_INFO)
+    /// requests reading the target type. (`2`)
+    pub const SYSTEM_SERVICE_TARGET_INFO_TYPE: Self = Self(2);
+    /// Offset for [`IndexGroup::SYSTEM_SERVICE_TARGET_INFO`](super::IndexGroup::SYSTEM_SERVICE_TARGET_INFO)
+    /// requests reading the target platform (fixed 64 bytes). (`4`)
+    pub const SYSTEM_SERVICE_TARGET_INFO_PLATFORM: Self = Self(4);
+    /// Offset for [`IndexGroup::SYSTEM_SERVICE_TARGET_INFO`](super::IndexGroup::SYSTEM_SERVICE_TARGET_INFO)
+    /// requests reading the project GUID (16 bytes). (`5`)
+    pub const SYSTEM_SERVICE_TARGET_INFO_PROJECT_GUID: Self = Self(5);
+    /// Offset for [`IndexGroup::SYSTEM_SERVICE_TARGET_INFO`](super::IndexGroup::SYSTEM_SERVICE_TARGET_INFO)
+    /// requests reading the project version GUID (16 bytes). (`6`)
+    pub const SYSTEM_SERVICE_TARGET_INFO_PROJECT_VERSION_GUID: Self = Self(6);
+    /// Offset for [`IndexGroup::SYSTEM_SERVICE_TARGET_INFO`](super::IndexGroup::SYSTEM_SERVICE_TARGET_INFO)
+    /// requests reading the project name. (`7`)
+    pub const SYSTEM_SERVICE_TARGET_INFO_PROJECT_NAME: Self = Self(7);
+    /// Offset for [`IndexGroup::SYSTEM_SERVICE_TARGET_INFO`](super::IndexGroup::SYSTEM_SERVICE_TARGET_INFO)
+    /// requests reading the self-signed certificate fingerprint (fixed 129 bytes). (`9`)
+    pub const SYSTEM_SERVICE_TARGET_INFO_CERT_FINGERPRINT: Self = Self(9);
 
     /// Create a new index offset instance.
     pub const fn new(index_offset: u32) -> Self {

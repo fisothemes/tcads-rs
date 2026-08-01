@@ -151,6 +151,15 @@ impl IndexGroup {
     pub const SYSTEM_SERVICE_START_PROCESS: Self = Self(500);
     /// Set the number of shared CPU cores via the System Service. (`1200`)
     pub const SYSTEM_SERVICE_SET_NUM_PROC: Self = Self(1200);
+    /// Read the System Service product version (4x `u16` fields). (`160`)
+    pub const SYSTEM_SERVICE_PRODUCT_VERSION: Self = Self(160);
+    /// Read/write the System Service's date and time. (`400`)
+    pub const SYSTEM_SERVICE_TIME_SERVICES: Self = Self(400);
+    /// Read the System Service's overall runtime status. (`240` / `0xF0`)
+    pub const SYSTEM_SERVICE_STATE: Self = Self(240);
+    /// Read System Service target info (XML info, target type, platform, project GUIDs/name,
+    /// certificate fingerprint). (`700`)
+    pub const SYSTEM_SERVICE_TARGET_INFO: Self = Self(700);
 
     /// Creates a new index group instance.
     pub const fn new(index_group: u32) -> Self {
