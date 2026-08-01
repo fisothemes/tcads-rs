@@ -20,6 +20,7 @@ pub mod sum;
 pub mod symbol;
 pub mod system_state;
 pub mod system_state_flags;
+pub mod target_info;
 pub mod trans_mode;
 pub mod windows_registry;
 
@@ -64,6 +65,7 @@ pub use symbol::{
 };
 pub use system_state::{AdsOsType, AdsPlatform, AdsSystemState};
 pub use system_state_flags::AdsSystemStateFlags;
+pub use target_info::AdsTargetType;
 pub use trans_mode::AdsTransMode;
 pub use windows_registry::WinRegistryValueType;
 

@@ -1,3 +1,5 @@
+use tcads_core::AdsError;
+
 /// Builds the write payload for a
 /// [`SYSTEM_SERVICE_START_PROCESS`](tcads_core::IndexGroup::SYSTEM_SERVICE_START_PROCESS)
 /// request.
@@ -38,6 +40,19 @@ pub fn build_start_host_process_request(
     data.push(0);
 
     Ok(data)
+}
+
+/// Decodes a little-endian `u32` from the start of `data`.
+pub fn decode_u32_le(data: &[u8]) -> crate::Result<u32> {
+    if data.len() != 4 {
+        return Err(AdsError::UnexpectedDataLength {
+            expected: 4,
+            got: data.len(),
+        }
+        .into());
+    }
+
+    Ok(u32::from_le_bytes([data[0], data[1], data[2], data[3]]))
 }
 
 #[cfg(test)]

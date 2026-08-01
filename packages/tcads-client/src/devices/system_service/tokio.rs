@@ -3,8 +3,8 @@ use crate::devices::tokio::{AdsDevice, AdsSubsystem};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use std::time::Duration;
 use tcads_core::{
-    AdsError, AdsProductVersion, AdsState, AdsSystemState, AmsAddr, AmsNetId, AmsPort, IndexGroup,
-    IndexOffset, WindowsFileTime,
+    AdsError, AdsProductVersion, AdsState, AdsSystemState, AdsTargetType, AmsAddr, AmsNetId,
+    AmsPort, Guid, IndexGroup, IndexOffset, WindowsFileTime,
 };
 
 /// Interacts with the TwinCAT System Service (Port 10000).
@@ -261,6 +261,136 @@ impl AdsSystemService {
             .await?;
 
         Ok(AdsSystemState::try_from_slice(&data).map_err(AdsError::from)?)
+    }
+
+    /// Retrieves information about the target device's host hardware, operating system, and
+    /// TwinCAT installation as an XML string.
+    pub async fn get_target_info(&self) -> crate::Result<String> {
+        let data = self
+            .device
+            .read(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_TARGET_INFO,
+                IndexOffset::SYSTEM_SERVICE_TARGET_INFO_XML,
+                4,
+            )
+            .await?;
+
+        let len = shared::decode_u32_le(&data)?;
+
+        let data = self
+            .device
+            .read(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_TARGET_INFO,
+                IndexOffset::SYSTEM_SERVICE_TARGET_INFO_XML,
+                len,
+            )
+            .await?;
+
+        Ok(String::from_utf8_lossy(&data).trim_matches('\0').into())
+    }
+
+    /// Reads the target device category (PC, CX, BC, or BX).
+    pub async fn get_target_type(&self) -> crate::Result<AdsTargetType> {
+        let data = self
+            .device
+            .read(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_TARGET_INFO,
+                IndexOffset::SYSTEM_SERVICE_TARGET_INFO_TYPE,
+                AdsTargetType::LENGTH as u32,
+            )
+            .await?;
+
+        Ok(AdsTargetType::from(shared::decode_u32_le(&data)?))
+    }
+
+    /// Reads the target platform name.
+    pub async fn get_target_platform(&self) -> crate::Result<String> {
+        let data = self
+            .device
+            .read(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_TARGET_INFO,
+                IndexOffset::SYSTEM_SERVICE_TARGET_INFO_PLATFORM,
+                64,
+            )
+            .await?;
+
+        Ok(String::from_utf8_lossy(&data).trim_matches('\0').into())
+    }
+
+    /// Reads the currently loaded project's GUID.
+    pub async fn get_target_project_guid(&self) -> crate::Result<Guid> {
+        let data = self
+            .device
+            .read(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_TARGET_INFO,
+                IndexOffset::SYSTEM_SERVICE_TARGET_INFO_PROJECT_GUID,
+                Guid::LENGTH as u32,
+            )
+            .await?;
+
+        Ok(Guid::try_from_slice(&data).map_err(AdsError::from)?)
+    }
+
+    /// Reads the currently loaded project's version GUID.
+    pub async fn get_target_project_version_guid(&self) -> crate::Result<Guid> {
+        let data = self
+            .device
+            .read(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_TARGET_INFO,
+                IndexOffset::SYSTEM_SERVICE_TARGET_INFO_PROJECT_VERSION_GUID,
+                Guid::LENGTH as u32,
+            )
+            .await?;
+
+        Ok(Guid::try_from_slice(&data).map_err(AdsError::from)?)
+    }
+
+    /// Reads the currently loaded project's name.
+    pub async fn get_target_project_name(&self) -> crate::Result<String> {
+        let data = &self
+            .device
+            .read(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_TARGET_INFO,
+                IndexOffset::SYSTEM_SERVICE_TARGET_INFO_PROJECT_NAME,
+                4,
+            )
+            .await?;
+
+        let len = shared::decode_u32_le(data)?;
+
+        let data = self
+            .device
+            .read(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_TARGET_INFO,
+                IndexOffset::SYSTEM_SERVICE_TARGET_INFO_PROJECT_NAME,
+                len,
+            )
+            .await?;
+
+        Ok(String::from_utf8_lossy(&data).trim_matches('\0').into())
+    }
+
+    /// Reads the target's self-signed certificate fingerprint.
+    pub async fn get_target_fingerprint(&self) -> crate::Result<String> {
+        let data = self
+            .device
+            .read(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_TARGET_INFO,
+                IndexOffset::SYSTEM_SERVICE_TARGET_INFO_CERT_FINGERPRINT,
+                129,
+            )
+            .await?;
+
+        Ok(String::from_utf8_lossy(&data).trim_matches('\0').into())
     }
 }
 
