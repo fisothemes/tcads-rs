@@ -50,6 +50,12 @@ pub enum AdsError {
     /// Invalid ADS symbol info format or content.
     #[error("Invalid ADS symbol info: {0}")]
     InvalidAdsSymbolInfo(#[from] AdsSymbolInfoError),
+    /// Invalid ADS system state format or content.
+    #[error("Invalid ADS system state: {0}")]
+    InvalidAdsSystemState(#[from] AdsSystemStateError),
+    /// Invalid ADS product version format or content.
+    #[error("Invalid ADS product version: {0}")]
+    InvalidAdsProductVersion(#[from] AdsProductVersionError),
     /// Invalid ADS data type format or content.
     #[error("Invalid GUID: {0}")]
     InvalidGuid(#[from] GuidParseError),
@@ -215,4 +221,18 @@ pub enum SumError {
     PayloadTooShort { expected: usize, got: usize },
     #[error("Unexpected length: expected {expected} bytes, got {got}")]
     UnexpectedLength { expected: usize, got: usize },
+}
+
+/// Error returned when parsing an [`AdsSystemState`](super::AdsSystemState) fails.
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum AdsSystemStateError {
+    #[error("Payload too short: expected at least {expected} bytes, got {got}")]
+    TooShort { expected: usize, got: usize },
+}
+
+/// Error returned when parsing an [`AdsProductVersion`](super::AdsProductVersion) fails.
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum AdsProductVersionError {
+    #[error("Payload too short: expected at least {expected} bytes, got {got}")]
+    TooShort { expected: usize, got: usize },
 }

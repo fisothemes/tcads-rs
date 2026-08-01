@@ -12,11 +12,14 @@ pub mod log_entry;
 pub mod logger_message_type;
 pub mod notification_attrib;
 pub mod notification_handle;
+pub mod product_version;
 pub mod return_codes;
 pub mod state_flag;
 pub mod string;
 pub mod sum;
 pub mod symbol;
+pub mod system_state;
+pub mod system_state_flags;
 pub mod trans_mode;
 pub mod windows_registry;
 
@@ -25,10 +28,10 @@ pub use device_state::{AdsState, DeviceState};
 pub use device_version::AdsDeviceVersion;
 pub use error::{
     AdsCommandError, AdsDeviceVersionError, AdsError, AdsHeaderError, AdsNotificationAttribError,
-    AdsNotificationHandleError, AdsReturnCodeError, AdsStateError, AdsStringError,
-    AdsSymbolInfoError, AdsSymbolUploadInfoError, AdsTransModeError, AdsTypeInfoError,
-    GuidParseError, LogEntryError, LogMessageTypeError, StateFlagError, SumError,
-    WindowsFileTimeError,
+    AdsNotificationHandleError, AdsProductVersionError, AdsReturnCodeError, AdsStateError,
+    AdsStringError, AdsSymbolInfoError, AdsSymbolUploadInfoError, AdsSystemStateError,
+    AdsTransModeError, AdsTypeInfoError, GuidParseError, LogEntryError, LogMessageTypeError,
+    StateFlagError, SumError, WindowsFileTimeError,
 };
 pub use file_flag::AdsFileFlags;
 pub use file_handle::AdsFileHandle;
@@ -40,6 +43,7 @@ pub use log_entry::LogEntry;
 pub use logger_message_type::LogMessageType;
 pub use notification_attrib::AdsNotificationAttrib;
 pub use notification_handle::NotificationHandle;
+pub use product_version::AdsProductVersion;
 pub use return_codes::AdsReturnCode;
 pub use state_flag::StateFlag;
 pub use string::AdsString;
@@ -58,6 +62,8 @@ pub use symbol::{
     AdsSymbolUploadInfoV2, AdsSymbolUploadInfoV3, AdsTypeCategory, AdsTypeFlags, AdsTypeId,
     AdsTypeInfo, AdsTypeInfoIterator, AdsTypeInfoIteratorOwned, Guid, SymbolHandle,
 };
+pub use system_state::{AdsOsType, AdsPlatform, AdsSystemState};
+pub use system_state_flags::AdsSystemStateFlags;
 pub use trans_mode::AdsTransMode;
 pub use windows_registry::WinRegistryValueType;
 
