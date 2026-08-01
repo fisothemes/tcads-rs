@@ -1,7 +1,11 @@
 use super::shared;
 use crate::devices::tokio::{AdsDevice, AdsSubsystem};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use std::time::Duration;
-use tcads_core::{AdsState, AmsAddr, AmsNetId, AmsPort, IndexGroup, IndexOffset};
+use tcads_core::{
+    AdsError, AdsProductVersion, AdsState, AdsSystemState, AmsAddr, AmsNetId, AmsPort, IndexGroup,
+    IndexOffset, WindowsFileTime,
+};
 
 /// Interacts with the TwinCAT System Service (Port 10000).
 ///
@@ -168,6 +172,95 @@ impl AdsSystemService {
                 data,
             )
             .await
+    }
+
+    /// Reads the System Service's product version.
+    pub async fn get_product_version(&self) -> crate::Result<AdsProductVersion> {
+        let data = self
+            .device
+            .read(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_PRODUCT_VERSION,
+                IndexOffset::ZERO,
+                AdsProductVersion::MIN_LENGTH as u32,
+            )
+            .await?;
+
+        Ok(AdsProductVersion::try_from_slice(&data).map_err(AdsError::from)?)
+    }
+
+    /// Reads the ADS device's current UTC system time.
+    pub async fn get_time_utc(&self) -> crate::Result<DateTime<Utc>> {
+        let data = self
+            .device
+            .read(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_TIME_SERVICES,
+                IndexOffset::SYSTEM_SERVICE_TIME_UTC,
+                WindowsFileTime::LENGTH as u32,
+            )
+            .await?;
+
+        let ft = WindowsFileTime::try_from_slice(&data).map_err(AdsError::from)?;
+        Ok(ft.to_datetime())
+    }
+
+    /// Sets the ADS device's UTC system time.
+    pub async fn set_time_utc(&self, time: DateTime<Utc>) -> crate::Result<()> {
+        let ft = WindowsFileTime::from_datetime(time);
+        self.device
+            .write(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_TIME_SERVICES,
+                IndexOffset::SYSTEM_SERVICE_TIME_UTC,
+                ft.to_bytes(),
+            )
+            .await
+    }
+
+    /// Reads the ADS device's current local system time.
+    pub async fn get_time_local(&self) -> crate::Result<NaiveDateTime> {
+        let data = self
+            .device
+            .read(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_TIME_SERVICES,
+                IndexOffset::SYSTEM_SERVICE_TIME_LOCAL,
+                WindowsFileTime::LENGTH as u32,
+            )
+            .await?;
+
+        let ft = WindowsFileTime::try_from_slice(&data).map_err(AdsError::from)?;
+        Ok(ft.to_naive_datetime())
+    }
+
+    /// Sets the ADS device's local system time.
+    pub async fn set_time_local(&self, time: NaiveDateTime) -> crate::Result<()> {
+        let ft = WindowsFileTime::from_naive_datetime(time);
+        self.device
+            .write(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_TIME_SERVICES,
+                IndexOffset::SYSTEM_SERVICE_TIME_LOCAL,
+                ft.to_bytes(),
+            )
+            .await
+    }
+
+    /// Reads the System Service's overall runtime status (ADS state, device state,
+    /// restart count, version, platform, OS type, flags, and timeout).
+    pub async fn get_system_state(&self) -> crate::Result<AdsSystemState> {
+        let data = self
+            .device
+            .read(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_STATE,
+                IndexOffset::ZERO,
+                AdsSystemState::LENGTH as u32,
+            )
+            .await?;
+
+        Ok(AdsSystemState::try_from_slice(&data).map_err(AdsError::from)?)
     }
 }
 
