@@ -128,7 +128,7 @@ impl AdsSystemService {
     /// # use tcads_client::devices::blocking::AdsSystemService;
     /// # fn main() -> tcads_client::Result<()> {
     /// # let device = AdsSystemService::connect_local(None)?;
-    /// device.start_host_process(
+    /// device.start_process_on_host(
     ///     "C:/Windows/Notepad.exe",
     ///     "C:/TwinCAT/3.1/Target",
     ///     "StaticRoutes.xml",
@@ -137,7 +137,7 @@ impl AdsSystemService {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn start_host_process(
+    pub fn start_process_on_host(
         &self,
 
         app: impl AsRef<str>,

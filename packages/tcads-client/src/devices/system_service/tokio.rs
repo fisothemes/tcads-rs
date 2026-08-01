@@ -145,7 +145,7 @@ impl AdsSystemService {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn start_host_process(
+    pub async fn start_process_on_host(
         &self,
         app: impl AsRef<str>,
         dir: impl AsRef<str>,
