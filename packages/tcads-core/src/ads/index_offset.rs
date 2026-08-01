@@ -33,6 +33,9 @@ impl IndexOffset {
     pub const SYSTEM_SERVICE_REG_ENUM_VALUE_VTD: Self = Self(0xC000_0000);
     /// Registry enumeration mask. (`0xC0000000`)
     pub const SYSTEM_SERVICE_REG_ENUM_VALUE_MASK: Self = Self(0xC000_0000);
+    /// Flag bit for [`IndexGroup::SYSTEM_SERVICE_START_PROCESS`](super::IndexGroup::SYSTEM_SERVICE_START_PROCESS)
+    /// requests. Set this bit to start the process with a hidden window. (`0x00010000`)
+    pub const SYSTEM_SERVICE_START_PROCESS_HIDDEN: Self = Self(0x0001_0000);
 
     /// Create a new index offset instance.
     pub const fn new(index_offset: u32) -> Self {

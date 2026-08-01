@@ -1,3 +1,4 @@
+use super::shared;
 use crate::devices::tokio::{AdsDevice, AdsSubsystem};
 use std::time::Duration;
 use tcads_core::{AdsState, AmsAddr, AmsNetId, AmsPort, IndexGroup, IndexOffset};
@@ -118,6 +119,55 @@ impl AdsSystemService {
             )
             .await?;
         Ok(())
+    }
+
+    /// Starts a new process on the host machine of the ADS device.
+    ///
+    /// `dir` is the working directory of the process. `args` are the command-line arguments passed
+    /// to it. `is_hidden` indicates whether the process starts without a user interface.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use tcads_client::devices::tokio::AdsSystemService;
+    /// # fn main() -> tcads_client::Result<()> {
+    /// # let device = AdsSystemService::connect_local(None)?;
+    /// device.start_host_process(
+    ///     "C:/Windows/Notepad.exe",
+    ///     "C:/TwinCAT/3.1/Target",
+    ///     "StaticRoutes.xml",
+    ///     false
+    /// ).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn start_host_process(
+        &self,
+        app: impl AsRef<str>,
+        dir: impl AsRef<str>,
+        args: impl AsRef<str>,
+        is_hidden: bool,
+    ) -> crate::Result<()> {
+        let app = app.as_ref();
+        let dir = dir.as_ref();
+        let args = args.as_ref();
+
+        let data = shared::build_start_host_process_request(app, dir, args)?;
+
+        let offset = if is_hidden {
+            IndexOffset::SYSTEM_SERVICE_START_PROCESS_HIDDEN
+        } else {
+            IndexOffset::ZERO
+        };
+
+        self.device
+            .write(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_START_PROCESS,
+                offset,
+                data,
+            )
+            .await
     }
 }
 
