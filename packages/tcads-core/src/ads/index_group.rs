@@ -131,10 +131,22 @@ impl IndexGroup {
     pub const SYSTEM_SERVICE_FREAD: Self = Self(122);
     /// Write a file via the System Service. (`123`)
     pub const SYSTEM_SERVICE_FWRITE: Self = Self(123);
+    /// Set a file's position via the System Service. (`124`)
+    pub const SYSTEM_SERVICE_FSEEK: Self = Self(124);
+    /// Read a file's position via the System Service. (`125`)
+    pub const SYSTEM_SERVICE_FTELL: Self = Self(125);
+    /// Check whether a file's position is at end-of-file via the System Service. (`130`)
+    pub const SYSTEM_SERVICE_FEOF: Self = Self(130);
     /// Delete a file via the System Service. (`131`)
     pub const SYSTEM_SERVICE_FDELETE: Self = Self(131);
     /// Browse a directory via the System Service. (`133`)
     pub const SYSTEM_SERVICE_FFILEFIND: Self = Self(133);
+    /// Read a file's status (size/timestamps/attributes) via the System Service. (`134`)
+    pub const SYSTEM_SERVICE_FGETSTATUS: Self = Self(134);
+    /// Create a directory via the System Service. (`138`)
+    pub const SYSTEM_SERVICE_MKDIR: Self = Self(138);
+    /// Remove a directory via the System Service. (`139`)
+    pub const SYSTEM_SERVICE_RMDIR: Self = Self(139);
     /// Access `HKEY_LOCAL_MACHINE`. (`200`)
     pub const SYSTEM_SERVICE_REG_HKEY_LOCAL_MACHINE: Self = Self(200);
     /// Access `HKEY_CURRENT_USER`. (`201`)

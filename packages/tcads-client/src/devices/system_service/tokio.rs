@@ -3,8 +3,9 @@ use crate::devices::tokio::{AdsDevice, AdsSubsystem};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use std::time::Duration;
 use tcads_core::{
-    AdsError, AdsProductVersion, AdsState, AdsSystemState, AdsTargetType, AmsAddr, AmsNetId,
-    AmsPort, Guid, IndexGroup, IndexOffset, WindowsFileTime,
+    AdsError, AdsFileFlags, AdsFileHandle, AdsFilePathType, AdsFileSeekOrigin, AdsFileStatus,
+    AdsProductVersion, AdsState, AdsSystemState, AdsTargetType, AmsAddr, AmsNetId, AmsPort, Guid,
+    IndexGroup, IndexOffset, WindowsFileTime,
 };
 
 /// Interacts with the TwinCAT System Service (Port 10000).
@@ -134,9 +135,11 @@ impl AdsSystemService {
     ///
     /// ```no_run
     /// # use tcads_client::devices::tokio::AdsSystemService;
-    /// # fn main() -> tcads_client::Result<()> {
-    /// # let device = AdsSystemService::connect_local(None)?;
-    /// device.start_host_process(
+    /// # #[tokio::main]
+    /// # async fn main() -> tcads_client::Result<()> {
+    /// # use tokio::main;
+    /// let device = AdsSystemService::connect_local(None).await?;
+    /// device.start_process_on_host(
     ///     "C:/Windows/Notepad.exe",
     ///     "C:/TwinCAT/3.1/Target",
     ///     "StaticRoutes.xml",
@@ -391,6 +394,210 @@ impl AdsSystemService {
             .await?;
 
         Ok(String::from_utf8_lossy(&data).trim_matches('\0').into())
+    }
+
+    /// Opens a file on the ADS device's host machine and returns a file handle.
+    pub async fn open_file(
+        &self,
+        path: impl AsRef<str>,
+        path_type: AdsFilePathType,
+        flags: AdsFileFlags,
+    ) -> crate::Result<AdsFileHandle> {
+        let offset = IndexOffset::new(((path_type.as_u16() as u32) << 16) | flags.as_raw());
+
+        let data = self
+            .device
+            .read_write(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_FOPEN,
+                offset,
+                AdsFileHandle::LENGTH as u32,
+                path.as_ref().as_bytes(),
+            )
+            .await?;
+
+        Ok(AdsFileHandle::try_from_slice(&data).map_err(AdsError::from)?)
+    }
+
+    /// Closes a file handle created a [`open_file`](Self::open_file) call.
+    pub async fn close_file(&self, handle: AdsFileHandle) -> crate::Result<()> {
+        self.device
+            .read_write(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_FCLOSE,
+                IndexOffset::new(handle.into()),
+                0,
+                [],
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    /// Reads the contents of a file on the ADS device's host machine into a buffer and returns the
+    /// number of bytes read.
+    pub async fn read_file(&self, handle: AdsFileHandle, buf: &mut [u8]) -> crate::Result<usize> {
+        let data = self
+            .device
+            .read_write(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_FREAD,
+                IndexOffset::new(handle.as_u32()),
+                buf.len() as u32,
+                [],
+            )
+            .await?;
+
+        let n = data.len().min(buf.len());
+        buf[..n].copy_from_slice(&data[..n]);
+        Ok(n)
+    }
+
+    /// Writes data to a file on the ADS device's host machine. Returns the number of bytes written.
+    pub async fn write_file(&self, handle: AdsFileHandle, data: &[u8]) -> crate::Result<usize> {
+        let resp = self
+            .device
+            .read_write(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_FWRITE,
+                IndexOffset::new(handle.as_u32()),
+                4,
+                data,
+            )
+            .await?;
+
+        Ok(shared::decode_u32_le(&resp)? as usize)
+    }
+
+    /// Sets an open file's position, relative to `origin`.
+    pub async fn seek_file(
+        &self,
+        handle: AdsFileHandle,
+        pos: i32,
+        origin: AdsFileSeekOrigin,
+    ) -> crate::Result<()> {
+        let mut data = Vec::with_capacity(8);
+        data.extend_from_slice(&pos.to_le_bytes());
+        data.extend_from_slice(&origin.as_u32().to_le_bytes());
+
+        self.device
+            .read_write(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_FSEEK,
+                IndexOffset::new(handle.as_u32()),
+                0,
+                data,
+            )
+            .await?;
+        Ok(())
+    }
+
+    /// Reads an open file's current position.
+    pub async fn tell_file(&self, handle: AdsFileHandle) -> crate::Result<u32> {
+        let data = self
+            .device
+            .read_write(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_FTELL,
+                IndexOffset::new(handle.as_u32()),
+                4,
+                [],
+            )
+            .await?;
+
+        shared::decode_u32_le(&data)
+    }
+
+    /// Returns `true` if an open file's position is at end-of-file.
+    pub async fn is_file_eof(&self, handle: AdsFileHandle) -> crate::Result<bool> {
+        let data = self
+            .device
+            .read_write(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_FEOF,
+                IndexOffset::new(handle.as_u32()),
+                4,
+                [],
+            )
+            .await?;
+
+        Ok(shared::decode_u32_le(&data)? != 0)
+    }
+
+    /// Deletes a file on the ADS device's host machine.
+    pub async fn delete_file(
+        &self,
+        path: impl AsRef<str>,
+        path_type: AdsFilePathType,
+    ) -> crate::Result<()> {
+        let offset = IndexOffset::new(((path_type.as_u16() as u32) << 16) | 0);
+
+        self.device
+            .read_write(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_FDELETE,
+                offset,
+                0,
+                path.as_ref().as_bytes(),
+            )
+            .await?;
+        Ok(())
+    }
+
+    /// Reads a file's status (size, timestamps, attributes).
+    pub async fn get_file_status(
+        &self,
+        path: impl AsRef<str>,
+        path_type: AdsFilePathType,
+    ) -> crate::Result<AdsFileStatus> {
+        let data = self
+            .device
+            .read_write(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_FGETSTATUS,
+                IndexOffset::new(path_type.as_u16() as u32),
+                AdsFileStatus::LENGTH as u32,
+                path.as_ref().as_bytes(),
+            )
+            .await?;
+
+        Ok(AdsFileStatus::try_from_slice(&data).map_err(AdsError::from)?)
+    }
+
+    /// Creates a directory on the ADS device's host machine.
+    pub async fn create_dir(
+        &self,
+        path: impl AsRef<str>,
+        path_type: AdsFilePathType,
+    ) -> crate::Result<()> {
+        self.device
+            .read_write(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_MKDIR,
+                IndexOffset::new(path_type.as_u16() as u32),
+                0,
+                path.as_ref().as_bytes(),
+            )
+            .await?;
+        Ok(())
+    }
+
+    /// Removes a directory on the ADS device's host machine.
+    pub async fn remove_dir(
+        &self,
+        path: impl AsRef<str>,
+        path_type: AdsFilePathType,
+    ) -> crate::Result<()> {
+        self.device
+            .read_write(
+                self.target,
+                IndexGroup::SYSTEM_SERVICE_RMDIR,
+                IndexOffset::new(path_type.as_u16() as u32),
+                0,
+                path.as_ref().as_bytes(),
+            )
+            .await?;
+        Ok(())
     }
 }
 

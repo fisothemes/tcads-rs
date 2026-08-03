@@ -2,8 +2,12 @@ pub mod command;
 pub mod device_state;
 pub mod device_version;
 pub mod error;
+pub mod file_attributes;
 pub mod file_flag;
 pub mod file_handle;
+pub mod file_path_type;
+pub mod file_seek_origin;
+pub mod file_status;
 pub mod filetime;
 pub mod header;
 pub mod index_group;
@@ -28,14 +32,19 @@ pub use command::AdsCommand;
 pub use device_state::{AdsState, DeviceState};
 pub use device_version::AdsDeviceVersion;
 pub use error::{
-    AdsCommandError, AdsDeviceVersionError, AdsError, AdsHeaderError, AdsNotificationAttribError,
-    AdsNotificationHandleError, AdsProductVersionError, AdsReturnCodeError, AdsStateError,
-    AdsStringError, AdsSymbolInfoError, AdsSymbolUploadInfoError, AdsSystemStateError,
-    AdsTransModeError, AdsTypeInfoError, GuidParseError, LogEntryError, LogMessageTypeError,
-    StateFlagError, SumError, WindowsFileTimeError,
+    AdsCommandError, AdsDeviceVersionError, AdsError, AdsFileHandleError, AdsFileStatusError,
+    AdsHeaderError, AdsNotificationAttribError, AdsNotificationHandleError, AdsProductVersionError,
+    AdsReturnCodeError, AdsStateError, AdsStringError, AdsSymbolInfoError,
+    AdsSymbolUploadInfoError, AdsSystemStateError, AdsTransModeError, AdsTypeInfoError,
+    GuidParseError, LogEntryError, LogMessageTypeError, StateFlagError, SumError,
+    WindowsFileTimeError,
 };
+pub use file_attributes::AdsFileAttributes;
 pub use file_flag::AdsFileFlags;
 pub use file_handle::AdsFileHandle;
+pub use file_path_type::AdsFilePathType;
+pub use file_seek_origin::AdsFileSeekOrigin;
+pub use file_status::AdsFileStatus;
 pub use filetime::WindowsFileTime;
 pub use header::AdsHeader;
 pub use index_group::IndexGroup;

@@ -1,4 +1,4 @@
-use std::array::TryFromSliceError;
+use super::error::AdsFileHandleError;
 use std::fmt;
 
 /// A handle identifying a remote file opened via the TwinCAT System Service.
@@ -24,7 +24,7 @@ impl AdsFileHandle {
     /// Tries to parse an [`AdsFileHandle`] from a byte slice.
     ///
     /// Returns an error if the slice is shorter than 4 bytes.
-    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, TryFromSliceError> {
+    pub fn try_from_slice(bytes: &[u8]) -> Result<Self, AdsFileHandleError> {
         bytes.try_into()
     }
 
@@ -69,11 +69,17 @@ impl From<AdsFileHandle> for [u8; AdsFileHandle::LENGTH] {
 }
 
 impl TryFrom<&[u8]> for AdsFileHandle {
-    type Error = TryFromSliceError;
+    type Error = AdsFileHandleError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        let bytes: [u8; AdsFileHandle::LENGTH] = bytes.try_into()?;
-        Ok(Self::from_bytes(bytes))
+        let len = bytes.len();
+
+        Ok(Self::from_bytes(bytes.try_into().map_err(|_| {
+            AdsFileHandleError::UnexpectedLength {
+                expected: AdsFileHandle::LENGTH,
+                got: len,
+            }
+        })?))
     }
 }
 

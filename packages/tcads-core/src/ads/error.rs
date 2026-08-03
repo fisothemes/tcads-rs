@@ -50,6 +50,12 @@ pub enum AdsError {
     /// Invalid ADS symbol info format or content.
     #[error("Invalid ADS symbol info: {0}")]
     InvalidAdsSymbolInfo(#[from] AdsSymbolInfoError),
+    /// Invalid ADS file handle format or content.
+    #[error("Invalid ADS file handle: {0}")]
+    InvalidateAdsFileHandle(#[from] AdsFileHandleError),
+    /// Invalid ADS file status format or content.
+    #[error("Invalid ADS file status: {0}")]
+    InvalidAdsFileStatus(#[from] AdsFileStatusError),
     /// Invalid ADS system state format or content.
     #[error("Invalid ADS system state: {0}")]
     InvalidAdsSystemState(#[from] AdsSystemStateError),
@@ -219,6 +225,20 @@ pub enum SumError {
     HeaderTooShort { expected: usize, got: usize },
     #[error("Invalid payload: expected at least {expected} bytes, got {got}")]
     PayloadTooShort { expected: usize, got: usize },
+    #[error("Unexpected length: expected {expected} bytes, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
+}
+
+/// Error returned when parsing an [`AdsFileHandle`](super::AdsFileHandle) fails.
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum AdsFileHandleError {
+    #[error("Unexpected length: expected {expected} bytes, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
+}
+
+/// Error returned when parsing an [`AdsFileStatus`](super::AdsFileStatus) fails.
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum AdsFileStatusError {
     #[error("Unexpected length: expected {expected} bytes, got {got}")]
     UnexpectedLength { expected: usize, got: usize },
 }

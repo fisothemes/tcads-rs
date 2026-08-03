@@ -137,7 +137,8 @@ pub mod protocol;
 
 pub use ads::{
     AdsArrayInfo, AdsAttribute, AdsCommand, AdsDeviceVersion, AdsEnumInfo, AdsError, AdsFieldInfo,
-    AdsFileFlags, AdsFileHandle, AdsHeader, AdsMethodFlags, AdsMethodInfo, AdsMethodParamFlags,
+    AdsFileAttributes, AdsFileFlags, AdsFileHandle, AdsFilePathType, AdsFileSeekOrigin,
+    AdsFileStatus, AdsHeader, AdsMethodFlags, AdsMethodInfo, AdsMethodParamFlags,
     AdsMethodParamInfo, AdsMethodReturnTypeInfo, AdsNotificationAttrib, AdsOsType, AdsPlatform,
     AdsProductVersion, AdsRefactorInfo, AdsReturnCode, AdsState, AdsSymbol2Flags, AdsSymbolFlags,
     AdsSymbolInfo, AdsSymbolInfoIterator, AdsSymbolInfoIteratorOwned, AdsSymbolUploadFlags,
