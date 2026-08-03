@@ -240,8 +240,7 @@ mod tests {
     fn roundtrips_utf8_message() {
         let mut data = test_bytes();
         // Set UTF8 flag (0x1000) in addition to existing flags
-        let flags =
-            (LogMessageType::HINT | LogMessageType::LOG | LogMessageType::UTF8).to_le_bytes();
+        let flags = (LogMessageType::HINT | LogMessageType::LOG | LogMessageType::UTF8).to_bytes();
         data[8..12].copy_from_slice(&flags);
         // Replace message bytes with a UTF-8 string containing a non-ASCII char
         let utf8_msg = "héllo".as_bytes();

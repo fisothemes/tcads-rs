@@ -30,7 +30,7 @@ fn main() -> Result<()> {
     // We can combine MessageTypes using standard bitwise OR (|)
     println!("Writing a test message to the logger...");
     logger.write_log(
-        (LogMessageType::WARNING | LogMessageType::LOG).into(),
+        LogMessageType::WARNING | LogMessageType::LOG,
         "RustClient",
         "Hello from tcads-rs! This is a custom log message.",
     )?;

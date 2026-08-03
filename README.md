@@ -57,7 +57,7 @@ fn main() -> Result<()> {
     });
 
     // Write a custom message to the TwinCAT ADS logger
-    logger.write_log(LogMessageType::WARNING.into(), "RustClient", "Starting up...")?;
+    logger.write_log(LogMessageType::WARNING, "RustClient", "Starting up...")?;
 
 
     // 3. PLC Runtime (Port 851): Read, Write, and RPC
@@ -75,7 +75,7 @@ fn main() -> Result<()> {
     // 4. System Service (Port 10,000): Host OS Control
     let system = AdsSystemService::new(device.clone(), AmsNetId::local());
 
-    // Fetch the target IPC's exact OS and Hardware manifest
+    // Fetch the target IPC's TwinCAT version
     let version = system.get_product_version()?;
     println!("Target TwinCAT Version: {}", version);
 
@@ -95,7 +95,7 @@ fn main() -> Result<()> {
 
 
     // 5. Clean up
-    logger.write_log(LogMessageType::WARNING.into(), "RustClient", "Exiting...")?;
+    logger.write_log(LogMessageType::WARNING, "RustClient", "Exiting...")?;
 
     // Unsubscribing drops the sender channel, gracefully exiting the receiver thread
     logger.unsubscribe(logger_handle)?;

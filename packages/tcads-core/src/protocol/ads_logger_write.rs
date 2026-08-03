@@ -162,7 +162,7 @@ impl<'a> AdsLoggerWriteRequest<'a> {
 
         let timestamp = WindowsFileTime::try_from_slice(&data[8..16]).map_err(AdsError::from)?;
         let msg_arg_len = u32::from_le_bytes(data[24..28].try_into().unwrap()) as usize;
-        let message_type = LogMessageType::try_from_bytes(&data[28..32]).map_err(AdsError::from)?;
+        let message_type = LogMessageType::try_from(&data[28..32]).map_err(AdsError::from)?;
         let (task_name, _, _) = WINDOWS_1252.decode(&data[32..32 + Self::TASK_NAME_LEN]);
 
         let strings_end = Self::MIN_PAYLOAD_SIZE + msg_arg_len;
@@ -460,7 +460,7 @@ mod tests {
     #[test]
     fn roundtrip_windows1252() {
         let owned = make_owned(
-            LogMessageType::new(LogMessageType::HINT | LogMessageType::LOG),
+            LogMessageType::HINT | LogMessageType::LOG,
             "Hello from tcads-rs",
             "some arg",
         );
@@ -475,7 +475,7 @@ mod tests {
     #[test]
     fn roundtrip_utf8() {
         let owned = make_owned(
-            LogMessageType::new(LogMessageType::HINT | LogMessageType::UTF8),
+            LogMessageType::HINT | LogMessageType::UTF8,
             "héllo wörld",
             "ärg",
         );
@@ -489,11 +489,7 @@ mod tests {
 
     #[test]
     fn empty_arg_roundtrip() {
-        let owned = make_owned(
-            LogMessageType::new(LogMessageType::ERROR),
-            "Something failed",
-            "",
-        );
+        let owned = make_owned(LogMessageType::ERROR, "Something failed", "");
         let frame = owned.to_frame();
         let view = AdsLoggerWriteRequest::try_from_frame(&frame).unwrap();
 
@@ -503,7 +499,7 @@ mod tests {
 
     #[test]
     fn as_view_borrows_without_allocation() {
-        let owned = make_owned(LogMessageType::new(LogMessageType::HINT), "msg", "arg");
+        let owned = make_owned(LogMessageType::HINT, "msg", "arg");
         let view = owned.as_view();
 
         assert_eq!(view.message().as_ptr(), owned.message().as_ptr());

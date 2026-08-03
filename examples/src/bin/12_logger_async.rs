@@ -61,7 +61,7 @@ async fn main() -> Result<()> {
 
     logger
         .write_log(
-            (LogMessageType::HINT | LogMessageType::LOG).into(),
+            LogMessageType::HINT | LogMessageType::LOG,
             "RustClient",
             "Hint from tcads-rs.",
         )
@@ -69,7 +69,7 @@ async fn main() -> Result<()> {
 
     logger
         .write_log(
-            (LogMessageType::WARNING | LogMessageType::LOG).into(),
+            LogMessageType::WARNING | LogMessageType::LOG,
             "RustClient",
             "Warning from tcads-rs.",
         )
@@ -78,7 +78,7 @@ async fn main() -> Result<()> {
     // The listener stops when it sees this message.
     logger
         .write_log(
-            (LogMessageType::ERROR | LogMessageType::LOG).into(),
+            LogMessageType::ERROR | LogMessageType::LOG,
             "RustClient",
             "Goodbye from tcads-rs!",
         )
