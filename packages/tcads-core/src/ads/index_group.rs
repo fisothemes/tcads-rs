@@ -139,10 +139,14 @@ impl IndexGroup {
     pub const SYSTEM_SERVICE_FEOF: Self = Self(130);
     /// Delete a file via the System Service. (`131`)
     pub const SYSTEM_SERVICE_FDELETE: Self = Self(131);
+    /// Rename or move a file via the System Service. (`132`)
+    pub const SYSTEM_SERVICE_FRENAME: Self = Self(132);
     /// Browse a directory via the System Service. (`133`)
     pub const SYSTEM_SERVICE_FFILEFIND: Self = Self(133);
     /// Read a file's status (size/timestamps/attributes) via the System Service. (`134`)
     pub const SYSTEM_SERVICE_FGETSTATUS: Self = Self(134);
+    /// Copy a file via the System Service.
+    pub const SYSTEM_SERVICE_FCOPY: Self = Self(136);
     /// Create a directory via the System Service. (`138`)
     pub const SYSTEM_SERVICE_MKDIR: Self = Self(138);
     /// Remove a directory via the System Service. (`139`)

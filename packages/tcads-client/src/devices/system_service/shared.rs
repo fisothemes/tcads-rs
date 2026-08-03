@@ -42,6 +42,20 @@ pub fn build_start_host_process_request(
     Ok(data)
 }
 
+/// Builds the write payload for a
+/// [`SYSTEM_SERVICE_FRENAME`](tcads_core::IndexGroup::SYSTEM_SERVICE_FRENAME) /
+/// [`SYSTEM_SERVICE_FCOPY`](tcads_core::IndexGroup::SYSTEM_SERVICE_FCOPY) request.
+pub fn build_rename_or_copy_request(from: &str, to: &str) -> crate::Result<Vec<u8>> {
+    let mut data = Vec::with_capacity(from.len() + to.len() + 2);
+
+    data.extend_from_slice(from.as_bytes());
+    data.push(0);
+    data.extend_from_slice(to.as_bytes());
+    data.push(0);
+
+    Ok(data)
+}
+
 /// Decodes a little-endian `u32` from the start of `data`.
 pub fn decode_u32_le(data: &[u8]) -> crate::Result<u32> {
     if data.len() != 4 {

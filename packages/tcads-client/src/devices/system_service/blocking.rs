@@ -469,6 +469,44 @@ impl AdsSystemService {
         Ok(())
     }
 
+    /// Renames or moves a file on the ADS device's host machine.
+    pub fn rename_file(
+        &self,
+        from: impl AsRef<str>,
+        to: impl AsRef<str>,
+        path_type: AdsFilePathType,
+    ) -> crate::Result<()> {
+        let data = shared::build_rename_or_copy_request(from.as_ref(), to.as_ref())?;
+
+        self.device.read_write(
+            self.target,
+            IndexGroup::SYSTEM_SERVICE_FRENAME,
+            IndexOffset::new(path_type.as_u16() as u32),
+            0,
+            data,
+        )?;
+        Ok(())
+    }
+
+    /// Copies a file on the ADS device's host machine.
+    pub fn copy_file(
+        &self,
+        from: impl AsRef<str>,
+        to: impl AsRef<str>,
+        path_type: AdsFilePathType,
+    ) -> crate::Result<()> {
+        let data = shared::build_rename_or_copy_request(from.as_ref(), to.as_ref())?;
+
+        self.device.read_write(
+            self.target,
+            IndexGroup::SYSTEM_SERVICE_FCOPY,
+            IndexOffset::new(path_type.as_u16() as u32),
+            0,
+            data,
+        )?;
+        Ok(())
+    }
+
     /// Reads a file's status (size, timestamps, attributes).
     pub fn get_file_status(
         &self,
