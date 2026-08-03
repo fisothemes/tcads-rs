@@ -1,8 +1,8 @@
 # TwinCAT ADS for Rust
 
-A rust-native implementation of the TwinCAT ADS protocol.
+A native rust implementation of the TwinCAT ADS protocol.
 
-This library aims to provide a robust way to communicate with TwinCAT devices (PLCs, NC, etc.), without relying on the official Beckhoff `TcAdsDll.dll` or requiring a local TwinCAT installation on the client machine.
+This library aims to provide a way to communicate with TwinCAT ADS devices (PLCs, NC, etc.), without relying on the official Beckhoff `TcAdsDll.dll` or requiring a local TwinCAT installation on the client machine.
 
 The project is organized as a Cargo workspace with the following crates:
 
@@ -13,7 +13,9 @@ The project is organized as a Cargo workspace with the following crates:
 - **[`tcads`](packages/tcads)**: The top-level facade crate that bundles everything together for easy consumption.
 - **[`examples`](examples)**: A comprehensive, step-by-step learning progression demonstrating how to use the library from raw bytes up to high-level Actor clients.
 
-## Getting Started: Examples
+## Getting Started
+
+### Examples
 
 The best way to learn how to use this library is by exploring the [`examples`](examples) directory. The examples are numbered to provide a gentle learning curve, for example:
 
@@ -26,6 +28,84 @@ The best way to learn how to use this library is by exploring the [`examples`](e
 7. **[`07_ads_device_async`](examples/src/bin/07_ads_device_async.rs)**: Mirroring Example 6 using the `tokio` async engine.
 
 and [more](examples/src/bin/).
+
+### Showcase
+
+```rust
+use std::thread;
+use std::time::Duration;
+use tcads::client::devices::blocking::{AdsDevice, AdsLogger, AdsRuntime, AdsSystemService};
+use tcads::core::*;
+
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+fn main() -> Result<()> {
+    // 1. Establish a single, multiplexed connection to the local TwinCAT AMS router
+    let device = AdsDevice::connect(Duration::from_secs(10))?;
+
+    // 2. ADS Logger (Port 100): Read and write TwinCAT system logs
+    let logger = AdsLogger::new(device.clone(), AmsNetId::local());
+    let (rx, logger_handle) = logger.subscribe()?;
+
+    // Spawn a background thread to listen to TwinCAT logs
+    let thread_handle = thread::spawn(move || {
+        while let Ok(msg) = rx.recv() {
+            println!("[TcLog {:?}] {}", msg.message_type(), msg.message());
+        }
+
+        println!("[TcLog] Logger thread exited.");
+    });
+
+    // Write a custom message to the TwinCAT ADS logger
+    logger.write_log(LogMessageType::WARNING.into(), "RustClient", "Starting up...")?;
+
+
+    // 3. PLC Runtime (Port 851): Read, Write, and RPC
+    let rt = AdsRuntime::new(device.clone(), AmsAddr::from_local(851));
+
+    // Read a variable directly by its symbol name
+    let temperature: f32 = rt.read_value("MAIN.fMachineTemperature")?;
+    println!("Current Machine Temperature: {}°C", temperature);
+
+    // Invoke a PLC Method (RPC) by passing a Rust tuple, returning a tuple
+    let (quotient, remainder): (i32, i32) = rt.rpc("MAIN.fbMath", "Divide", &(100i32, 3i32))?;
+    println!("RPC Result: 100 / 3 = {} (remainder {})", quotient, remainder);
+
+
+    // 4. System Service (Port 10,000): Host OS Control
+    let system = AdsSystemService::new(device.clone(), AmsNetId::local());
+
+    // Fetch the target IPC's exact OS and Hardware manifest
+    let version = system.get_product_version()?;
+    println!("Target TwinCAT Version: {}", version);
+
+    // Set working directory
+    let folder_path = r#"C:\TcAdsRust"#;
+
+    // Create a new directory on the target device
+    system.create_dir(folder_path, AdsFilePathType::Generic)?;
+
+    // Spawn a background process directly on the host Windows/CE/TcBSD/Linux operating system
+    system.start_process_on_host(
+        r#"C:\Windows\System32\cmd.exe"#,
+        folder_path,
+        "/C echo Hello from tcads-rs > hello.txt",
+        true, // Run hidden from the user
+    )?;
+
+
+    // 5. Clean up
+    logger.write_log(LogMessageType::WARNING.into(), "RustClient", "Exiting...")?;
+
+    // Unsubscribing drops the sender channel, gracefully exiting the receiver thread
+    logger.unsubscribe(logger_handle)?;
+
+    // Wait for the background thread to finish printing its exit message
+    thread_handle.join().unwrap();
+
+    Ok(())
+}
+```
 
 ## Status
 
