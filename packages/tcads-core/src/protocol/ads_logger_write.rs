@@ -1,9 +1,9 @@
 use super::{ProtocolError, validate_ads_command, validate_ams_command};
+use crate::AmsFrame;
 use crate::ads::{
     AdsCommand, AdsError, AdsHeader, AdsReturnCode, LogMessageType, StateFlag, WindowsFileTime,
 };
 use crate::ams::{AmsAddr, AmsCommand};
-use crate::io::AmsFrame;
 use encoding_rs::WINDOWS_1252;
 use std::borrow::Cow;
 
@@ -274,7 +274,7 @@ impl AdsLoggerWriteRequestOwned {
             target,
             source,
             AdsCommand::AdsDeviceNotification,
-            StateFlag::ADS_COMMAND.into(),
+            StateFlag::ADS_COMMAND,
             data_len as u32,
             AdsReturnCode::Ok,
             0,

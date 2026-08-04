@@ -1,5 +1,5 @@
+use crate::AmsFrame;
 use crate::ams::{AmsCommand, AmsPort};
-use crate::io::frame::AmsFrame;
 use crate::protocol::ProtocolError;
 
 /// Represents an AMS Port Close Request (Command `0x0001`).

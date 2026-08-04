@@ -1,9 +1,9 @@
 use super::{ProtocolError, parse_ads_frame};
+use crate::AmsFrame;
 use crate::ads::{
     AdsCommand, AdsError, AdsHeader, AdsReturnCode, IndexGroup, IndexOffset, InvokeId, StateFlag,
 };
 use crate::ams::{AmsAddr, AmsCommand};
-use crate::io::AmsFrame;
 
 /// A zero-copy view of an ADS Read/Write Request (Command `0x0009`).
 ///

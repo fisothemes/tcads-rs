@@ -5,12 +5,12 @@ pub use sample::{AdsNotificationSample, AdsNotificationSampleOwned};
 pub use stamp::{AdsStampHeader, AdsStampHeaderOwned};
 
 use super::{ProtocolError, validate_ads_command, validate_ams_command};
+use crate::AmsFrame;
 use crate::ads::{
     AdsCommand, AdsError, AdsHeader, AdsReturnCode, InvokeId, StateFlag, StateFlagError,
     WindowsFileTime,
 };
 use crate::ams::{AmsAddr, AmsCommand};
-use crate::io::AmsFrame;
 
 /// A zero-copy view of an ADS Device Notification (Command `0x0008`).
 ///
@@ -83,7 +83,7 @@ impl<'a> AdsDeviceNotification<'a> {
     /// # use tcads_core::protocol::{AdsDeviceNotification, AdsStampHeader, AdsNotificationSample};
     /// # use tcads_core::ams::AmsCommand;
     /// # use tcads_core::ads::NotificationHandle;
-    /// # use tcads_core::io::AmsFrame;
+    /// # use tcads_core::AmsFrame;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let ncount_notif_handle = NotificationHandle::from(1);
@@ -176,7 +176,7 @@ impl<'a> TryFrom<&'a AmsFrame> for AdsDeviceNotification<'a> {
 
         if !flags.is_ads_command() {
             return Err(AdsError::from(StateFlagError::UnexpectedStateFlag {
-                expected: vec![StateFlag::from(StateFlag::ADS_COMMAND)],
+                expected: vec![StateFlag::ADS_COMMAND],
                 got: flags,
             })
             .into());

@@ -1,6 +1,5 @@
-use tcads_core::AmsCommand;
-use tcads_core::io::AmsFrame;
-use tcads_core::io::tokio::AmsWriter;
+use tcads_core::{AmsCommand, AmsFrame};
+use tcads_io::tokio::AmsWriter;
 use tokio::io::AsyncWrite;
 use tokio::sync::mpsc::{self, UnboundedReceiver as Receiver, UnboundedSender as Sender};
 use tokio::task::JoinHandle;

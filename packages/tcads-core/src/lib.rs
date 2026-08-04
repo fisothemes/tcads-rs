@@ -2,10 +2,9 @@
 //!
 //! This crate contains the core building blocks for the **TwinCAT AMS/ADS** protocol.
 //!
-//! It provides a high-performance, transport-agnostic implementation of the
-//! Beckhoff ADS protocol. It is designed to handle the complexities of
-//! byte-level frame construction and parsing while remaining flexible enough to
-//! integrate with any I/O layer.
+//! It provides a transport-agnostic implementation of the Beckhoff ADS protocol. It is designed to
+//! handle the complexities of byte-level frame construction and parsing without dictating the
+//! underlying network or async runtime.
 //!
 //! ## Getting Around
 //!
@@ -16,10 +15,9 @@
 //! - **The ADS Layer ([`ads`]):** Contains the protocol primitives, including
 //!   command IDs, device states, and error codes.
 //! - **The Protocol Layer ([`protocol`]):** Provides strongly typed Request and
-//!   Response structures for every ADS command (e.g., `Read`, `Write`, `AddNotification`).
-//! - **The I/O Layer ([`io`]):** Defines the [`AmsFrame`]—the primary container
-//!   for wire communication—and provides concrete streams for both blocking and async (Tokio)
-//!   runtimes.
+//!   Response structures for every ADS command (e.g. `Read`, `Write`, `AddNotification`).
+//! - **The Frame Container ([`frame`]):** Defines the [`AmsFrame`] which is the primary container
+//!   for wire communication.
 //!
 //! ## Memory Efficiency: Borrowed vs. Owned
 //!
@@ -37,71 +35,61 @@
 //!
 //! ## Transport Agnosticism
 //!
-//! While this crate includes TCP-based stream implementations in the [`io`] module,
-//! the core logic only requires types that implement standard traits. You can
-//! introduce any blocking or async transportation layer required by your
-//! specific hardware environment.
+//! This crate is purely protocol logic and contains **no I/O primitives** (no `TcpStream`,
+//! no `tokio`). To send and receive [`AmsFrame`]s over a network, you should pair this
+//! crate with **`tcads-io`**, or implement your own transport layer.
 //!
 //! ## Getting Started
 //!
-//! ### Low-level Frame Communication
+//! ### Low-level Frame Construction
 //!
-//! For direct control, you can work with raw [`AmsFrame`] objects over a stream.
+//! For direct control, you can construct raw [`AmsFrame`] objects and serialize
+//! them to a byte vector to send over any transport layer of your choosing.
 //!
-//! ```rust,no_run
+//! ```rust
 //! use tcads_core::ams::AmsCommand;
-//! use tcads_core::io::{AmsFrame, blocking::AmsStream};
+//! use tcads_core::frame::AmsFrame;
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let stream = AmsStream::connect("127.0.0.1:48898")?;
-//! let (mut reader, mut writer) = stream.try_split()?;
-//!
-//! // Send a raw "Port Connect" command
+//! // Construct a raw "Port Connect" command
 //! let frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
-//! writer.write_frame(&frame)?;
 //!
-//! // Read the response
-//! let frame = reader.read_frame()?;
-//! println!("Received: {:?}", frame.header().command());
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! The async API is identical in shape, just swap the import and add `.await`:
-//!
-//! ```rust,no_run
-//! use tcads_core::ams::AmsCommand;
-//! use tcads_core::io::{AmsFrame, tokio::AmsStream};
-//!
-//! # #[tokio::main(flavor = "current_thread")]
-//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let stream = AmsStream::connect("127.0.0.1:48898").await?;
-//! let (mut reader, mut writer) = stream.into_split();
-//!
-//! let frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
-//! writer.write_frame(&frame).await?;
-//!
-//! let frame = reader.read_frame().await?;
-//! println!("Received: {:?}", frame.header().command());
-//! # Ok(())
-//! # }
+//! // Serialize the frame to a contiguous byte vector
+//! let network_bytes: Vec<u8> = frame.to_vec();
+//! assert_eq!(network_bytes.len(), 8); // 6 byte header + 2 byte payload
 //! ```
 //!
 //! ### High-level Protocol Logic
 //!
-//! Use the [`protocol`] module for type-safe interactions without manual byte-shuffling.
+//! Use the [`protocol`] module for type-safe interactions. Every request type
+//! can be directly serialized into an [`AmsFrame`].
 //!
-//! ```rust,no_run
-//! use tcads_core::io::blocking::AmsStream;
+//! ```rust
 //! use tcads_core::protocol::PortConnectRequest;
+//! use tcads_core::frame::AmsFrame;
 //!
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let stream = AmsStream::connect("127.0.0.1:48898")?;
-//! let (_, mut writer) = stream.try_split()?;
-//!
-//! // Construct a typed request and convert it to a wire-ready frame
+//! // Construct a typed request
 //! let request = PortConnectRequest::default();
-//! writer.write_frame(&request.into_frame())?;
+//!
+//! // Convert it to a wire-ready frame
+//! let frame: AmsFrame = request.into_frame();
+//! ```
+//!
+//! ### Parsing Responses
+//!
+//! Borrowed response types slice directly into the frame buffer, performing
+//! zero copies of the underlying data payload.
+//!
+//! ```rust
+//! use tcads_core::protocol::AdsReadResponse;
+//! # use tcads_core::frame::AmsFrame;
+//! # fn parse_example(frame: &AmsFrame) -> Result<(), Box<dyn std::error::Error>> {
+//!
+//! // Parsed response borrows from `frame`, there is no copy of the data bytes
+//! let response = AdsReadResponse::try_from(frame)?;
+//! let value = i32::from_le_bytes(response.data().try_into()?);
+//!
+//! // Need to store it across threads? Convert explicitly
+//! let owned = response.into_owned();
 //! # Ok(())
 //! # }
 //! ```
@@ -121,11 +109,10 @@ pub mod ads;
 /// with the AMS Router itself (e.g. [`PortConnect`](AmsCommand::PortConnect)).
 pub mod ams;
 
-/// Frame I/O and transport implementations.
+/// I/O Frame I/O for wire communication.
 ///
-/// Defines the [`AmsFrame`] for all wire communication and provides concrete `AmsStream` implementations
-/// for both [blocking](io::blocking::AmsStream) and [tokio-based](io::tokio::AmsStream) async I/O.
-pub mod io;
+/// Defines the [`AmsFrame`] for all wire communication. This is transportation layer agnostic.
+pub mod frame;
 
 /// High-level, type-safe Request and Response definitions.
 ///
@@ -156,5 +143,5 @@ pub use ads::{
 pub use ams::{
     AmsAddr, AmsCommand, AmsError, AmsNetId, AmsPort, AmsTcpHeader, RouterState, RuntimeType,
 };
-pub use io::AmsFrame;
+pub use frame::{AMS_FRAME_MAX_LEN, AmsFrame};
 pub use protocol::{AdsNotificationSampleOwned, ProtocolError};

@@ -1,9 +1,8 @@
 use std::io::Write;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::{self, JoinHandle};
-use tcads_core::AmsCommand;
-use tcads_core::io::AmsFrame;
-use tcads_core::io::blocking::AmsWriter;
+use tcads_core::{AmsCommand, AmsFrame};
+use tcads_io::blocking::AmsWriter;
 
 /// Spawns a dedicated writer thread for serializing [AMS frames](AmsFrame) onto a byte stream.
 ///

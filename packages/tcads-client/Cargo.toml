@@ -10,7 +10,8 @@ repository.workspace = true
 chrono = { workspace = true }
 indexmap = { workspace = true }
 serde = { workspace = true }
-tcads-serde = { workspace = true }
 tcads-core = { workspace = true }
+tcads-io = { workspace = true }
+tcads-serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "net", "macros", "sync"] }

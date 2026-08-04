@@ -1,10 +1,10 @@
 use super::{ProtocolError, parse_ads_frame};
+use crate::AmsFrame;
 use crate::ads::{
     AdsCommand, AdsError, AdsHeader, AdsNotificationAttrib, AdsReturnCode, AdsTransMode,
     IndexGroup, IndexOffset, InvokeId, NotificationHandle, StateFlag,
 };
 use crate::ams::{AmsAddr, AmsCommand};
-use crate::io::AmsFrame;
 
 /// Represents an ADS Add Device Notification Request (Command `0x0006`).
 ///

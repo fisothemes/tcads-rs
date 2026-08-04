@@ -5,9 +5,9 @@ use super::{
 use std::io::Read;
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
-use tcads_core::io::blocking::AmsReader;
 use tcads_core::protocol::{AdsDeviceNotification, RouterNotification};
 use tcads_core::{AdsCommand, AdsHeader, AmsCommand, RouterState};
+use tcads_io::blocking::AmsReader;
 
 /// Spawns a dedicated reader thread for deserializing incoming [`AmsFrame`](tcads_core::AmsFrame)s
 /// and routing them to their waiting callers.

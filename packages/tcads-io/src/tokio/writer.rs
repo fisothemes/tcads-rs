@@ -1,7 +1,7 @@
 use super::traits::WriteAllVectored;
-use crate::io::frame::AmsFrame;
 use std::io::IoSlice;
 use std::net::SocketAddr;
+use tcads_core::AmsFrame;
 use tokio::io::{self, AsyncWrite, AsyncWriteExt, BufWriter};
 use tokio::net::TcpStream;
 
@@ -86,7 +86,7 @@ impl AmsWriter<TcpStream> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ams::AmsCommand;
+    use tcads_core::AmsCommand;
     use tokio::io::AsyncReadExt;
 
     #[tokio::test]

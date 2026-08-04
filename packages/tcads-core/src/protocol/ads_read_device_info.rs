@@ -1,10 +1,10 @@
 use super::{ProtocolError, parse_ads_frame};
+use crate::AmsFrame;
 use crate::ads::{
     AdsCommand, AdsDeviceVersion, AdsError, AdsHeader, AdsReturnCode, AdsString, InvokeId,
     StateFlag,
 };
 use crate::ams::{AmsAddr, AmsCommand};
-use crate::io::AmsFrame;
 use std::borrow::Cow;
 
 /// Represents an ADS Read Device Info Request (Command `0x0001`).

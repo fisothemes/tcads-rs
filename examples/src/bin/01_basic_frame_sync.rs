@@ -1,8 +1,8 @@
 //! Example 1: Basic Synchronous Frame
 //! Run with: `cargo run --bin 01_basic_frame_sync`
 
-use tcads::core::io::blocking::AmsStream;
 use tcads::core::{AmsCommand, AmsFrame};
+use tcads::io::blocking::AmsStream;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 

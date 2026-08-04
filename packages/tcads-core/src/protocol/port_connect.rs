@@ -1,5 +1,5 @@
+use crate::AmsFrame;
 use crate::ams::{self, AmsAddr, AmsCommand, AmsPort};
-use crate::io::frame::AmsFrame;
 use crate::protocol::ProtocolError;
 
 /// Represents an AMS Port Connect Request (Command `0x1000`).

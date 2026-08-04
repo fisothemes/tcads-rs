@@ -2,7 +2,7 @@
 
 This crate contains the core building blocks for the **TwinCAT AMS/ADS** protocol.
 
-It handles the heavy lifting of AMS/ADS frame construction, parsing, and serialization. It is strictly **transport-agnostic**, meaning it doesn't care how you move bytes, whether you're using standard TCP, a custom serial bridge, or a high-performance async runtime, `tcads-core` provides the protocol logic.
+It handles the heavy lifting of AMS/ADS frame construction, parsing, and serialization. It is strictly **transport-agnostic** and contains **no networking dependencies** (like `tokio` or `std::net`). It doesn't care how you move bytes—whether you're using standard TCP, a custom serial bridge, or an async runtime, `tcads-core` provides the pure protocol logic.
 
 ## Features
 
@@ -15,8 +15,6 @@ It handles the heavy lifting of AMS/ADS frame construction, parsing, and seriali
   `AdsDeviceNotification<'a>`, etc.) slice directly into the frame buffer;
   owned types (`AdsReadResponseOwned`, etc.) are available when you need
   to store or send across threads
-- **Blocking and async I/O** - `blocking::AmsStream` for synchronous use;
-  async equivalents share the same protocol types
 - **Type-safe primitives** - `AmsNetId`, `AmsAddr`, `AdsState`,
   `AdsTransMode`, `NotificationHandle`, `WindowsFileTime`, `AdsString<N>`
 
@@ -30,214 +28,138 @@ Generate documentation with `cargo doc --open` and explore the API reference.
 tcads-core/
   ├── ads/        # ADS primitives (commands, states, error codes, strings, ...)
   ├── ams/        # AMS primitives (addresses, net IDs, router commands, ...)
-  ├── io/         # Frame I/O (AmsFrame, AmsReader, AmsWriter, AmsStream)
-  └── protocol/   # Request/response types for every ADS command
+  ├── protocol/   # Request/response types for every ADS command
+  └── frame.rs    # The AmsFrame byte-buffer container
+
 ```
 
 ## Quick Start
 
-### Frame
+### Low-level Frame Construction
 
-At the lowest level, the `AmsStream` sends and receives [`AmsFrame`](src/io/frame.rs)s over TCP.
-You can work directly with raw frames if you need full control:
-
-#### Blocking I/O
+At the lowest level, the protocol is wrapped in an `AmsFrame`. You can construct raw frames and serialize them into byte vectors to send over your chosen transport layer.
 
 ```rust
-use tcads_core::io::blocking::AmsStream;
-use tcads_core::{AmsCommand, AmsFrame};
+use tcads_core::ams::AmsCommand;
+use tcads_core::AmsFrame;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-  // Connect to the local AMS Router
-  let mut stream = AmsStream::connect("127.0.0.1:48898")?;
+fn main() {
+    // Construct a raw Port Connect frame
+    let port_connect_frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
 
-  // Construct a raw Port Connect frame
-  let port_connect_frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
-
-  // Write and read directly on the stream
-  stream.write_frame(&port_connect_frame)?;
-  let response_frame = stream.read_frame()?;
-
-  println!(
-    "Received: {:?} -> {:?}",
-    response_frame.header().command(),
-    response_frame.payload()
-  );
-
-  Ok(())
+    // Extract the wire-ready bytes to send over your socket
+    let network_bytes: Vec<u8> = port_connect_frame.to_vec();
+    
+    assert_eq!(network_bytes.len(), 8); // 6-byte header + 2-byte payload
 }
+
 ```
-
-#### Async I/O (Tokio)
-
-The async API is identical in shape just swap the import and add `.await`:
-
-```rust
-use tcads_core::io::tokio::AmsStream;
-use tcads_core::{AmsCommand, AmsFrame};
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-  // Connect to the local AMS Router
-  let mut stream = AmsStream::connect("127.0.0.1:48898").await?;
-
-  // Construct a raw Port Connect frame
-  let port_connect_frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
-
-  // Write and read directly on the stream
-  stream.write_frame(&port_connect_frame).await?;
-  let response_frame = stream.read_frame().await?;
-
-  println!(
-    "Received: {:?} -> {:?}",
-    response_frame.header().command(),
-    response_frame.payload()
-  );
-
-  Ok(())
-}
-```
-
-> [!NOTE]
-> Support for other async runtimes (e.g. `async-std`, `smol`) is available
-> upon request, create an issue or open a Pull Request.
 
 ### Using the protocol layer
 
-Building frames by hand means managing byte layouts yourself. This is best described as `"much pain, such work"`. Luckily, the [protocol](src/protocol) module has you covered. Every AMS and ADS command has a typed request and response that serializes to and from the `AmsFrame`:
+Building frames by hand means managing byte layouts yourself. This is best described as `"much pain, such work"`. Luckily, the `protocol` module has you covered. Every AMS and ADS command has a typed request and response that serializes to and from the `AmsFrame`:
 
 ```rust
-use tcads_core::ads::{AdsCommand, AdsHeader};
-use tcads_core::ams::{AmsAddr, AmsCommand};
-use tcads_core::io::blocking::AmsStream;
-use tcads_core::protocol::{
-  GetLocalNetIdRequest, GetLocalNetIdResponse,
-  PortConnectRequest, PortConnectResponse,
-  AdsReadStateRequest, AdsReadStateResponse,
-  RouterNotification,
-};
+use tcads_core::protocol::PortConnectRequest;
+use tcads_core::AmsFrame;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let stream = AmsStream::connect("127.0.0.1:48898")?;
+fn main() {
+    // Construct a typed request
+    let request = PortConnectRequest::default();
 
-    let (reader, mut writer) = stream.try_split()?;
-
-    writer.write_frame(&PortConnectRequest::default().into_frame())?;
-
-    let mut source = AmsAddr::default();
-    let mut target = AmsAddr::default();
-
-    for result in reader.incoming() { 
-        let frame = result?;
-        match frame.header().command() {
-            AmsCommand::PortConnect => {
-                let resp = PortConnectResponse::try_from(frame)?;
-                source = *resp.addr();
-                println!("AMS Router has assigned us the address {}!", source);
-                writer.write_frame(&GetLocalNetIdRequest::into_frame())?;
-            }
-            AmsCommand::GetLocalNetId => {
-                let resp = GetLocalNetIdResponse::try_from(frame)?;
-                println!("Local Net ID is {}", resp.net_id());
-                target = AmsAddr::new(resp.net_id(), 851);
-                println!("Target address is {}",target);
-                writer.write_frame(
-                  &AdsReadStateRequest::new(target, source, 0x01).into_frame()
-                )?;
-            }
-            AmsCommand::RouterNotification => {
-                // Received when changing between config and run mode
-                let notif = RouterNotification::try_from(frame)?;
-                println!("AMS Router state: {:?}", notif.state());
-            }
-            AmsCommand::AdsCommand => {
-                let (header, payload) = AdsHeader::parse_prefix(frame.payload())?;
-                match header.command_id() { 
-                    AdsCommand::AdsReadState => {
-                        let (_, state, _) = AdsReadStateResponse::parse_payload(payload)?;
-                        println!("PLC state: {state:?}");
-                    }
-                    _ => {}
-                }
-            }
-            _ => {}
-        } 
-    }
-
-  Ok(())
+    // Convert it to a wire-ready frame
+    let frame: AmsFrame = request.into_frame();
+    
+    // Serialize to bytes for transmission
+    let bytes_to_send = frame.to_vec();
 }
-```
 
-Result:
-
-```console
-AMS Router has assigned us the address 192.168.137.1.1.1:32817!
-Local Net ID is 192.168.137.1.1.1
-Target address is 192.168.137.1.1.1:851
-PLC state: Run
 ```
 
 ### Zero-copy response parsing
 
-Borrowed types slice directly into the frame, no allocation for the data payload:
+When you receive bytes from your network layer, you can parse them into typed responses. Borrowed types slice directly into the frame buffer, performing zero allocations for the data payload:
 
 ```rust
 use tcads_core::protocol::AdsReadResponse;
+use tcads_core::AmsFrame;
 
-// Parsed response borrows from `frame`, there no copy of the data bytes
-let response = AdsReadResponse::try_from(&frame)?;
-let value = i32::from_le_bytes(response.data().try_into()?);
+fn parse_example(frame: &AmsFrame) -> Result<(), Box<dyn std::error::Error>> {
+    // Parsed response borrows from `frame`, there is no copy of the data bytes
+    let response = AdsReadResponse::try_from(frame)?;
+    let value = i32::from_le_bytes(response.data().try_into()?);
 
-// Need to store it? Convert explicitly
-let owned = response.into_owned();
+    // Need to store it across threads? Convert explicitly
+    let owned = response.into_owned();
+    
+    Ok(())
+}
+
 ```
 
 ### Symbol handle lookup (AdsReadWrite)
 
+Constructing complex requests is simple and strongly typed:
+
 ```rust
 use tcads_core::protocol::AdsReadWriteRequestOwned;
+use tcads_core::ams::AmsAddr;
+use tcads_core::ads::{IndexGroup, IndexOffset};
 
-let request = AdsReadWriteRequestOwned::new(
-    target, source, invoke_id,
-    0xF003, // ADSIGRP_SYM_HNDBYNAME
-    0x0000,
-    4,      // handle is 4 bytes
-    b"MAIN.nCount\0",
-);
+fn build_handle_request(target: AmsAddr, source: AmsAddr, invoke_id: u32) {
+    let request = AdsReadWriteRequestOwned::new(
+        target, source, invoke_id,
+        IndexGroup::new(0xF003), // Symbol handle by name
+        IndexOffset::ZERO,
+        4, // Handle is 4 bytes
+        b"MAIN.nCount\0",
+    );
 
-writer.write_frame(&request.into_frame())?;
+    let frame = request.into_frame();
+    // Pass `frame.to_vec()` to your socket...
+}
 ```
 
 ### Subscribing to variable changes
 
 ```rust
-use tcads_core::ads::{AdsTransMode, AdsNotificationAttrib};
-use tcads_core::protocol::{
-    AdsAddDeviceNotificationRequest,
-    AdsDeviceNotification,
-};
+use tcads_core::ads::{AdsTransMode, AdsNotificationAttrib, NotificationHandle, IndexGroup, IndexOffset};
+use tcads_core::protocol::{AdsAddDeviceNotificationRequest, AdsDeviceNotification};
+use tcads_core::ams::AmsAddr;
+use tcads_core::AmsFrame;
 
-// Subscribe
-let request = AdsAddDeviceNotificationRequest::new(
-    target, source, invoke_id,
-    0xF005, handle,   // index group + offset (value by handle)
-    AdsNotificationAttrib {
-        length: 4, // variable size in bytes
-        trans_mode: AdsTransMode::ServerOnChange, 
-        max_delay: 0, // (100ns steps)
-        cycle_time: 10_000 * 100, // 100 ms (100ns steps)
-    }
-);
-writer.write_frame(&request.into_frame())?;
+fn build_subscription(target: AmsAddr, source: AmsAddr, invoke_id: u32, handle: NotificationHandle) {
+    // Subscribe
+    let request = AdsAddDeviceNotificationRequest::new(
+        target, 
+        source, 
+        invoke_id,
+        IndexGroup::new(0xF005), // Value by handle
+        IndexOffset::new(handle.as_u32()),
+        AdsNotificationAttrib {
+            length: 4, // variable size in bytes
+            trans_mode: AdsTransMode::ServerOnChange, 
+            max_delay: 0, // (100ns steps)
+            cycle_time: 10_000 * 100, // 100 ms (100ns steps)
+        }
+    );
+    
+    let frame = request.into_frame();
+    // Pass `frame.to_vec()` to your socket...
+}
 
-// Receive sample data as zero-copy from the frame
-let frame = reader.read_frame()?;
-let notif = AdsDeviceNotification::try_from(&frame)?;
-for (timestamp, sample) in notif.iter_samples() {
-    if sample.handle() == my_handle {
-        let value = i32::from_le_bytes(sample.data().try_into()?);
-        println!("nCount = {value} at {timestamp}");
+fn handle_notification(frame: &AmsFrame, my_handle: NotificationHandle) -> Result<(), Box<dyn std::error::Error>> {
+    // Receive sample data as zero-copy from the frame
+    let notif = AdsDeviceNotification::try_from(frame)?;
+    
+    for (timestamp, sample) in notif.iter_samples() {
+        if sample.handle() == my_handle {
+            let value = i32::from_le_bytes(sample.data().try_into()?);
+            println!("nCount = {value} at {timestamp}");
+        }
     }
+    
+    Ok(())
 }
 ```
 

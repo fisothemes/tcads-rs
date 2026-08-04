@@ -4,12 +4,12 @@
 //! Demonstrates sending an ADS read request to the TwinCAT Real-Time system (Port 200)
 //! and manually parsing the raw little-endian bytes into a Rust struct.
 
-use tcads::core::io::blocking::AmsStream;
 use tcads::core::protocol::{
     AdsReadRequest, AdsReadResponse, GetLocalNetIdRequest, GetLocalNetIdResponse,
     PortConnectRequest, PortConnectResponse,
 };
 use tcads::core::{AdsReturnCode, AmsAddr, IndexGroup, IndexOffset};
+use tcads::io::blocking::AmsStream;
 
 type BoxError = Box<dyn std::error::Error>;
 type Result<T> = std::result::Result<T, BoxError>;

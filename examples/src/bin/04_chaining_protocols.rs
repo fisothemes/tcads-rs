@@ -4,12 +4,12 @@
 //! Demonstrates chaining multiple core protocol requests to perform a
 //! full router handshake and query a PLC for its device information.
 
-use tcads::core::io::blocking::AmsStream;
 use tcads::core::protocol::{
     AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse, GetLocalNetIdRequest,
     GetLocalNetIdResponse, PortConnectRequest, PortConnectResponse,
 };
 use tcads::core::{AmsAddr, InvokeId};
+use tcads::io::blocking::AmsStream;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 

@@ -1,5 +1,5 @@
+use crate::AmsFrame;
 use crate::ams::{self, AmsCommand, AmsNetId};
-use crate::io::frame::AmsFrame;
 use crate::protocol::ProtocolError;
 
 /// Represents an AMS Get Local NetId Request (Command `0x1002`).

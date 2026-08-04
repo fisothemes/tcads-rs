@@ -1,18 +1,39 @@
 use super::reader::AmsReader;
 use super::traits::WriteAllVectored;
 use super::writer::AmsWriter;
-use crate::ams::AmsTcpHeader;
-use crate::io::frame::{AMS_FRAME_MAX_LEN, AmsFrame};
 use std::io::IoSlice;
 use std::net::SocketAddr;
+use tcads_core::{AMS_FRAME_MAX_LEN, AmsFrame, AmsTcpHeader};
 use tokio::io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{self, TcpStream};
 use tokio::time::{self, Duration, timeout};
 
-/// A stream wrapper for communicating with an AMS Router asynchronously.
+/// A stream wrapper for communicating with an AMS Router over any asynchronous transport.
 ///
 /// This struct serves as the main entry point for an ADS connection. It wraps a raw byte stream
-/// (typically a [`TcpStream`]) and provides methods to read and write [`AmsFrame`]s.
+/// and provides methods to read and write [`AmsFrame`]s.
+///
+/// While the default transport is a [`TcpStream`], this struct is generic over
+/// any type `S` that implements [`AsyncRead`], [`AsyncWrite`], and [`Unpin`]. This allows you to
+/// route AMS frames over TLS, Unix Domain Sockets, Serial Ports, or in-memory buffers for testing.
+///
+/// # Example (Custom Stream)
+/// ```
+/// use std::io::Cursor;
+/// use tcads_io::tokio::AmsStream;
+/// use tcads_core::{AmsCommand, AmsFrame};
+///
+/// # #[tokio::main(flavor = "current_thread")]
+/// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// // Wrap any AsyncRead + AsyncWrite object (e.g. an in-memory buffer)
+/// let mut mock_socket = Cursor::new(Vec::new());
+/// let mut stream = AmsStream::new(mock_socket);
+///
+/// let frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
+/// stream.write_frame(&frame).await?;
+/// # Ok(())
+/// # }
+/// ```
 pub struct AmsStream<S: AsyncRead + AsyncWrite + Unpin = TcpStream> {
     stream: S,
     read_timeout: Option<Duration>,
@@ -173,7 +194,7 @@ impl AmsStream<TcpStream> {
     /// # Example
     ///
     /// ```no_run
-    /// use tcads_core::io::tokio::AmsStream;
+    /// use tcads_io::tokio::AmsStream;
     ///
     /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -256,7 +277,7 @@ impl AmsStream<TcpStream> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ams::AmsCommand;
+    use tcads_core::AmsCommand;
 
     #[tokio::test]
     async fn test_stream_generic_read_write() {

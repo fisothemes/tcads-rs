@@ -1,8 +1,8 @@
 //! Example 3: Using Protocol Structs
 //! Run with: `cargo run --bin 03_protocol_structs`
 
-use tcads::core::io::blocking::AmsStream;
 use tcads::core::protocol::{PortConnectRequest, PortConnectResponse};
+use tcads::io::blocking::AmsStream;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 

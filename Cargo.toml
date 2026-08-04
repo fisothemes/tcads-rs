@@ -4,6 +4,7 @@ members = [
     "examples",
     "packages/tcads",
     "packages/tcads-core",
+    "packages/tcads-io",
     "packages/tcads-client",
     "packages/tcads-serde",
     "packages/tcads-server",
@@ -24,8 +25,9 @@ rand = "0.10.0"
 serde = "1"
 serde_json = "1"
 tcads = { path = "packages/tcads" }
-tcads-core = { path = "packages/tcads-core" }
 tcads-client = { path = "packages/tcads-client" }
+tcads-core = { path = "packages/tcads-core" }
+tcads-io = { path = "packages/tcads-io" }
 tcads-serde = {path = "packages/tcads-serde"}
 tcads-server = { path = "packages/tcads-server" }
 tokio = "1"

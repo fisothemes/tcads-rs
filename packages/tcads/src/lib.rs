@@ -8,12 +8,14 @@
 //!
 //! This crate is composed of the following sub-crates:
 //!
-//! - [`core`] - Protocol primitives, serialization, and frame I/O
+//! - [`core`] - Protocol primitives, serialization, and frame
 //! - [`client`] - High-level connection and request management for ADS devices.
+//! - [`io`] - Network transport layer for the ADS protocol.
 //! - [`server`] - Framework for building custom ADS servers/devices in Rust.
 //! - [`serde`] - Serialization and deserialization of ADS data structures.
 
 pub use tcads_client as client;
 pub use tcads_core as core;
+pub use tcads_io as io;
 pub use tcads_serde as serde;
 pub use tcads_server as server;

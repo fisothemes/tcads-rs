@@ -3,9 +3,9 @@ use super::{
     RouterNotificationDispatcher,
 };
 use std::sync::Arc;
-use tcads_core::io::tokio::AmsReader;
 use tcads_core::protocol::{AdsDeviceNotification, RouterNotification};
 use tcads_core::{AdsCommand, AdsHeader, AmsCommand, RouterState};
+use tcads_io::tokio::AmsReader;
 use tokio::io::{self, AsyncRead};
 use tokio::task::JoinHandle;
 

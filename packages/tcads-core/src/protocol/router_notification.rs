@@ -1,5 +1,5 @@
+use crate::AmsFrame;
 pub use crate::ams::{AmsCommand, RouterState};
-use crate::io::frame::AmsFrame;
 use crate::protocol::ProtocolError;
 
 /// Represents an AMS Router Notification (Command `0x1001`).
@@ -18,36 +18,21 @@ use crate::protocol::ProtocolError;
 /// * **Payload:** 32-bit integer (Little Endian) representing [`RouterState`]
 ///
 /// # Example
-/// ```no_run
-/// use tcads_core::protocol::{RouterNotification, PortConnectRequest, PortConnectResponse};
-/// use tcads_core::io::blocking::AmsStream;
-/// use tcads_core::ams::AmsCommand;
-/// use tcads_core::protocol::ProtocolError;
-/// use std::net::TcpStream;
+/// ```rust
+/// use tcads_core::protocol::RouterNotification;
+/// use tcads_core::ams::RouterState;
+/// use tcads_core::AmsFrame;
 ///
-/// fn example(mut stream: AmsStream<TcpStream>) -> Result<(), Box<dyn std::error::Error>> {
-///     let (reader, mut writer) = stream.try_split()?;
-///     // Send Port Connect request
-///     writer.write_frame(&PortConnectRequest::default().to_frame())?;
-///     // Listen for notifications
-///     for result in reader.incoming() {
-///         let frame = result?;
-///         match frame.header().command() {
-///             AmsCommand::PortConnect => {
-///                 let resp = PortConnectResponse::try_from(frame)?;
-///                 println!("Router assigned us address: {}", resp.addr());
-///             },
-///             AmsCommand::RouterNotification => {
-///                 let notif = RouterNotification::try_from(frame)?;
-///                 println!("Router state changed: {}", notif.state())
-///             },
-///             cmd => {
-///                 println!("Unexpected Router command: {cmd:?}");
-///             }
-///         }
-///     }
-///     Ok(())
-/// }
+/// // 1. Constructing a Notification to send over the wire
+/// let notif = RouterNotification::new(RouterState::Start);
+/// let frame: AmsFrame = notif.to_frame();
+///
+/// // 2. Parsing a Notification received from the wire
+/// # fn parse_example(frame: AmsFrame) -> Result<(), Box<dyn std::error::Error>> {
+/// let parsed_notif = RouterNotification::try_from(frame)?;
+/// println!("Router state changed to: {:?}", parsed_notif.state());
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RouterNotification {

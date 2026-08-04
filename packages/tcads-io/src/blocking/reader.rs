@@ -1,8 +1,7 @@
-use crate::ams::AmsTcpHeader;
-use crate::io::frame::{AMS_FRAME_MAX_LEN, AmsFrame};
 use std::io::{self, BufRead, BufReader, Read};
 use std::net::{Shutdown, SocketAddr, TcpStream};
 use std::time::Duration;
+use tcads_core::{AMS_FRAME_MAX_LEN, AmsFrame, AmsTcpHeader};
 
 /// A buffered reader specialised for parsing AMS frames from a byte stream.
 ///
@@ -60,9 +59,8 @@ impl<R: Read> AmsReader<R> {
     ///
     /// # Example
     /// ```no_run
-    /// use tcads_core::io::blocking::AmsStream;
-    /// use tcads_core::ams::AmsCommand;
-    /// use tcads_core::protocol::ProtocolError;
+    /// use tcads_io::blocking::AmsStream;
+    /// use tcads_core::{AmsCommand, ProtocolError};
     ///
     /// fn run_client(tcp: std::net::TcpStream) -> Result<(), Box<dyn std::error::Error>> {
     ///     let stream = AmsStream::new(tcp);
@@ -206,8 +204,8 @@ impl<'a, R: Read> Iterator for AmsIncomingMut<'a, R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ams::AmsCommand;
     use std::io::Cursor;
+    use tcads_core::AmsCommand;
 
     #[test]
     fn read_frame_reads_one_frame() {

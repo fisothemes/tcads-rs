@@ -520,6 +520,7 @@ version = "0.1.0"
 dependencies = [
  "tcads-client",
  "tcads-core",
+ "tcads-io",
  "tcads-serde",
  "tcads-server",
 ]
@@ -532,6 +533,7 @@ dependencies = [
  "indexmap",
  "serde",
  "tcads-core",
+ "tcads-io",
  "tcads-serde",
  "thiserror",
  "tokio",
@@ -548,8 +550,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
- "tokio",
- "tokio-test",
 ]
 
 [[package]]
@@ -559,6 +559,15 @@ dependencies = [
  "serde",
  "tcads",
  "tokio",
+]
+
+[[package]]
+name = "tcads-io"
+version = "0.1.0"
+dependencies = [
+ "tcads-core",
+ "tokio",
+ "tokio-test",
 ]
 
 [[package]]

@@ -1,9 +1,9 @@
 use super::{ProtocolError, parse_ads_frame};
+use crate::AmsFrame;
 use crate::ads::{
     AdsCommand, AdsError, AdsHeader, AdsReturnCode, InvokeId, NotificationHandle, StateFlag,
 };
 use crate::ams::{AmsAddr, AmsCommand};
-use crate::io::AmsFrame;
 
 /// Represents an ADS Delete Device Notification Request (Command `0x0007`).
 ///

@@ -1,16 +1,34 @@
 use super::reader::AmsReader;
 use super::traits::WriteAllVectored;
 use super::writer::AmsWriter;
-use crate::ams::AmsTcpHeader;
-use crate::io::frame::{AMS_FRAME_MAX_LEN, AmsFrame};
 use std::io::{self, IoSlice, Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpStream};
 use std::time::Duration;
+use tcads_core::{AMS_FRAME_MAX_LEN, AmsFrame, AmsTcpHeader};
 
-/// A stream wrapper for communicating with an AMS Router.
+/// A stream wrapper for communicating with an AMS Router over any transport.
 ///
 /// This struct serves as the main entry point for an ADS connection. It wraps a raw byte stream
-/// (typically a [`TcpStream`]) and provides methods to read and write [`AmsFrame`]s.
+/// and provides methods to read and write [`AmsFrame`]s.
+///
+/// While the default transport is a [`TcpStream`], this struct is generic over
+/// any type `S` that implements [`Read`] and [`Write`]. This allows you to route AMS frames
+/// over TLS, Serial Ports, Unix Domain Sockets, or in-memory buffers for testing.
+///
+/// # Example (Custom Stream)
+///
+/// ```
+/// use std::io::Cursor;
+/// use tcads_io::blocking::AmsStream;
+/// use tcads_core::{AmsCommand, AmsFrame};
+///
+/// // Wrap any Read + Write object (e.g. an in-memory buffer)
+/// let mut mock_socket = Cursor::new(Vec::new());
+/// let mut stream = AmsStream::new(mock_socket);
+///
+/// let frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);
+/// stream.write_frame(&frame).unwrap();
+/// ```
 pub struct AmsStream<S: Read + Write = TcpStream> {
     stream: S,
 }
@@ -102,7 +120,7 @@ impl AmsStream<TcpStream> {
     /// # Example
     ///
     /// ```no_run
-    /// use tcads_core::io::blocking::AmsStream;
+    /// use tcads_io::blocking::AmsStream;
     ///
     /// let stream = AmsStream::connect("127.0.0.1:48898").unwrap();
     /// ```
@@ -196,8 +214,8 @@ impl AmsStream<TcpStream> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ams::AmsCommand;
     use std::io::Cursor;
+    use tcads_core::AmsCommand;
 
     #[test]
     fn test_stream_generic_read_write() {

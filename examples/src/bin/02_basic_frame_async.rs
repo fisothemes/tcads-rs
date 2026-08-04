@@ -1,8 +1,8 @@
 //! Example 2: Basic Asynchronous Frame (Tokio)
 //! Run with: `cargo run --bin 02_basic_frame_async`
 
-use tcads::core::io::tokio::AmsStream;
 use tcads::core::{AmsCommand, AmsFrame};
+use tcads::io::tokio::AmsStream;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 

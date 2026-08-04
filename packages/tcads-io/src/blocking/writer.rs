@@ -1,8 +1,8 @@
 use super::traits::WriteAllVectored;
-use crate::io::frame::AmsFrame;
 use std::io::{self, BufWriter, IntoInnerError, IoSlice, Write};
 use std::net::{Shutdown, SocketAddr, TcpStream};
 use std::time::Duration;
+use tcads_core::AmsFrame;
 
 /// A buffered writer specialised for serializing AMS frames to a byte stream.
 ///
@@ -108,7 +108,7 @@ impl AmsWriter<TcpStream> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ams::AmsCommand;
+    use tcads_core::AmsCommand;
 
     #[test]
     fn test_write_frame_flushes_correctly() {

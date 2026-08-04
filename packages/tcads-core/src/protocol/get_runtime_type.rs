@@ -1,6 +1,6 @@
 use super::{ProtocolError, validate_ams_command};
+use crate::AmsFrame;
 use crate::ams::{AmsCommand, AmsError, RuntimeType};
-use crate::io::frame::AmsFrame;
 
 /// Represents an AMS Get Runtime Type Request (Command `0x1003`).
 ///

@@ -1,7 +1,7 @@
 use super::ProtocolError;
+use crate::AmsFrame;
 use crate::ads::{AdsCommand, AdsError, AdsHeader, StateFlag, StateFlagError};
 use crate::ams::AmsCommand;
-use crate::io::AmsFrame;
 
 /// Parses an AMS Frame and checks if it's an ADS frame.
 pub fn parse_ads_frame(

@@ -10,7 +10,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::time::Duration;
-use tcads_core::io::blocking::{AmsReader, AmsStream, AmsWriter};
 use tcads_core::protocol::{
     AdsAddDeviceNotificationRequest, AdsAddDeviceNotificationResponse,
     AdsDeleteDeviceNotificationRequest, AdsDeleteDeviceNotificationResponse,
@@ -28,6 +27,7 @@ use tcads_core::{
     SumReadResponseOwned, SumReadWriteRequest, SumReadWriteResponseOwned, SumWriteRequest,
     SumWriteResponse,
 };
+use tcads_io::blocking::{AmsReader, AmsStream, AmsWriter};
 
 /// Shared state for an [`AdsDevice`] connection.
 ///

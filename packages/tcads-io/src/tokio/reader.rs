@@ -1,6 +1,5 @@
-use crate::ams::AmsTcpHeader;
-use crate::io::frame::{AMS_FRAME_MAX_LEN, AmsFrame};
 use std::net::SocketAddr;
+use tcads_core::{AMS_FRAME_MAX_LEN, AmsFrame, AmsTcpHeader};
 use tokio::io::{self, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 
@@ -110,8 +109,8 @@ impl AmsReader<TcpStream> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ams::AmsCommand;
     use std::time::Duration;
+    use tcads_core::AmsCommand;
     use tokio_test::io::Builder;
 
     #[tokio::test]
