@@ -136,11 +136,11 @@ fn add_notification<T: Sized>(
         target,
         IndexGroup::SYMBOL_VALUE_BY_HANDLE,
         handle,
-        AdsNotificationAttrib {
-            length: size_of::<T>() as u32,
-            trans_mode: AdsTransMode::ServerOnChange,
-            max_delay: 0,
-            cycle_time: 10_000 * 10, // 10 ms
-        },
+        AdsNotificationAttrib::new(
+            size_of::<T>() as u32,
+            AdsTransMode::ServerOnChange,
+            Duration::ZERO,
+            Duration::from_millis(10),
+        ),
     )?)
 }

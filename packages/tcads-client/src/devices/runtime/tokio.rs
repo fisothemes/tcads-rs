@@ -169,7 +169,12 @@ impl AdsRuntime {
                 self.target,
                 IndexGroup::SYMBOL_VERSION,
                 IndexOffset::ZERO,
-                AdsNotificationAttrib::new(1, AdsTransMode::ServerOnChange, 0, 0),
+                AdsNotificationAttrib::new(
+                    1,
+                    AdsTransMode::ServerOnChange,
+                    Duration::ZERO,
+                    Duration::ZERO,
+                ),
             )
             .await?;
 
@@ -444,8 +449,8 @@ impl AdsRuntime {
         &self,
         path: impl AsRef<str>,
         trans_mode: AdsTransMode,
-        max_delay: u32,
-        cycle_time: u32,
+        max_delay: Duration,
+        cycle_time: Duration,
     ) -> crate::Result<(ValueReceiver<T>, NotificationHandle)>
     where
         T: serde::de::DeserializeOwned,

@@ -146,7 +146,12 @@ impl AdsLogger {
             self.target,
             IndexGroup::SYSTEM_LOGGER,
             IndexOffset::SYSTEM_LOGGER,
-            AdsNotificationAttrib::new(LogEntry::MAX_PAYLOAD_LEN, AdsTransMode::ServerCycle, 0, 0),
+            AdsNotificationAttrib::new(
+                LogEntry::MAX_PAYLOAD_LEN,
+                AdsTransMode::ServerCycle,
+                Duration::ZERO,
+                Duration::ZERO,
+            ),
         )?;
 
         let guard = NotificationGuard::new(handle, self.target, self.device.clone());

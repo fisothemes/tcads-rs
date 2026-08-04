@@ -944,7 +944,12 @@ impl AdsDevice {
             target,
             IndexGroup::DEVICE_DATA,
             IndexOffset::ZERO,
-            AdsNotificationAttrib::new(4, AdsTransMode::ServerOnChange, 0, 0),
+            AdsNotificationAttrib::new(
+                4,
+                AdsTransMode::ServerOnChange,
+                Duration::ZERO,
+                Duration::ZERO,
+            ),
         )?;
 
         let guard = NotificationGuard::new(notif_handle, target, self.clone());

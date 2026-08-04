@@ -146,22 +146,22 @@ impl AdsAddDeviceNotificationRequest {
 
     /// Returns the length of bytes which should be sent every notification.
     pub fn length(&self) -> u32 {
-        self.notif_attr.length
+        self.notif_attr.length()
     }
 
     /// Returns the transmission mode.
     pub fn trans_mode(&self) -> AdsTransMode {
-        self.notif_attr.trans_mode
+        self.notif_attr.trans_mode()
     }
 
     /// Returns the maximum buffering delay in 100ns steps.
     pub fn max_delay(&self) -> u32 {
-        self.notif_attr.max_delay
+        AdsNotificationAttrib::duration_to_ticks(self.notif_attr.max_delay())
     }
 
     /// Returns the cyclic check interval in 100ns steps.
     pub fn cycle_time(&self) -> u32 {
-        self.notif_attr.cycle_time
+        AdsNotificationAttrib::duration_to_ticks(self.notif_attr.cycle_time())
     }
 
     /// Returns the reserved bytes at the end of the payload.
@@ -188,18 +188,10 @@ impl AdsAddDeviceNotificationRequest {
 
         let index_group = IndexGroup::from_bytes(payload[0..4].try_into().unwrap());
         let index_offset = IndexOffset::from_bytes(payload[4..8].try_into().unwrap());
-        let length = u32::from_le_bytes(payload[8..12].try_into().unwrap());
-        let trans_mode = AdsTransMode::try_from_slice(&payload[12..16]).map_err(AdsError::from)?;
-        let max_delay = u32::from_le_bytes(payload[16..20].try_into().unwrap());
-        let cycle_time = u32::from_le_bytes(payload[20..24].try_into().unwrap());
+        let notif_attribs = AdsNotificationAttrib::from_bytes(payload[8..24].try_into().unwrap());
         let reserved = &payload[24..40];
 
-        Ok((
-            index_group,
-            index_offset,
-            AdsNotificationAttrib::new(length, trans_mode, max_delay, cycle_time),
-            reserved,
-        ))
+        Ok((index_group, index_offset, notif_attribs, reserved))
     }
 }
 
@@ -407,6 +399,7 @@ impl TryFrom<AmsFrame> for AdsAddDeviceNotificationResponse {
 mod tests {
     use super::*;
     use crate::ams::AmsNetId;
+    use std::time::Duration;
 
     fn make_addrs() -> (AmsAddr, AmsAddr) {
         let target = AmsAddr::new(AmsNetId::new(192, 168, 0, 1, 1, 1), 851);
@@ -424,12 +417,12 @@ mod tests {
             0xCAFE,
             IndexGroup::new(0xF005),
             IndexOffset::new(0x0001_0203),
-            AdsNotificationAttrib {
-                length: 4,
-                trans_mode: AdsTransMode::ClientOnChange,
-                max_delay: 0,             // send it immediately
-                cycle_time: 10_000 * 100, // 100 ms
-            },
+            AdsNotificationAttrib::new(
+                4,
+                AdsTransMode::ClientOnChange,
+                Duration::ZERO, // send it immediately
+                Duration::from_millis(100),
+            ),
         );
 
         let frame = request.to_frame();
@@ -455,12 +448,12 @@ mod tests {
             1,
             IndexGroup::new(0x4020),
             IndexOffset::ZERO,
-            AdsNotificationAttrib {
-                length: 4,
-                trans_mode: AdsTransMode::ClientCycle,
-                max_delay: 10_000 * 10,   // 10 ms
-                cycle_time: 10_000 * 100, // 100 ms
-            },
+            AdsNotificationAttrib::new(
+                4,
+                AdsTransMode::ClientCycle,
+                Duration::from_millis(10),
+                Duration::from_millis(100),
+            ),
         );
 
         let frame = request.to_frame();
@@ -481,12 +474,7 @@ mod tests {
             1,
             IndexGroup::new(0x1),
             IndexOffset::ZERO,
-            AdsNotificationAttrib {
-                length: 4,
-                trans_mode: AdsTransMode::None,
-                max_delay: 0,
-                cycle_time: 0,
-            },
+            AdsNotificationAttrib::new(4, AdsTransMode::None, Duration::ZERO, Duration::ZERO),
         );
 
         let frame = request.to_frame();
@@ -531,12 +519,12 @@ mod tests {
             invoke_id,
             IndexGroup::new(0xF005),
             IndexOffset::new(0x1234),
-            AdsNotificationAttrib {
-                length: 4,
-                trans_mode: AdsTransMode::ClientOnChange,
-                max_delay: 0,
-                cycle_time: 10_000 * 100, // 100ms
-            },
+            AdsNotificationAttrib::new(
+                4,
+                AdsTransMode::ClientOnChange,
+                Duration::ZERO,
+                Duration::from_millis(100),
+            ),
         );
 
         let assigned_handle = NotificationHandle::from(42_u32);
@@ -576,12 +564,7 @@ mod tests {
             1,
             IndexGroup::new(0x1),
             IndexOffset::ZERO,
-            AdsNotificationAttrib {
-                length: 4,
-                trans_mode: AdsTransMode::None,
-                max_delay: 0,
-                cycle_time: 0,
-            },
+            AdsNotificationAttrib::new(4, AdsTransMode::None, Duration::ZERO, Duration::ZERO),
         );
         let frame = request.to_frame();
 

@@ -1,5 +1,3 @@
-//
-
 use super::LogMessageTypeError;
 use bitflags::bitflags;
 use std::fmt;

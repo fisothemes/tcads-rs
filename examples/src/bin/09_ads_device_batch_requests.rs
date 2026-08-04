@@ -57,12 +57,22 @@ fn main() -> Result<()> {
         SumAddNotificationRequest::new(
             IndexGroup::SYMBOL_VALUE_BY_HANDLE,
             IndexOffset::from(handles[0]),
-            AdsNotificationAttrib::new(1, AdsTransMode::ServerOnChange, 0, 100_000),
+            AdsNotificationAttrib::new(
+                1,
+                AdsTransMode::ServerOnChange,
+                Duration::ZERO,
+                Duration::from_millis(10),
+            ),
         ),
         SumAddNotificationRequest::new(
             IndexGroup::SYMBOL_VALUE_BY_HANDLE,
             IndexOffset::from(handles[1]),
-            AdsNotificationAttrib::new(4, AdsTransMode::ServerOnChange, 0, 100_000),
+            AdsNotificationAttrib::new(
+                4,
+                AdsTransMode::ServerOnChange,
+                Duration::ZERO,
+                Duration::from_millis(10),
+            ),
         ),
     ];
 

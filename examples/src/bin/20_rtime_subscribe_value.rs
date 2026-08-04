@@ -27,7 +27,12 @@ async fn main() -> Result<()> {
 
     // 2. Subscribe to a variable's value changes
     let (mut rx, notif_handle) = device
-        .subscribe_value::<u32>(sym_name, AdsTransMode::ServerOnChange, 0, 0)
+        .subscribe_value::<u32>(
+            sym_name,
+            AdsTransMode::ServerOnChange,
+            Duration::ZERO,
+            Duration::ZERO,
+        )
         .await?;
 
     println!("Subscribed to {}. Spawning background task...", sym_name);

@@ -155,8 +155,8 @@ impl AdsLogger {
                 AdsNotificationAttrib::new(
                     LogEntry::MAX_PAYLOAD_LEN,
                     AdsTransMode::ServerCycle,
-                    0,
-                    0,
+                    Duration::ZERO,
+                    Duration::ZERO,
                 ),
             )
             .await?;

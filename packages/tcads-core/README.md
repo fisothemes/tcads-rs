@@ -123,43 +123,44 @@ fn build_handle_request(target: AmsAddr, source: AmsAddr, invoke_id: u32) {
 ### Subscribing to variable changes
 
 ```rust
+use std::time::Duration;
 use tcads_core::ads::{AdsTransMode, AdsNotificationAttrib, NotificationHandle, IndexGroup, IndexOffset};
 use tcads_core::protocol::{AdsAddDeviceNotificationRequest, AdsDeviceNotification};
 use tcads_core::ams::AmsAddr;
 use tcads_core::AmsFrame;
 
 fn build_subscription(target: AmsAddr, source: AmsAddr, invoke_id: u32, handle: NotificationHandle) {
-    // Subscribe
-    let request = AdsAddDeviceNotificationRequest::new(
-        target, 
-        source, 
-        invoke_id,
-        IndexGroup::new(0xF005), // Value by handle
-        IndexOffset::new(handle.as_u32()),
-        AdsNotificationAttrib {
-            length: 4, // variable size in bytes
-            trans_mode: AdsTransMode::ServerOnChange, 
-            max_delay: 0, // (100ns steps)
-            cycle_time: 10_000 * 100, // 100 ms (100ns steps)
-        }
-    );
-    
-    let frame = request.into_frame();
-    // Pass `frame.to_vec()` to your socket...
+  // Subscribe
+  let request = AdsAddDeviceNotificationRequest::new(
+    target,
+    source,
+    invoke_id,
+    IndexGroup::new(0xF005), // Value by handle
+    IndexOffset::new(handle.as_u32()),
+    AdsNotificationAttrib::new(
+      4, // variable size in bytes
+      AdsTransMode::ServerOnChange,
+      Duration::ZERO, // maximum delay before notification is sent (ZERO = no delay)
+      Duration::from_millis(100), // how often to check for changes or request for notification.
+    )
+  );
+
+  let frame = request.into_frame();
+  // Pass `frame.to_vec()` to your socket...
 }
 
 fn handle_notification(frame: &AmsFrame, my_handle: NotificationHandle) -> Result<(), Box<dyn std::error::Error>> {
-    // Receive sample data as zero-copy from the frame
-    let notif = AdsDeviceNotification::try_from(frame)?;
-    
-    for (timestamp, sample) in notif.iter_samples() {
-        if sample.handle() == my_handle {
-            let value = i32::from_le_bytes(sample.data().try_into()?);
-            println!("nCount = {value} at {timestamp}");
-        }
+  // Receive sample data as zero-copy from the frame
+  let notif = AdsDeviceNotification::try_from(frame)?;
+
+  for (timestamp, sample) in notif.iter_samples() {
+    if sample.handle() == my_handle {
+      let value = i32::from_le_bytes(sample.data().try_into()?);
+      println!("nCount = {value} at {timestamp}");
     }
-    
-    Ok(())
+  }
+
+  Ok(())
 }
 ```
 

@@ -210,13 +210,19 @@ impl<'a> Iterator for SumAddNotificationIter<'a> {
 mod tests {
     use super::*;
     use crate::AdsTransMode;
+    use std::time::Duration;
 
     #[test]
     fn test_add_notif_request_padding() {
         let req = SumAddNotificationRequest::new(
             0xF005.into(),
             1234.into(),
-            AdsNotificationAttrib::new(4, AdsTransMode::ServerCycle, 0, 100_0000),
+            AdsNotificationAttrib::new(
+                4,
+                AdsTransMode::ServerCycle,
+                Duration::ZERO,
+                Duration::from_millis(10),
+            ),
         );
 
         let bytes = req.to_bytes();
