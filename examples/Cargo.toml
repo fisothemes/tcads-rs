@@ -9,5 +9,5 @@ publish = false
 
 [dependencies]
 serde = { workspace = true }
-tcads = { workspace = true }
-tokio = { workspace = true , features = ["full"] }
+tcads = { workspace = true, features = ["tokio"]}
+tokio = { workspace = true, features = ["full"] }

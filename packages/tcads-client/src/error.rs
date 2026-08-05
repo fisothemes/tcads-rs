@@ -4,6 +4,7 @@ use std::sync::{Arc, PoisonError};
 use tcads_core::ads::{AdsSymbolInfoError, AdsTypeInfoError};
 use tcads_core::ams::{AddrError, NetIdError};
 use tcads_core::{AdsError, AdsReturnCode, AmsError, ProtocolError};
+#[cfg(feature = "tokio")]
 use tokio::sync::mpsc::error::SendError as TokioSendError;
 
 #[derive(Debug, Clone, thiserror::Error)]
@@ -82,6 +83,7 @@ impl From<RecvTimeoutError> for Error {
     }
 }
 
+#[cfg(feature = "tokio")]
 impl<T> From<TokioSendError<T>> for Error {
     fn from(_: TokioSendError<T>) -> Self {
         Error::Disconnected

@@ -57,7 +57,9 @@
 //! ```
 
 /// Synchronous (blocking) I/O utilizing [`std::net`] and [`std::io`].
+#[cfg(feature = "blocking")]
 pub mod blocking;
 
 /// Asynchronous I/O utilizing [`tokio::net`] and [`tokio::io`].
+#[cfg(feature = "tokio")]
 pub mod tokio;

@@ -6,6 +6,7 @@
 
 use tcads_core::{AmsAddr, NotificationHandle};
 
+#[cfg(feature = "blocking")]
 pub mod blocking {
     use super::*;
     use crate::devices::blocking::AdsDevice;
@@ -68,6 +69,7 @@ pub mod blocking {
     }
 }
 
+#[cfg(feature = "tokio")]
 pub mod tokio {
     use super::*;
     use crate::devices::tokio::AdsDevice;

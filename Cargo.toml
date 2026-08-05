@@ -28,7 +28,7 @@ tcads = { path = "packages/tcads" }
 tcads-client = { path = "packages/tcads-client" }
 tcads-core = { path = "packages/tcads-core" }
 tcads-io = { path = "packages/tcads-io" }
-tcads-serde = {path = "packages/tcads-serde"}
+tcads-serde = { path = "packages/tcads-serde" }
 tcads-server = { path = "packages/tcads-server" }
 tokio = "1"
 tokio-test = "0.4"

@@ -10,9 +10,14 @@ keywords = ["twincat", "beckhoff", "ads"]
 categories = ["api-bindings", "network-programming"]
 readme = "README.md"
 
+[features]
+default = ["blocking"]
+blocking = []
+tokio = ["dep:tokio"]
+
 [dependencies]
 tcads-core = { workspace = true }
-tokio = { workspace = true, features = ["net", "rt", "io-util", "sync", "time", "macros"] }
+tokio = { workspace = true, features = ["net", "rt", "io-util", "sync", "time", "macros"], optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["full"] }

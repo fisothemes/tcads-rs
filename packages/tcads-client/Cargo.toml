@@ -6,6 +6,11 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+default = ["blocking"]
+blocking = ["tcads-io/blocking"]
+tokio = ["tcads-io/tokio", "dep:tokio"]
+
 [dependencies]
 chrono = { workspace = true }
 indexmap = { workspace = true }
@@ -14,4 +19,4 @@ tcads-core = { workspace = true }
 tcads-io = { workspace = true }
 tcads-serde = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["io-util", "net", "macros", "sync"] }
+tokio = { workspace = true, features = ["io-util", "net", "macros", "sync"], optional = true }

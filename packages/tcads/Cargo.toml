@@ -6,6 +6,11 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+default = ["blocking"]
+blocking = ["tcads-io/blocking", "tcads-client/blocking"]
+tokio = ["tcads-io/tokio", "tcads-client/tokio"]
+
 [dependencies]
 tcads-core = { workspace = true }
 tcads-client = { workspace = true }
