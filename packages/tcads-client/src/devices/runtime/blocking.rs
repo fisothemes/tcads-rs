@@ -560,10 +560,11 @@ impl AdsRuntime {
     /// preserving their contents is the caller's responsibility.
     ///
     /// See [`read_value`](Self::read_value) for caching and invalidation behavior.
-    pub fn write_value<T>(&self, path: impl AsRef<str>, value: &T) -> crate::Result<()>
-    where
-        T: serde::Serialize + ?Sized,
-    {
+    pub fn write_value(
+        &self,
+        path: impl AsRef<str>,
+        value: impl serde::Serialize,
+    ) -> crate::Result<()> {
         let path = path.as_ref();
         let (cache, entry) = self.resolve_symbol(path)?;
 
@@ -600,35 +601,83 @@ impl AdsRuntime {
         WriteMultiValues::new(self)
     }
 
-    /// Calls an RPC method on a Function Block or Interface instance.
+    /// Calls a Remote Procedure Call (RPC) method on a TwinCAT Function Block or Interface.
     ///
-    /// `fb_path` is the instance's path (e.g. `"MAIN.fbSomeInterface"`), not
-    /// the method itself; `method_name` is looked up case-insensitively
-    /// against that instance's type. Requires the method to have
-    /// `{attribute 'TcRpcEnable'}` in its PLC declaration.
+    /// The method is looked up case-insensitively against the instance's type. For the RPC
+    /// call to succeed, the target method in the PLC must be explicitly decorated with the
+    /// `{attribute 'TcRpcEnable'}` pragma.
     ///
-    /// `I`/`O` are plain tuples (or a bare value when only one element is
-    /// relevant on that side):
-    /// - `I`: one element per `IN` or `IN_OUT` parameter, in declared order.
-    /// - `O`: the return value first (if the method has one), then one
-    ///   element per `OUT` or `IN_OUT` parameter, in declared order.
+    /// # Parameter Mapping
     ///
-    /// An `IN_OUT` parameter appears on *both* sides: you send a value in
-    /// `I`, and get the PLC's (possibly different) value for it back out
-    /// through `O`, at its own declared position among the parameters
-    /// relevant to each side, not necessarily the same position on both.
+    /// TwinCAT RPC methods are composed of `VAR_INPUT`, `VAR_OUTPUT`, `VAR_IN_OUT`, and a `RETURN`
+    /// value. This function automatically maps these to Rust types based on the number of
+    /// parameters relevant to each side:
     ///
-    /// A method with no relevant parameters on a side uses `()` for that
-    /// side, e.g. a method with no return and no `OUT`/`IN_OUT` parameters
-    /// has `O = ()`.
-    pub fn rpc<I, O>(
+    /// ### Inputs (`inputs` argument)
+    ///
+    /// Provide values for all `VAR_INPUT` and `VAR_IN_OUT` parameters in their declared order.
+    /// - **Zero Inputs:** Pass the unit type `()`.
+    /// - **One Input:** Pass the value directly (e.g. `100i32`).
+    /// - **Multiple Inputs:** Pass a tuple containing the values (e.g. `(50i32, 25i32)`).
+    ///
+    /// ### Outputs (`O` return type)
+    ///
+    /// Captures the `RETURN` value (if one exists), followed by all `VAR_OUTPUT` and
+    /// `VAR_IN_OUT` parameters in their declared order.
+    /// - **Zero Outputs:** Use the unit type `()`.
+    /// - **One Output:** Parses and returns the single value directly.
+    /// - **Multiple Outputs:** Returns a tuple.
+    ///
+    /// *Note on `VAR_IN_OUT`:* These parameters appear on *both* sides of the transaction.
+    /// You send their initial value in the `inputs` argument, and receive their updated
+    /// value back in the `O` return type, located at their respective positions.
+    ///
+    /// # Type Inference
+    ///
+    /// Because the input type is inferred dynamically, you only need to specify the return
+    /// type `O` when using the turbofish syntax (e.g. `.rpc::<()>(...)`). If the return type
+    /// can be inferred from the surrounding code, the turbofish can be omitted entirely.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # use tcads_client::devices::blocking::AdsRuntime;
+    /// # use tcads_core::AmsAddr;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let device = AdsRuntime::connect(AmsAddr::from_local(851), None)?;
+    /// let fb_path = "MAIN.fbMath";
+    ///
+    /// // 1. Zero Inputs, Zero Outputs
+    /// // Both sides use the unit type `()`
+    /// device.rpc::<()>(fb_path, "Reset", ())?;
+    ///
+    /// // 2. One Input, Zero Outputs
+    /// // Pass `100` directly instead of wrapping it in a tuple
+    /// device.rpc::<()>(fb_path, "SetValue", 100i32)?;
+    ///
+    /// // 3. Zero Inputs, One Output
+    /// // Parses the return value directly into an `i32`
+    /// let value: i32 = device.rpc(fb_path, "GetValue", ())?;
+    ///
+    /// // 4. Multiple Inputs, One Output
+    /// // Pass a tuple `(50, 25)` and get an `i32` back
+    /// let sum: i32 = device.rpc(fb_path, "SumValues", (50i32, 25i32))?;
+    ///
+    /// // 5. Multiple Inputs, Multiple Outputs
+    /// // Passes a tuple and returns a tuple. The output tuple ALWAYS starts
+    /// // with the RETURN value, followed by VAR_OUTPUT and VAR_IN_OUT.
+    /// let (quotient, remainder): (i32, i32) =
+    ///     device.rpc(fb_path, "DivideValues", (100i32, 3i32))?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn rpc<O>(
         &self,
         fb_path: impl AsRef<str>,
         method_name: impl AsRef<str>,
-        inputs: &I,
+        inputs: impl serde::Serialize,
     ) -> crate::Result<O>
     where
-        I: serde::Serialize,
         O: serde::de::DeserializeOwned,
     {
         let fb_path = fb_path.as_ref();

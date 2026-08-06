@@ -14,14 +14,13 @@ use tcads_core::AdsTypeInfo;
 /// # Note
 ///
 /// `buf` must be exactly [`type_info.size()`](AdsTypeInfo::size) bytes.
-pub fn to_bytes<T, P>(
-    value: &T,
+pub fn to_bytes<P>(
+    value: impl Serialize,
     buf: &mut [u8],
     type_info: &AdsTypeInfo,
     provider: &P,
 ) -> crate::Result<()>
 where
-    T: Serialize + ?Sized,
     P: TypeProvider,
 {
     let serializer = AdsSerializer::new(buf, type_info, provider);
@@ -30,9 +29,12 @@ where
 }
 
 /// Serializes a Rust value into a byte vector, using the given PLC type metadata.
-pub fn to_vec<T, P>(value: &T, type_info: &AdsTypeInfo, provider: &P) -> crate::Result<Vec<u8>>
+pub fn to_vec<P>(
+    value: impl Serialize,
+    type_info: &AdsTypeInfo,
+    provider: &P,
+) -> crate::Result<Vec<u8>>
 where
-    T: Serialize + ?Sized,
     P: TypeProvider,
 {
     let mut buf = vec![0u8; type_info.size() as usize];
@@ -46,14 +48,13 @@ where
 /// # Note
 ///
 /// `buf` must be exactly the sum of every field's size.
-pub fn to_rpc_fields<'ser, T, P>(
-    value: &T,
+pub fn to_rpc_fields<'ser, P>(
+    value: impl Serialize,
     buf: &'ser mut [u8],
     fields: Rc<[ResolvedField<'ser>]>,
     provider: &'ser P,
 ) -> crate::Result<()>
 where
-    T: Serialize + ?Sized,
     P: TypeProvider,
 {
     let serializer = AdsRpcSerializer::new(fields, buf, provider);

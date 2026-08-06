@@ -26,28 +26,27 @@ fn main() -> Result<()> {
     // 1. Zero Inputs, Zero Outputs
     // Both sides use the unit type `()`
     println!("1. Calling Reset()...");
-    device.rpc::<(), ()>(fb_path, "Reset", &())?;
+    device.rpc::<()>(fb_path, "Reset", ())?;
 
     // 2. One Input, Zero Outputs
     // Pass in `100` directly instead of a tuple `(100,)`
     println!("2. Calling SetValue(100)...");
-    device.rpc::<i32, ()>(fb_path, "SetValue", &100)?;
+    device.rpc::<()>(fb_path, "SetValue", 100i32)?;
 
     // 3. Zero Inputs, One Output
     // Parses the return value directly into a `i32`
-    let value: i32 = device.rpc(fb_path, "GetValue", &())?;
+    let value: i32 = device.rpc(fb_path, "GetValue", ())?;
     println!("3. GetValue() returned: {}", value);
 
     // 4. Multiple Inputs (N), One Output
     // Pass in a tuple `(50, 25)` and gets a `i32` back
-    let sum: i32 = device.rpc(fb_path, "SumValues", &(50i32, 25i32))?;
+    let sum: i32 = device.rpc(fb_path, "SumValues", (50i32, 25i32))?;
     println!("4. SumValues(50, 25) returned: {}", sum);
 
     // 5. Multiple Inputs (N), Multiple Outputs (N)
     // Passes a tuple and returns a tuple.
     // The output tuple ALWAYS starts with the RETURN value, followed by VAR_OUTPUT/IN_OUT.
-    let (quotient, remainder): (i32, i32) =
-        device.rpc(fb_path, "DivideValues", &(100_i32, 3_i32))?;
+    let (quotient, remainder): (i32, i32) = device.rpc(fb_path, "DivideValues", (100i32, 3i32))?;
     println!(
         "5. DivideValues(100, 3) returned: Quotient = {}, Remainder = {}",
         quotient, remainder
