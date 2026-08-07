@@ -219,14 +219,17 @@ impl AdsRuntime {
         I::IntoIter: ExactSizeIterator,
         S: AsRef<str> + 'a + ?Sized,
     {
-        let reqs = names.into_iter().map(|name| {
-            SumReadWriteRequest::new(
-                IndexGroup::SYMBOL_HANDLE_BY_NAME,
-                IndexOffset::ZERO,
-                4,
-                name.as_ref().as_bytes(),
-            )
-        });
+        let reqs: Vec<_> = names
+            .into_iter()
+            .map(|name| {
+                SumReadWriteRequest::new(
+                    IndexGroup::SYMBOL_HANDLE_BY_NAME,
+                    IndexOffset::ZERO,
+                    4,
+                    name.as_ref().as_bytes(),
+                )
+            })
+            .collect();
 
         let resp = self.device.read_write_multi(self.target, reqs).await?;
 
@@ -307,13 +310,16 @@ impl AdsRuntime {
         I: IntoIterator<Item = (SymbolHandle, usize)>,
         I::IntoIter: ExactSizeIterator,
     {
-        let reqs = items.into_iter().map(|(handle, len)| {
-            SumReadRequest::new(
-                IndexGroup::SYMBOL_VALUE_BY_HANDLE,
-                handle.as_u32().into(),
-                len as u32,
-            )
-        });
+        let reqs: Vec<_> = items
+            .into_iter()
+            .map(|(handle, len)| {
+                SumReadRequest::new(
+                    IndexGroup::SYMBOL_VALUE_BY_HANDLE,
+                    handle.as_u32().into(),
+                    len as u32,
+                )
+            })
+            .collect();
 
         let resp = self.device.read_multi(self.target, reqs).await?;
 
@@ -508,13 +514,16 @@ impl AdsRuntime {
         I: IntoIterator<Item = (SymbolHandle, &'a [u8])>,
         I::IntoIter: ExactSizeIterator,
     {
-        let reqs = items.into_iter().map(|(handle, data)| {
-            SumWriteRequest::new(
-                IndexGroup::SYMBOL_VALUE_BY_HANDLE,
-                handle.as_u32().into(),
-                data,
-            )
-        });
+        let reqs: Vec<_> = items
+            .into_iter()
+            .map(|(handle, data)| {
+                SumWriteRequest::new(
+                    IndexGroup::SYMBOL_VALUE_BY_HANDLE,
+                    handle.as_u32().into(),
+                    data,
+                )
+            })
+            .collect();
 
         let resp = self.device.write_multi(self.target, reqs).await?;
 
@@ -550,13 +559,16 @@ impl AdsRuntime {
         S: AsRef<AdsSymbolInfo> + 'a,
         D: AsRef<[u8]> + 'a,
     {
-        let reqs = items.into_iter().map(|(info, data)| {
-            SumWriteRequest::new(
-                info.as_ref().index_group(),
-                info.as_ref().index_offset(),
-                data.as_ref(),
-            )
-        });
+        let reqs: Vec<_> = items
+            .into_iter()
+            .map(|(info, data)| {
+                SumWriteRequest::new(
+                    info.as_ref().index_group(),
+                    info.as_ref().index_offset(),
+                    data.as_ref(),
+                )
+            })
+            .collect();
 
         let resp = self.device.write_multi(self.target, reqs).await?;
 
@@ -864,14 +876,17 @@ impl AdsRuntime {
         I::IntoIter: ExactSizeIterator,
         S: AsRef<str> + 'a + ?Sized,
     {
-        let reqs = names.into_iter().map(|name| {
-            SumReadWriteRequest::new(
-                IndexGroup::SYMBOL_INFO_BY_NAME_EX,
-                IndexOffset::ZERO,
-                1_048_576, // assumed max size of a single entry, router will return the actual size
-                name.as_ref().as_bytes(),
-            )
-        });
+        let reqs: Vec<_> = names
+            .into_iter()
+            .map(|name| {
+                SumReadWriteRequest::new(
+                    IndexGroup::SYMBOL_INFO_BY_NAME_EX,
+                    IndexOffset::ZERO,
+                    1_048_576, // assumed max size of a single entry, router will return the actual size
+                    name.as_ref().as_bytes(),
+                )
+            })
+            .collect();
 
         let resp = self.device.read_write_multi(self.target, reqs).await?;
 
@@ -937,14 +952,17 @@ impl AdsRuntime {
         I::IntoIter: ExactSizeIterator,
         S: AsRef<str> + 'a + ?Sized,
     {
-        let reqs = names.into_iter().map(|name| {
-            SumReadWriteRequest::new(
-                IndexGroup::DATA_TYPE_INFO_BY_NAME_EX,
-                IndexOffset::ZERO,
-                1_048_576, // assumed max size of a single entry, router will return the actual size
-                name.as_ref().as_bytes(),
-            )
-        });
+        let reqs: Vec<_> = names
+            .into_iter()
+            .map(|name| {
+                SumReadWriteRequest::new(
+                    IndexGroup::DATA_TYPE_INFO_BY_NAME_EX,
+                    IndexOffset::ZERO,
+                    1_048_576, // assumed max size of a single entry, router will return the actual size
+                    name.as_ref().as_bytes(),
+                )
+            })
+            .collect();
 
         let resp = self.device.read_write_multi(self.target, reqs).await?;
 
