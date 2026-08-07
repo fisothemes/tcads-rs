@@ -44,7 +44,7 @@ fn main() -> Result<()> {
     println!("Current Machine Temperature: {}°C", temperature);
 
     // Invoke a PLC Method (RPC) by passing a Rust tuple, returning a tuple
-    let (quotient, remainder): (i32, i32) = rt.rpc("MAIN.fbMath", "Divide", &(100i32, 3i32))?;
+    let (quotient, remainder): (i32, i32) = rt.rpc("MAIN.fbMath", "Divide", (100i32, 3i32))?;
     println!("RPC Result: 100 / 3 = {} (remainder {})", quotient, remainder);
 
 
