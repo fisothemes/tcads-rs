@@ -201,7 +201,7 @@ impl AdsReadDeviceInfoResponse {
     /// Parses the response payload into a tuple of return code, version, and device name.
     pub fn parse_payload(
         payload: &[u8],
-    ) -> Result<(AdsReturnCode, AdsDeviceVersion, AdsString<16>), AdsError> {
+    ) -> Result<(AdsReturnCode, AdsDeviceVersion, AdsString<16>), ProtocolError> {
         if payload.len() != Self::PAYLOAD_SIZE {
             return Err(AdsError::UnexpectedDataLength {
                 expected: Self::PAYLOAD_SIZE,
