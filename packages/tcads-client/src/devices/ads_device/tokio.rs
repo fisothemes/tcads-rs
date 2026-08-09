@@ -9,6 +9,7 @@ use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
+use tcads_core::protocol::utils::parse_ads_frame;
 use tcads_core::protocol::{
     AdsAddDeviceNotificationRequest, AdsAddDeviceNotificationResponse,
     AdsDeleteDeviceNotificationRequest, AdsDeleteDeviceNotificationResponse,
@@ -19,9 +20,9 @@ use tcads_core::protocol::{
     GetLocalNetIdResponse, PortCloseRequest, PortConnectRequest, PortConnectResponse,
 };
 use tcads_core::{
-    AdsDeviceVersion, AdsError, AdsHeader, AdsNotificationAttrib, AdsReturnCode, AdsState,
-    AdsTransMode, AmsAddr, AmsCommand, AmsFrame, AmsNetId, DeviceState, IndexGroup, IndexOffset,
-    InvokeId, NotificationHandle, RouterState, SumAddNotificationRequest,
+    AdsCommand, AdsDeviceVersion, AdsError, AdsHeader, AdsNotificationAttrib, AdsReturnCode,
+    AdsState, AdsTransMode, AmsAddr, AmsCommand, AmsFrame, AmsNetId, DeviceState, IndexGroup,
+    IndexOffset, InvokeId, NotificationHandle, RouterState, SumAddNotificationRequest,
     SumAddNotificationResponse, SumDeleteNotificationResponse, SumReadRequest,
     SumReadResponseOwned, SumReadWriteRequest, SumReadWriteResponseOwned, SumWriteRequest,
     SumWriteResponse,
@@ -372,12 +373,16 @@ impl AdsDevice {
         let invoke_id = self.next_invoke_id();
 
         let frame = AdsReadDeviceInfoRequest::new(target, self.source, invoke_id).into_frame();
-        let resp =
-            AdsReadDeviceInfoResponse::try_from(self.send_and_wait(frame, invoke_id).await?)?;
 
-        Self::check_result(resp.result())?;
+        let frame = self.send_and_wait(frame, invoke_id).await?;
 
-        Ok((resp.version(), resp.device_name().into_owned()))
+        let (header, payload) = parse_ads_frame(&frame, AdsCommand::AdsReadDeviceInfo, false)?;
+        Self::check_result(header.error_code())?;
+
+        let (err_code, version, device_name) = AdsReadDeviceInfoResponse::parse_payload(payload)?;
+        Self::check_result(err_code)?;
+
+        Ok((version, device_name.as_str().into()))
     }
 
     /// Reads the ADS and device state of `target`.
@@ -385,11 +390,16 @@ impl AdsDevice {
         let invoke_id = self.next_invoke_id();
 
         let frame = AdsReadStateRequest::new(target, self.source, invoke_id).into_frame();
-        let resp = AdsReadStateResponse::try_from(self.send_and_wait(frame, invoke_id).await?)?;
 
-        Self::check_result(resp.result())?;
+        let frame = self.send_and_wait(frame, invoke_id).await?;
 
-        Ok((resp.ads_state(), resp.device_state()))
+        let (header, payload) = parse_ads_frame(&frame, AdsCommand::AdsReadState, false)?;
+        Self::check_result(header.error_code())?;
+
+        let (err_code, ads_state, device_state) = AdsReadStateResponse::parse_payload(payload)?;
+        Self::check_result(err_code)?;
+
+        Ok((ads_state, device_state))
     }
 
     /// Changes the ADS and device state of `target`.
@@ -411,9 +421,14 @@ impl AdsDevice {
             data,
         )
         .into_frame();
-        let resp = AdsWriteControlResponse::try_from(&self.send_and_wait(frame, invoke_id).await?)?;
 
-        Self::check_result(resp.result())?;
+        let frame = self.send_and_wait(frame, invoke_id).await?;
+
+        let (header, payload) = parse_ads_frame(&frame, AdsCommand::AdsWriteControl, false)?;
+        Self::check_result(header.error_code())?;
+
+        let err_code = AdsWriteControlResponse::parse_payload(payload)?;
+        Self::check_result(err_code)?;
 
         Ok(())
     }
@@ -437,12 +452,16 @@ impl AdsDevice {
             length,
         )
         .into_frame();
+
         let frame = self.send_and_wait(frame, invoke_id).await?;
-        let resp = AdsReadResponse::try_from_frame(&frame)?;
 
-        Self::check_result(resp.result())?;
+        let (header, payload) = parse_ads_frame(&frame, AdsCommand::AdsRead, false)?;
+        Self::check_result(header.error_code())?;
 
-        Ok(resp.data().to_vec())
+        let (err_code, data) = AdsReadResponse::parse_payload(payload)?;
+        Self::check_result(err_code)?;
+
+        Ok(data.into())
     }
 
     /// Writes `data` to `target` at `index_group` and `index_offset`.
@@ -464,9 +483,14 @@ impl AdsDevice {
             data,
         )
         .into_frame();
-        let resp = AdsWriteResponse::try_from(self.send_and_wait(frame, invoke_id).await?)?;
 
-        Self::check_result(resp.result())?;
+        let frame = self.send_and_wait(frame, invoke_id).await?;
+
+        let (header, payload) = parse_ads_frame(&frame, AdsCommand::AdsWrite, false)?;
+        Self::check_result(header.error_code())?;
+
+        let err_code = AdsWriteResponse::parse_payload(payload)?;
+        Self::check_result(err_code)?;
 
         Ok(())
     }
@@ -494,12 +518,16 @@ impl AdsDevice {
             write_data,
         )
         .into_frame();
+
         let frame = self.send_and_wait(frame, invoke_id).await?;
-        let resp = AdsReadWriteResponse::try_from_frame(&frame)?;
 
-        Self::check_result(resp.result())?;
+        let (header, payload) = parse_ads_frame(&frame, AdsCommand::AdsReadWrite, false)?;
+        Self::check_result(header.error_code())?;
 
-        Ok(resp.data().to_vec())
+        let (err_code, data) = AdsReadWriteResponse::parse_payload(payload)?;
+        Self::check_result(err_code)?;
+
+        Ok(data.into())
     }
 
     /// Registers a device notification on `target`.
@@ -533,13 +561,16 @@ impl AdsDevice {
             notif_attr,
         )
         .into_frame();
-        let resp = AdsAddDeviceNotificationResponse::try_from(
-            self.send_and_wait(frame, invoke_id).await?,
-        )?;
 
-        Self::check_result(resp.result())?;
+        let frame = self.send_and_wait(frame, invoke_id).await?;
 
-        let handle = resp.handle();
+        let (header, payload) =
+            parse_ads_frame(&frame, AdsCommand::AdsAddDeviceNotification, false)?;
+        Self::check_result(header.error_code())?;
+
+        let (err_code, handle) = AdsAddDeviceNotificationResponse::parse_payload(payload)?;
+        Self::check_result(err_code)?;
+
         self.inner.ads_notifs.promote(invoke_id, handle).await;
 
         Ok((rx, handle))
@@ -557,18 +588,25 @@ impl AdsDevice {
         let invoke_id = self.next_invoke_id();
         let frame = AdsDeleteDeviceNotificationRequest::new(target, self.source, invoke_id, handle)
             .into_frame();
-        let resp = AdsDeleteDeviceNotificationResponse::try_from(
-            self.send_and_wait(frame, invoke_id).await?,
-        )?;
-        Self::check_result(resp.result())?;
+
+        let frame = self.send_and_wait(frame, invoke_id).await?;
+
+        let (header, payload) =
+            parse_ads_frame(&frame, AdsCommand::AdsDeleteDeviceNotification, false)?;
+        Self::check_result(header.error_code())?;
+
+        let err_code = AdsDeleteDeviceNotificationResponse::parse_payload(payload)?;
+        Self::check_result(err_code)?;
+
         self.inner.ads_notifs.remove(handle).await;
+
         Ok(())
     }
     /// Sends a fire-and-forget frame to the router.
     ///
     /// This method exists for unconventional ADS commands that do not follow the
     /// standard request/response pattern, such as
-    /// [`AdsDeviceNotification`](tcads_core::AdsCommand::AdsDeviceNotification) frames
+    /// [`AdsDeviceNotification`](AdsCommand::AdsDeviceNotification) frames
     /// written directly to the TwinCAT logger (port 100). For standard commands
     /// that expect a response, use the high-level methods on [`AdsDevice`].
     ///
@@ -894,13 +932,13 @@ impl AdsDevice {
             None => rx.recv().await.ok_or(crate::Error::Disconnected)?,
         };
 
-        let read_write_resp = AdsReadWriteResponse::try_from_frame(&response_frame)?;
+        let (header, payload) = parse_ads_frame(&response_frame, AdsCommand::AdsReadWrite, false)?;
+        Self::check_result(header.error_code())?;
 
-        if read_write_resp.result() != AdsReturnCode::Ok {
-            return Err(crate::Error::from(read_write_resp.result()));
-        }
+        let (err_code, data) = AdsReadWriteResponse::parse_payload(payload)?;
+        Self::check_result(err_code)?;
 
-        let response = SumAddNotificationResponse::new(read_write_resp.data())
+        let response = SumAddNotificationResponse::new(data)
             .map_err(|e| crate::Error::from(AdsError::from(e)))?;
 
         let parsed_results: Vec<Result<NotificationHandle, AdsReturnCode>> =
