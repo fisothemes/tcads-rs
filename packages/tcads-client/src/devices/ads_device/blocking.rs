@@ -91,8 +91,9 @@ pub struct AdsDeviceInner {
 ///
 /// ```no_run
 /// use tcads_client::devices::blocking::AdsDevice;
+/// use tcads_core::AmsAddr;
 ///
-/// let source = "192.168.1.10.1.1:32750".parse()?;
+/// let source: AmsAddr = "192.168.1.10.1.1:32750".parse()?;
 /// let device = AdsDevice::connect_remote("192.168.1.120:48898", source, None)?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
@@ -201,16 +202,17 @@ impl AdsDevice {
     ///
     /// ```no_run
     /// use tcads_client::devices::blocking::AdsDevice;
+    /// use tcads_core::AmsAddr;
     ///
     /// // Source Net ID must match the static route entry on the remote router
     /// // The port can be any unused number.
-    /// let source = "192.168.1.10.1.1:32750".parse()?;
+    /// let source: AmsAddr = "192.168.1.10.1.1:32750".parse()?;
     /// let device = AdsDevice::connect_remote("192.168.1.120:48898", source, None)?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn connect_remote(
         addr: impl ToSocketAddrs,
-        source: AmsAddr,
+        source: impl Into<AmsAddr>,
         timeout: impl Into<Option<Duration>>,
     ) -> crate::Result<Self> {
         let timeout = timeout.into();
@@ -226,7 +228,7 @@ impl AdsDevice {
             }
             None => AmsStream::connect(addr)?.try_split()?,
         };
-        Ok(Self::new(reader, writer, source, timeout))
+        Ok(Self::new(reader, writer, source.into(), timeout))
     }
 
     /// Creates an [`AdsDevice`] from an already-split reader and writer.

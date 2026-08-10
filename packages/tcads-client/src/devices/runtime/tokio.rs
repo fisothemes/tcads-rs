@@ -41,7 +41,10 @@ impl AdsRuntime {
         target: impl Into<AmsAddr>,
         timeout: impl Into<Option<Duration>>,
     ) -> crate::Result<Self> {
-        Ok(Self::new(AdsDevice::connect(timeout).await?, target.into()))
+        let device = AdsDevice::connect(timeout).await?;
+        let device = Self::new(device, target.into());
+        let _ = device.read_state().await?;
+        Ok(device)
     }
 
     /// Connects to a target ADS device whose runtime [`AmsNetId`](tcads_core::AmsNetId) is the
@@ -58,7 +61,9 @@ impl AdsRuntime {
     ) -> crate::Result<Self> {
         let device = AdsDevice::connect(timeout.into()).await?;
         let target = AmsAddr::new(device.get_local_net_id().await?, port);
-        Ok(Self::new(device, target))
+        let device = Self::new(device, target);
+        let _ = device.read_state().await?;
+        Ok(device)
     }
 
     /// Connects to a target ADS device using a remote AMS router.
@@ -70,13 +75,14 @@ impl AdsRuntime {
     /// See [`AdsDevice::connect_remote`] for details.
     pub async fn connect_remote(
         addr: impl ToSocketAddrs,
-        source: AmsAddr,
+        source: impl Into<AmsAddr>,
+        target: impl Into<AmsAddr>,
         timeout: impl Into<Option<Duration>>,
     ) -> crate::Result<Self> {
-        Ok(Self::new(
-            AdsDevice::connect_remote(addr, source, timeout).await?,
-            source,
-        ))
+        let device = AdsDevice::connect_remote(addr, source, timeout).await?;
+        let device = Self::new(device, target.into());
+        let _ = device.read_state().await?;
+        Ok(device)
     }
 
     /// Creates an instance of the [`AdsRuntime`] by wrapping an existing [`AdsDevice`] and

@@ -27,9 +27,14 @@ impl AdsSystemService {
     /// Performs a [`PortConnect`](tcads_core::protocol::PortConnectRequest) handshake
     /// to obtain a dynamically assigned source address from the local router.
     /// See [`AdsDevice::connect`] for more details.
-    pub fn connect(net_id: AmsNetId, timeout: impl Into<Option<Duration>>) -> crate::Result<Self> {
+    pub fn connect(
+        net_id: impl Into<AmsNetId>,
+        timeout: impl Into<Option<Duration>>,
+    ) -> crate::Result<Self> {
         let device = AdsDevice::connect(timeout)?;
-        Ok(Self::new(device, net_id))
+        let device = Self::new(device, net_id.into());
+        let _ = device.read_state()?;
+        Ok(device)
     }
 
     /// Connects to the TwinCAT System Service (Port 10000) of an ADS device using the local
@@ -39,7 +44,9 @@ impl AdsSystemService {
     pub fn connect_local(timeout: impl Into<Option<Duration>>) -> crate::Result<Self> {
         let device = AdsDevice::connect(timeout)?;
         let net_id = device.get_local_net_id()?;
-        Ok(Self::new(device, net_id))
+        let device = Self::new(device, net_id);
+        let _ = device.read_state()?;
+        Ok(device)
     }
 
     /// Connects to the TwinCAT System Service (Port 10000) of an ADS device on a remote AMS router.
@@ -51,12 +58,14 @@ impl AdsSystemService {
     /// is **not** performed. See [`AdsDevice::connect_remote`] for details.
     pub fn connect_remote(
         addr: impl std::net::ToSocketAddrs,
-        source: AmsAddr,
-        net_id: AmsNetId,
+        source: impl Into<AmsAddr>,
+        net_id: impl Into<AmsNetId>,
         timeout: impl Into<Option<Duration>>,
     ) -> crate::Result<Self> {
         let device = AdsDevice::connect_remote(addr, source, timeout)?;
-        Ok(Self::new(device, net_id))
+        let device = Self::new(device, net_id.into());
+        let _ = device.read_state()?;
+        Ok(device)
     }
 
     /// Shuts down the underlying connection.

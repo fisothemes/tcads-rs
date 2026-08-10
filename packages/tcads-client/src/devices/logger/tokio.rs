@@ -33,11 +33,13 @@ impl AdsLogger {
     /// Performs a [`PortConnect`](tcads_core::protocol::PortConnectRequest) handshake
     /// to obtain a dynamically assigned source address from the local router
     pub async fn connect(
-        net_id: AmsNetId,
+        net_id: impl Into<AmsNetId>,
         timeout: impl Into<Option<Duration>>,
     ) -> crate::Result<Self> {
         let device = AdsDevice::connect(timeout).await?;
-        Ok(Self::new(device, net_id))
+        let device = Self::new(device, net_id.into());
+        let _ = device.read_state().await?;
+        Ok(device)
     }
 
     /// Connects to the Logger (Port 100) of the local AMS router at `127.0.0.1:48898`.
@@ -54,7 +56,9 @@ impl AdsLogger {
     pub async fn connect_local(timeout: impl Into<Option<Duration>>) -> crate::Result<Self> {
         let device = AdsDevice::connect(timeout).await?;
         let net_id = device.get_local_net_id().await?;
-        Ok(Self::new(device, net_id))
+        let device = Self::new(device, net_id);
+        let _ = device.read_state().await?;
+        Ok(device)
     }
 
     /// Connects directly to the Logger of a remote AMS router without a local router.
@@ -66,12 +70,14 @@ impl AdsLogger {
     /// is **not** performed. See [`AdsDevice::connect_remote`] for details.
     pub async fn connect_remote(
         addr: impl ToSocketAddrs,
-        source: AmsAddr,
-        net_id: AmsNetId,
+        source: impl Into<AmsAddr>,
+        net_id: impl Into<AmsNetId>,
         timeout: impl Into<Option<Duration>>,
     ) -> crate::Result<Self> {
         let device = AdsDevice::connect_remote(addr, source, timeout).await?;
-        Ok(Self::new(device, net_id))
+        let device = Self::new(device, net_id.into());
+        let _ = device.read_state().await?;
+        Ok(device)
     }
 
     /// Creates an [`AdsLogger`] from an existing [`AdsDevice`] and router Net ID.
