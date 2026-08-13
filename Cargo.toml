@@ -11,7 +11,7 @@ members = [
 ]
 
 [workspace.package]
-authors = ["Goodwill Mzumala <fisothemes@egmail.com>"]
+authors = ["Goodwill Mzumala <fisothemes@gmail.com>"]
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/fisothemes/tcads-rs"
