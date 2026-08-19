@@ -1,6 +1,5 @@
 [package]
 name = "tcads-io"
-version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,6 +8,7 @@ description = "Network transport layer for the TwinCAT ADS protocol"
 keywords = ["twincat", "beckhoff", "ads"]
 categories = ["api-bindings", "network-programming"]
 readme = "README.md"
+version.workspace = true
 
 [features]
 default = ["blocking"]

@@ -1,10 +1,10 @@
 [package]
 name = "tcads-serde"
-version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+version.workspace = true
 
 [dependencies]
 encoding_rs = { workspace = true }

@@ -15,6 +15,7 @@ authors = ["Goodwill Mzumala <fisothemes@gmail.com>"]
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/fisothemes/tcads-rs"
+version = "0.1.0-alpha.1"
 
 [workspace.dependencies]
 bitflags = "2"
