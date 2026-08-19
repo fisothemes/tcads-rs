@@ -4,6 +4,14 @@ A native rust implementation of the TwinCAT ADS protocol.
 
 This library aims to provide a way to communicate with TwinCAT ADS devices (PLCs, NC, etc.), without relying on the official Beckhoff `TcAdsDll.dll` or requiring a local TwinCAT installation on the client machine.
 
+## Installation
+
+Add the following code to your `Cargo.toml` to get started:
+```toml
+[dependencies]
+tcads = { git = "https://github.com/fisothemes/tcads-rs", tag = "0.1.0-alpha.1", features = ["tokio"]}
+```
+
 ## Showcase
 
 ```rust
