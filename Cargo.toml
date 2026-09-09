@@ -27,12 +27,12 @@ indexmap = "2"
 rand = "0.10.0"
 serde = "1"
 serde_json = "1"
-tcads = { path = "packages/tcads" }
-tcads-client = { path = "packages/tcads-client" }
-tcads-core = { path = "packages/tcads-core" }
-tcads-io = { path = "packages/tcads-io" }
-tcads-serde = { path = "packages/tcads-serde" }
-tcads-server = { path = "packages/tcads-server" }
+tcads = { path = "packages/tcads", version = "0.1.0-alpha.2" }
+tcads-client = { path = "packages/tcads-client", version = "0.1.0-alpha.2" }
+tcads-core = { path = "packages/tcads-core", version = "0.1.0-alpha.2" }
+tcads-io = { path = "packages/tcads-io", version = "0.1.0-alpha.2" }
+tcads-serde = { path = "packages/tcads-serde", version = "0.1.0-alpha.2" }
+tcads-server = { path = "packages/tcads-server", version = "0.1.0-alpha.2" }
 tokio = "1"
 tokio-test = "0.4"
 thiserror = "2"
