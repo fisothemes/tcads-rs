@@ -6,8 +6,6 @@ pub const AMS_FRAME_MAX_LEN: usize = 4 * 1024 * 1024;
 /// A single AMS frame/packet consisting of a header and a payload.
 ///
 /// This struct is I/O-agnostic and simply holds the frame data.
-/// Reading and writing frames is handled by the I/O layer
-/// ([`blocking`](crate::io::blocking) or [`tokio`](crate::io::tokio)).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AmsFrame {
     header: AmsTcpHeader,

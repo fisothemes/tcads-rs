@@ -100,7 +100,7 @@ impl AmsReader<TcpStream> {
 
     /// Shuts down the output stream, ensuring that the value can be dropped cleanly.
     ///
-    /// See [`TcpStream::shutdown`] for more details.
+    /// See [`AsyncWriteExt::shutdown`] for more details.
     pub async fn shutdown(&mut self) -> io::Result<()> {
         self.reader.get_mut().shutdown().await
     }

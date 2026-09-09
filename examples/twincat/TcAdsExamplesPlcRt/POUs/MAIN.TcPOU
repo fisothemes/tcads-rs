@@ -4,6 +4,50 @@
     <Declaration><![CDATA[// This is an example TwinCAT Runtime project for tcads-rs demonstrations.
 PROGRAM MAIN
 VAR
+	bOpen, bClose, bEOF, bStart : BOOL;
+	nFileHandle : UINT;
+	fbOpen : Tc2_System.FB_FileOpen;
+	fbClose : Tc2_System.FB_FileClose;
+	fbEOF : Tc2_System.FB_EOF;
+	fbProc : Tc2_Utilities.NT_StartProcess;
+	Value1 : PVOID;
+	Value2 : POINTER TO BYTE;
+	Value3 : POINTER TO WORD;
+	Value4 : POINTER TO DWORD;
+	Value5 : POINTER TO LWORD;
+	Value6 : POINTER TO SINT;
+	Value7 : POINTER TO USINT;
+	Value8 : POINTER TO INT;
+	Value9 : POINTER TO UINT;
+	Value10 : POINTER TO DINT;
+	Value11 : POINTER TO UDINT;
+	Value12 : POINTER TO LINT;
+	Value13 : POINTER TO ULINT;
+	
+	Value14 : POINTER TO REAL;
+	Value15 : POINTER TO LREAL;
+	
+	Value16 : POINTER TO TIME;
+	Value17 : POINTER TO LTIME;
+	
+	Value18 : POINTER TO DATE;
+	Value19 : POINTER TO DT;
+	Value20 : POINTER TO TOD;
+	
+	Value21 : POINTER TO STRING(79);
+	Value22 : POINTER TO STRING(81);
+	Value222 : POINTER TO STRING(254);
+	Value2222 : POINTER TO STRING(255);
+	Value22222 : POINTER TO STRING(256);
+	
+	Value24 : POINTER TO WSTRING(79);
+	Value244 : POINTER TO WSTRING;
+	Value25 : POINTER TO WSTRING(81);
+	Value255 : POINTER TO WSTRING(254);
+	Value2555 : POINTER TO WSTRING(255);
+	Value25555 : POINTER TO WSTRING(256);
+	
+	
 	nCount 			: UDINT := 99;
 	bIncrement 		: BOOL;
 	bDecrement 		: BOOL;

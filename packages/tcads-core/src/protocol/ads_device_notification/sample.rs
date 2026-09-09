@@ -8,7 +8,7 @@ use crate::ads::NotificationHandle;
 ///
 /// Samples are always parsed as part of an [`AdsStampHeader`](super::stamp::AdsStampHeader),
 /// which groups samples that share the same timestamp. The `data` field borrows
-/// directly from the [`AmsFrame`](crate::io::AmsFrame) that was parsed, thus no copy is made.
+/// directly from the [`AmsFrame`](crate::AmsFrame) that was parsed, thus no copy is made.
 ///
 /// For storage or use after the frame is dropped, convert to [`AdsNotificationSampleOwned`]
 /// via [`into_owned`](Self::into_owned) or [`to_owned`](Self::to_owned).
@@ -45,7 +45,7 @@ impl<'a> AdsNotificationSample<'a> {
 
     /// Returns a zero-copy slice of the sample data.
     ///
-    /// The slice borrows from the originating [`AmsFrame`](crate::io::AmsFrame) —
+    /// The slice borrows from the originating [`AmsFrame`](crate::AmsFrame) —
     /// interpret it according to the data type of the watched variable.
     pub fn data(&self) -> &[u8] {
         self.data

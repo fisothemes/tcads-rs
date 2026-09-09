@@ -437,7 +437,7 @@ impl AdsRuntime {
     /// `SYMBOL_VALUE_BY_HANDLE`. `trans_mode`, `max_delay`, and `cycle_time`
     /// are passed straight through to [`AdsNotificationAttrib`]; use
     /// [`AdsTransMode::ServerOnChange`] for push-on-change, or
-    /// [`AdsTransMode::ServerCyclic`] with a `cycle_time` for polling at a
+    /// [`AdsTransMode::ServerCycle`] with a `cycle_time` for polling at a
     /// fixed interval, useful for fast-changing values where on-change would
     /// flood the subscription.
     ///

@@ -19,7 +19,7 @@
 //!
 //! The crate is split into two distinct implementations:
 //! - **[`blocking`]**: Uses standard library [`std::io`] and blocking threads.
-//! - **[`tokio`]**: Uses [`tokio::io`] for asynchronous I/O.
+//! - **[`tokio`]**: Uses [`tokio::io`](::tokio::io) for asynchronous I/O.
 //!
 //! Both modules provide an `AmsStream` that can be split into independent reader
 //! and writer halves, allowing you to process incoming server notifications
@@ -60,6 +60,6 @@
 #[cfg(feature = "blocking")]
 pub mod blocking;
 
-/// Asynchronous I/O utilizing [`tokio::net`] and [`tokio::io`].
+/// Asynchronous I/O utilizing [`tokio::net`](::tokio::net) and [`tokio::io`](::tokio::io).
 #[cfg(feature = "tokio")]
 pub mod tokio;

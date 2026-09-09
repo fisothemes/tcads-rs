@@ -415,7 +415,7 @@ impl AdsRuntime {
     /// [`SYMBOL_VALUE_BY_HANDLE`](IndexGroup::SYMBOL_VALUE_BY_HANDLE). `trans_mode`, `max_delay`,
     /// and `cycle_time` are passed straight through to [`AdsNotificationAttrib`]; use
     /// [`AdsTransMode::ServerOnChange`] for push-on-change, or
-    /// [`AdsTransMode::ServerCyclic`] with a `cycle_time` for polling at a
+    /// [`AdsTransMode::ServerCycle`] with a `cycle_time` for polling at a
     /// fixed interval, useful for fast-changing values where on-change would
     /// flood the subscription.
     ///
@@ -1401,7 +1401,7 @@ impl ReadMultiValues {
     }
 }
 
-/// Iterator adapter over a [`ReadMulti`] where every entry decodes to the same `T`.
+/// Iterator adapter over a [`ReadMultiValues`] where every entry decodes to the same `T`.
 /// Obtained via [`ReadMultiValues::into_iter_as`].
 pub struct ReadMultiValuesIter<T> {
     inner: ReadMultiValues,

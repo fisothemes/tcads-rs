@@ -233,8 +233,8 @@ impl<'a> TryFrom<&'a AmsFrame> for AdsLoggerWriteRequest<'a> {
 ///
 /// # Usage
 ///
-/// * **Client:** Construct with [`new`](Self::new) and send via
-///   [`write_frame`](crate::io::blocking::AmsStream::write_frame) (or similar).
+/// * **Client:** Construct with [`new`](Self::new) and send via `AmsStream::write_frame`
+///   from `tcads-io` (or similar).
 /// * **Server:** Obtained by calling [`AdsLoggerWriteRequest::into_owned`] or
 ///   [`to_owned`](AdsLoggerWriteRequest::to_owned) after parsing an incoming frame.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

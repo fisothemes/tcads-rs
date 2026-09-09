@@ -9,7 +9,7 @@ use crate::ads::{AdsError, NotificationHandle, WindowsFileTime};
 /// the same scan cycle into a single stamp.
 ///
 /// The `samples` field contains borrowed views into the originating
-/// [`AmsFrame`](crate::io::AmsFrame) therefore, no data is copied. The `Vec` of sample
+/// [`AmsFrame`](crate::AmsFrame) therefore, no data is copied. The `Vec` of sample
 /// structs is allocated during parsing, but the variable-length data each sample
 /// points to stays in the frame buffer.
 ///
