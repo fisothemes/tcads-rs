@@ -19,7 +19,7 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
-tcads-client = { workspace = true }
+tcads-client = { path = "../tcads-client" }
 
 [package.metadata.docs.rs]
 all-features = true
