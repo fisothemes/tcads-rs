@@ -4,6 +4,13 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Framework for building custom ADS servers and devices in Rust"
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
 version.workspace = true
 
 [dependencies]
+
+[package.metadata.docs.rs]
+all-features = true

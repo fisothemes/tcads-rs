@@ -15,6 +15,8 @@ authors = ["Goodwill Mzumala <fisothemes@gmail.com>"]
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/fisothemes/tcads-rs"
+keywords = ["twincat", "beckhoff", "ads", "plc"]
+categories = ["api-bindings", "network-programming"]
 version = "0.1.0-alpha.2"
 
 [workspace.dependencies]
