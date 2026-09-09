@@ -13,7 +13,7 @@ This library aims to provide a way to communicate with TwinCAT ADS devices (PLCs
 Add the following code to your `Cargo.toml` to get started:
 ```toml
 [dependencies]
-tcads = { git = "https://github.com/fisothemes/tcads-rs", tag = "0.1.0-alpha.2", features = ["tokio"]}
+tcads = { version = "0.1.0-alpha.2", features = ["tokio"] }
 ```
 
 ## Showcase
