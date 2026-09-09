@@ -9,7 +9,7 @@ This library aims to provide a way to communicate with TwinCAT ADS devices (PLCs
 Add the following code to your `Cargo.toml` to get started:
 ```toml
 [dependencies]
-tcads = { git = "https://github.com/fisothemes/tcads-rs", tag = "0.1.0-alpha.1", features = ["tokio"]}
+tcads = { git = "https://github.com/fisothemes/tcads-rs", tag = "0.1.0-alpha.2", features = ["tokio"]}
 ```
 
 ## Showcase
@@ -103,6 +103,18 @@ The project is organized as a Cargo workspace with the following crates:
 - **[`tcads`](packages/tcads)**: The top-level facade crate that bundles everything together for easy consumption.
 - **[`examples`](examples)**: A comprehensive, step-by-step learning progression demonstrating how to use the library from raw bytes up to high-level ADS clients/servers.
 
+## Connecting
+
+If you have XAE or XAR installed, you have an AMS router. It runs on the local machine on port
+48898, and every ADS message passes through it, local or remote. `AdsDevice::connect` opens a
+socket to `127.0.0.1:48898` and the router does the rest.
+
+If your machine cannot run XAE or XAR (a Linux or macOS development machine, a container, a bare
+Windows box), you connect directly to the router on the target instead, and it needs to know your
+source AMS Net ID in advance. See
+[Connecting without a local AMS router](docs/static-routes.md) for how to add that route, pick a
+source address, and read the failure modes.
+
 ## Getting Started: Examples
 
 The best way to learn how to use this library is by exploring the [`examples`](examples) directory. The examples are numbered to provide a gentle learning curve, for example:
@@ -122,7 +134,9 @@ and [more](examples/src/bin).
 > [!WARNING]
 > This project is currently under active development. APIs are subject to change.
 
-[`tcads-core`](packages/tcads-core), [`tcads-io`](packages/tcads-io) and [`tcads-serde`](packages/tcads-serde) are the most mature crates. [`tcads-client`](packages/tcads-client) and [`tcads-server`](packages/tcads-server) are work-in-progress.
+[`tcads-core`](packages/tcads-core), [`tcads-io`](packages/tcads-io),
+[`tcads-serde`](packages/tcads-serde) and [`tcads-client`](packages/tcads-client) 
+are the most mature crates. [`tcads-server`](packages/tcads-server) is still work-in-progress.
 
 ## Acknowledgments & Prior Art
 
@@ -130,6 +144,7 @@ Building a native protocol implementation from scratch requires standing on the 
 
 - **[Beckhoff/ADS](https://github.com/Beckhoff/ADS)**: The official open-source C++ ADS library provided by Beckhoff. It served as the primary reference for the AMS/ADS protocol routing, device states, and C++ header translations.
 - **[jisotalo/ads-client](https://github.com/jisotalo/ads-client)**: An incredible, full-featured Node.js ADS client. Jussi Isotalo's reverse-engineering efforts, specifically documented in his blog post [Subscribing to TwinCAT logger in Node.js](https://jisotalo.fi/subscribing-to-twincat-logger-in-nodejs/), were instrumental in building the `AdsLogger` device and deciphering the undocumented `ADSLOGSTR` wire format.
+- **[JarmoCluyse/ads-go](https://github.com/JarmoCluyse/ads-go)**: A pure Go implementation of the ADS protocol, and useful prior art for anyone comparing how the protocol maps onto a statically typed language.
 - **[birkenfeld/ads-rs](https://github.com/birkenfeld/ads-rs)**: An earlier Rust implementation of the ADS protocol that provided excellent prior art and inspiration for modeling ADS concepts in idiomatic Rust.
 - **[Beckhoff Information System (InfoSys)](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/index.html)**: The official TwinCAT 3 documentation and ADS specification portal.
 
