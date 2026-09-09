@@ -1,3 +1,7 @@
+[![Crates.io](https://img.shields.io/crates/v/tcads.svg)](https://crates.io/crates/tcads)
+[![Documentation](https://docs.rs/tcads/badge.svg)](https://docs.rs/tcads)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 # TwinCAT ADS for Rust
 
 A native rust implementation of the TwinCAT ADS protocol.
