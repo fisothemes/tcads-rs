@@ -230,6 +230,14 @@ impl LogEntryReceiver {
             Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
         }
     }
+
+    /// Explicitly cancels the subscription, returning any error from the router.
+    ///
+    /// Dropping the receiver has the same effect but discards the result; prefer this
+    /// when you want to know cancellation actually succeeded.
+    pub async fn unsubscribe(self) -> crate::Result<()> {
+        self.guard.cancel().await
+    }
 }
 
 impl AdsSubsystem for AdsLogger {
