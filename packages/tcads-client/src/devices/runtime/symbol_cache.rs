@@ -21,6 +21,7 @@ use tcads_serde::{AdsTypeCache, TypeProvider, resolvers};
 
 /// A fully resolved symbol: type metadata, an optionally acquired handle, and any RPC method
 /// handles resolved for this instance so far.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SymbolEntry {
     type_info: Arc<AdsTypeInfo>,
     size: u32,
@@ -86,6 +87,7 @@ impl SymbolEntry {
 
 /// Cache mapping symbol instance paths to [`SymbolEntry`]s, backed by a shared
 /// [`AdsTypeCache`] for type metadata.
+#[derive(Debug)]
 pub struct SymbolCache {
     entries: RwLock<HashMap<Arc<str>, Arc<RwLock<SymbolEntry>>>>,
     types: RwLock<AdsTypeCache>,
