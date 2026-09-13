@@ -16,7 +16,7 @@ use tcads_core::{
 /// The [`AdsLogger`] device is [`Clone`], so all clones share the same underlying connection.
 /// It is also [`Send`] + [`Sync`], so multiple tasks can receive log entries
 /// concurrently. Clean-up only happens when the last clone is dropped.
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AdsLogger {
     device: AdsDevice,
     target: AmsAddr,

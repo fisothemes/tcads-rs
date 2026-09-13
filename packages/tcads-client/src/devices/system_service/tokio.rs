@@ -12,6 +12,7 @@ use tcads_core::{
 ///
 /// Provides host OS control, CPU core isolation, remote file access,
 /// process execution, and Windows Registry management.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AdsSystemService {
     device: AdsDevice,
     target: AmsAddr,
