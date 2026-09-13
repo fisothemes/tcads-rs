@@ -1102,3 +1102,17 @@ impl fmt::Debug for AdsDevice {
             .finish()
     }
 }
+
+impl PartialEq for AdsDevice {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
+}
+
+impl Eq for AdsDevice {}
+
+impl std::hash::Hash for AdsDevice {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        Arc::as_ptr(&self.inner).hash(state);
+    }
+}
