@@ -519,7 +519,7 @@ checksum = "c1bbb9f3c5c463a01705937a24fdabc5047929ac764b2d5b9cf681c1f5041ed5"
 
 [[package]]
 name = "tcads"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.3"
 dependencies = [
  "tcads-client",
  "tcads-core",
@@ -530,7 +530,7 @@ dependencies = [
 
 [[package]]
 name = "tcads-client"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.3"
 dependencies = [
  "chrono",
  "indexmap",
@@ -544,7 +544,7 @@ dependencies = [
 
 [[package]]
 name = "tcads-core"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.3"
 dependencies = [
  "bitflags",
  "chrono",
@@ -566,7 +566,7 @@ dependencies = [
 
 [[package]]
 name = "tcads-io"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.3"
 dependencies = [
  "tcads-core",
  "tokio",
@@ -575,7 +575,7 @@ dependencies = [
 
 [[package]]
 name = "tcads-serde"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.3"
 dependencies = [
  "encoding_rs",
  "indexmap",
@@ -588,7 +588,7 @@ dependencies = [
 
 [[package]]
 name = "tcads-server"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.3"
 
 [[package]]
 name = "thiserror"
