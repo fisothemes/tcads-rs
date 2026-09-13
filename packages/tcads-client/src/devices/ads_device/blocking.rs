@@ -4,6 +4,7 @@ use crate::tasks::blocking::{
     AmsResponseReader, RouterNotificationDispatcher,
 };
 use std::borrow::Borrow;
+use std::fmt;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::Arc;
@@ -1091,5 +1092,13 @@ pub trait AdsSubsystem {
     fn write_control(&self, ads_state: AdsState, device_state: DeviceState) -> crate::Result<()> {
         self.device()
             .write_control(self.target(), ads_state, device_state, &[])
+    }
+}
+
+impl fmt::Debug for AdsDevice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AdsDevice")
+            .field("source", &self.source)
+            .finish()
     }
 }
