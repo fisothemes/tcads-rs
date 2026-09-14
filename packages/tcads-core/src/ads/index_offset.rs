@@ -64,6 +64,27 @@ impl IndexOffset {
     /// requests reading the self-signed certificate fingerprint (fixed 129 bytes). (`9`)
     pub const SYSTEM_SERVICE_TARGET_INFO_CERT_FINGERPRINT: Self = Self(9);
 
+    /// Offset for [`IndexGroup::LICENSE_SYSTEM_INFO`](super::IndexGroup::LICENSE_SYSTEM_INFO)
+    /// requests reading the 16-byte system ID (a COM-style GUID). (`1`)
+    pub const LICENSE_SYSTEM_ID: Self = Self(1);
+    /// Offset for [`IndexGroup::LICENSE_SYSTEM_INFO`](super::IndexGroup::LICENSE_SYSTEM_INFO)
+    /// requests reading the 16-bit platform ID. (`2`)
+    pub const LICENSE_PLATFORM_ID: Self = Self(2);
+    /// Offset for [`IndexGroup::LICENSE_SYSTEM_INFO`](super::IndexGroup::LICENSE_SYSTEM_INFO)
+    /// requests reading the 32-bit volume number. (`5`)
+    pub const LICENSE_VOLUME_NO: Self = Self(5);
+
+    /// Offset for [`IndexGroup::R0_REALTIME_DEVICE_INFO`](super::IndexGroup::R0_REALTIME_DEVICE_INFO)
+    /// requests reading the current/maximum/limit CPU latency. (`2`)
+    pub const R0_REALTIME_READ_LATENCY: Self = Self(2);
+    /// Offset for [`IndexGroup::R0_REALTIME_DEVICE_INFO`](super::IndexGroup::R0_REALTIME_DEVICE_INFO)
+    /// requests resetting the maximum CPU latency counter, returning its prior value. (`11`)
+    pub const R0_REALTIME_RESET_LATENCY: Self = Self(11);
+    /// Offset for [`IndexGroup::R0_REALTIME_DEVICE_INFO`](super::IndexGroup::R0_REALTIME_DEVICE_INFO)
+    /// requests reading the CPU settings block (core counts, affinity mask, CPU type/family/frequency).
+    /// (`13`)
+    pub const R0_REALTIME_CPU_SETTINGS: Self = Self(13);
+
     /// Create a new index offset instance.
     pub const fn new(index_offset: u32) -> Self {
         Self(index_offset)

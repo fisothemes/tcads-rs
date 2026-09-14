@@ -177,6 +177,20 @@ impl IndexGroup {
     /// certificate fingerprint). (`700`)
     pub const SYSTEM_SERVICE_TARGET_INFO: Self = Self(700);
 
+    /// Read the License Server's system info block: system ID, platform ID, and volume
+    /// number. (`0x01010004`)
+    pub const LICENSE_SYSTEM_INFO: Self = Self(0x0101_0004);
+    /// Read the number of installed licenses as well as their info. (`0x01010006`)
+    pub const LICENSE_ONLINE_INFO: Self = Self(0x0101_0006);
+    /// Read/write a license's display name. (`0x0101000C`)
+    pub const LICENSE_NAME: Self = Self(0x0101_000C);
+    /// Read a license's order number. (`0x0101000D`)
+    pub const LICENSE_ORDER_NUMBER: Self = Self(0x0101_000D);
+
+    /// Read the Ring 0 real-time core's device info block: CPU settings and per-core
+    /// latency. (`0x1`)
+    pub const R0_REALTIME_DEVICE_INFO: Self = Self(0x1);
+
     /// Creates a new index group instance.
     pub const fn new(index_group: u32) -> Self {
         Self(index_group)
