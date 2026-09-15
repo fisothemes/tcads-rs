@@ -749,23 +749,27 @@ impl AdsRuntime {
             frontier = next;
         }
 
-        let types_guard = cache.types()?;
-        let in_fields = rpc::input_fields(method, &*types_guard)?;
-        let out_fields = rpc::output_fields(method, &*types_guard)?;
+        let (input_bytes, output_size) = {
+            let types_guard = cache.types()?;
+            let in_fields = rpc::input_fields(method, &*types_guard)?;
+            let out_fields = rpc::output_fields(method, &*types_guard)?;
 
-        let input_bytes: Vec<u8> = if in_fields.len() == 1 {
-            let field = &in_fields[0];
-            let mut buf = vec![0u8; field.size() as usize];
-            tcads_serde::to_bytes(inputs, &mut buf, field.type_info(), &*types_guard)?;
-            buf
-        } else {
-            let total: u32 = in_fields.iter().map(|f| f.size()).sum();
-            let mut buf = vec![0u8; total as usize];
-            tcads_serde::to_rpc_fields(inputs, &mut buf, Rc::from(in_fields), &*types_guard)?;
-            buf
+            let input_bytes: Vec<u8> = if in_fields.len() == 1 {
+                let field = &in_fields[0];
+                let mut buf = vec![0u8; field.size() as usize];
+                tcads_serde::to_bytes(inputs, &mut buf, field.type_info(), &*types_guard)?;
+                buf
+            } else {
+                let total: u32 = in_fields.iter().map(|f| f.size()).sum();
+                let mut buf = vec![0u8; total as usize];
+                tcads_serde::to_rpc_fields(inputs, &mut buf, Rc::from(in_fields), &*types_guard)?;
+                buf
+            };
+
+            let output_size: u32 = out_fields.iter().map(|f| f.size()).sum();
+
+            (input_bytes, output_size)
         };
-
-        let output_size: u32 = out_fields.iter().map(|f| f.size()).sum();
 
         let cached_handle = { entry.read()?.method_handle(method.name()) };
         let handle = match cached_handle {
@@ -793,6 +797,9 @@ impl AdsRuntime {
             )
             .await
             .map_err(|err| self.map_stale(err, &cache, fb_path))?;
+
+        let types_guard = cache.types()?;
+        let out_fields = rpc::output_fields(method, &*types_guard)?;
 
         if out_fields.len() == 1 {
             let field = &out_fields[0];
