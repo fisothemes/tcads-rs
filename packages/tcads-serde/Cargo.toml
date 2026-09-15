@@ -23,3 +23,6 @@ tcads-client = { path = "../tcads-client" }
 
 [package.metadata.docs.rs]
 all-features = true
+
+[lints]
+workspace = true

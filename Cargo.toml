@@ -36,3 +36,7 @@ tcads-server = { path = "packages/tcads-server", version = "0.1.0-alpha.3" }
 tokio = "1"
 tokio-test = "0.4"
 thiserror = "2"
+
+
+[workspace.lints.clippy]
+await_holding_lock = "deny"
