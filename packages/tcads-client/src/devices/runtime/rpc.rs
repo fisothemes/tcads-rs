@@ -35,11 +35,12 @@ pub fn missing_method_types(
 ) -> crate::Result<IndexSet<String>> {
     let mut missing = IndexSet::new();
 
-    if let Some(ret) = method.return_type() {
-        if !cache.contains_type(ret.name())? {
-            missing.insert(ret.name().to_string());
-        }
+    if let Some(ret) = method.return_type()
+        && !cache.contains_type(ret.name())?
+    {
+        missing.insert(ret.name().to_string());
     }
+
     for p in method.parameters() {
         if !cache.contains_type(p.type_name())? {
             missing.insert(p.type_name().to_string());

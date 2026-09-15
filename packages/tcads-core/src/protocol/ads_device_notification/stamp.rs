@@ -40,7 +40,7 @@ impl<'a> AdsStampHeader<'a> {
     ///   * Data (n bytes)
     pub fn parse(data: &'a [u8]) -> Result<(Self, &'a [u8]), ProtocolError> {
         if data.len() < Self::HEADER_SIZE {
-            return Err(AdsError::UnexpectedDataLength {
+            Err(AdsError::UnexpectedDataLength {
                 expected: Self::HEADER_SIZE,
                 got: data.len(),
             })?;
@@ -54,7 +54,7 @@ impl<'a> AdsStampHeader<'a> {
 
         for _ in 0..sample_count {
             if data.len() < offset + AdsNotificationSample::MIN_SAMPLE_SIZE {
-                return Err(AdsError::UnexpectedDataLength {
+                Err(AdsError::UnexpectedDataLength {
                     expected: offset + AdsNotificationSample::MIN_SAMPLE_SIZE,
                     got: data.len(),
                 })?;
@@ -73,7 +73,7 @@ impl<'a> AdsStampHeader<'a> {
             offset += 4;
 
             if data.len() < offset + sample_size {
-                return Err(AdsError::UnexpectedDataLength {
+                Err(AdsError::UnexpectedDataLength {
                     expected: offset + sample_size,
                     got: data.len(),
                 })?;

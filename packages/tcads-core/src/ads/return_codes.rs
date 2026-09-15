@@ -730,11 +730,6 @@ mod tests {
     }
 
     #[test]
-    fn test_from_ads_return_code() {
-        assert_eq!(AdsReturnCode::from(AdsReturnCode::Ok), AdsReturnCode::Ok);
-    }
-
-    #[test]
     fn test_from_ads_return_code_to_u32() {
         assert_eq!(u32::from(AdsReturnCode::RtErrIrqlNotLessOrEqual), 0x1010);
     }

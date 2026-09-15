@@ -40,7 +40,10 @@ fn main() -> Result<()> {
     let type_info = provider.get_type_info(sym_info.type_name()).unwrap();
 
     // 4. Create and mutate the recipe steps in Rust.
-    let mut recipe = Recipe::default();
+    let mut recipe = Recipe {
+        id: "New Recipe".into(),
+        ..Default::default()
+    };
 
     recipe.id = "New Recipe".into();
 

@@ -467,7 +467,7 @@ impl AdsSystemService {
         path: impl AsRef<str>,
         path_type: AdsFilePathType,
     ) -> crate::Result<()> {
-        let offset = IndexOffset::new(((path_type.as_u16() as u32) << 16) | 0);
+        let offset = IndexOffset::new((path_type.as_u16() as u32) << 16);
 
         self.device.read_write(
             self.target,

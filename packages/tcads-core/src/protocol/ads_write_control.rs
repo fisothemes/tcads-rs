@@ -95,7 +95,7 @@ impl<'a> AdsWriteControlRequest<'a> {
     /// Returns the [ADS State](AdsState), [Device State](DeviceState), and additional data.
     pub fn parse_payload(payload: &[u8]) -> Result<(AdsState, DeviceState, &[u8]), ProtocolError> {
         if payload.len() < Self::MIN_PAYLOAD_SIZE {
-            return Err(AdsError::UnexpectedDataLength {
+            Err(AdsError::UnexpectedDataLength {
                 expected: Self::MIN_PAYLOAD_SIZE,
                 got: payload.len(),
             })?;
@@ -107,7 +107,7 @@ impl<'a> AdsWriteControlRequest<'a> {
 
         let data = if data_len > 0 {
             if payload.len() < Self::MIN_PAYLOAD_SIZE + data_len {
-                return Err(AdsError::UnexpectedDataLength {
+                Err(AdsError::UnexpectedDataLength {
                     expected: Self::MIN_PAYLOAD_SIZE + data_len,
                     got: payload.len(),
                 })?;
@@ -369,7 +369,7 @@ impl AdsWriteControlResponse {
     /// Returns the [ADS Return Code](AdsReturnCode).
     pub fn parse_payload(payload: &[u8]) -> Result<AdsReturnCode, ProtocolError> {
         if payload.len() != Self::PAYLOAD_SIZE {
-            return Err(AdsError::UnexpectedDataLength {
+            Err(AdsError::UnexpectedDataLength {
                 expected: Self::PAYLOAD_SIZE,
                 got: payload.len(),
             })?;

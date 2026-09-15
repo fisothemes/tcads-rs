@@ -79,7 +79,7 @@ impl AdsDeleteDeviceNotificationRequest {
     /// Parses only the ADS payload portion (4 bytes).
     pub fn parse_payload(payload: &[u8]) -> Result<NotificationHandle, ProtocolError> {
         if payload.len() != Self::PAYLOAD_SIZE {
-            return Err(AdsError::UnexpectedDataLength {
+            Err(AdsError::UnexpectedDataLength {
                 expected: Self::PAYLOAD_SIZE,
                 got: payload.len(),
             })?;
@@ -200,7 +200,7 @@ impl AdsDeleteDeviceNotificationResponse {
     /// Parses only the ADS payload portion (4 bytes).
     pub fn parse_payload(payload: &[u8]) -> Result<AdsReturnCode, ProtocolError> {
         if payload.len() != Self::PAYLOAD_SIZE {
-            return Err(AdsError::UnexpectedDataLength {
+            Err(AdsError::UnexpectedDataLength {
                 expected: Self::PAYLOAD_SIZE,
                 got: payload.len(),
             })?;

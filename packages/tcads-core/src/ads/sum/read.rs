@@ -301,7 +301,7 @@ mod tests {
         // Data payload (Only 4 bytes total because Item 1 returned 0 bytes)
         buffer.extend_from_slice(&[0xAA, 0xBB, 0xCC, 0xDD]);
 
-        let reqs = vec![
+        let reqs = [
             SumReadRequest::new(0x4020.into(), 0.into(), 4),
             SumReadRequest::new(0x4020.into(), 4.into(), 4),
         ];

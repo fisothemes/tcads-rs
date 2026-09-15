@@ -131,7 +131,7 @@ impl<'a> AdsDeviceNotification<'a> {
     /// the actual payload length.
     pub fn parse_payload(payload: &'a [u8]) -> Result<Vec<AdsStampHeader<'a>>, ProtocolError> {
         if payload.len() < Self::MIN_PAYLOAD_SIZE {
-            return Err(AdsError::UnexpectedDataLength {
+            Err(AdsError::UnexpectedDataLength {
                 expected: Self::MIN_PAYLOAD_SIZE,
                 got: payload.len(),
             })?;
@@ -143,7 +143,7 @@ impl<'a> AdsDeviceNotification<'a> {
         let stamps_data = &payload[Self::MIN_PAYLOAD_SIZE..];
 
         if stamps_data.len() != length.saturating_sub(4) {
-            return Err(AdsError::UnexpectedDataLength {
+            Err(AdsError::UnexpectedDataLength {
                 expected: length.saturating_sub(4),
                 got: stamps_data.len(),
             })?;

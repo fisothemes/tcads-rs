@@ -109,7 +109,7 @@ impl<'a> AdsReadWriteRequest<'a> {
         payload: &[u8],
     ) -> Result<(IndexGroup, IndexOffset, u32, &[u8]), ProtocolError> {
         if payload.len() < Self::MIN_PAYLOAD_SIZE {
-            return Err(AdsError::UnexpectedDataLength {
+            Err(AdsError::UnexpectedDataLength {
                 expected: Self::MIN_PAYLOAD_SIZE,
                 got: payload.len(),
             })?;
@@ -121,7 +121,7 @@ impl<'a> AdsReadWriteRequest<'a> {
         let write_length = u32::from_le_bytes(payload[12..16].try_into().unwrap()) as usize;
 
         if payload.len() < Self::MIN_PAYLOAD_SIZE + write_length {
-            return Err(AdsError::UnexpectedDataLength {
+            Err(AdsError::UnexpectedDataLength {
                 expected: Self::MIN_PAYLOAD_SIZE + write_length,
                 got: payload.len(),
             })?;
@@ -380,7 +380,7 @@ impl<'a> AdsReadWriteResponse<'a> {
     /// Returns the [ADS Return Code](AdsReturnCode) and a zero-copy slice of the data read.
     pub fn parse_payload(payload: &[u8]) -> Result<(AdsReturnCode, &[u8]), ProtocolError> {
         if payload.len() < Self::MIN_PAYLOAD_SIZE {
-            return Err(AdsError::UnexpectedDataLength {
+            Err(AdsError::UnexpectedDataLength {
                 expected: Self::MIN_PAYLOAD_SIZE,
                 got: payload.len(),
             })?;
@@ -390,7 +390,7 @@ impl<'a> AdsReadWriteResponse<'a> {
         let length = u32::from_le_bytes(payload[4..8].try_into().unwrap()) as usize;
 
         if payload.len() < Self::MIN_PAYLOAD_SIZE + length {
-            return Err(AdsError::UnexpectedDataLength {
+            Err(AdsError::UnexpectedDataLength {
                 expected: Self::MIN_PAYLOAD_SIZE + length,
                 got: payload.len(),
             })?;

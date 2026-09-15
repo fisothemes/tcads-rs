@@ -180,7 +180,7 @@ impl AdsAddDeviceNotificationRequest {
         payload: &[u8],
     ) -> Result<(IndexGroup, IndexOffset, AdsNotificationAttrib, &[u8]), ProtocolError> {
         if payload.len() != Self::PAYLOAD_SIZE {
-            return Err(AdsError::UnexpectedDataLength {
+            Err(AdsError::UnexpectedDataLength {
                 expected: Self::PAYLOAD_SIZE,
                 got: payload.len(),
             })?;
@@ -339,7 +339,7 @@ impl AdsAddDeviceNotificationResponse {
         payload: &[u8],
     ) -> Result<(AdsReturnCode, NotificationHandle), ProtocolError> {
         if payload.len() != Self::PAYLOAD_SIZE {
-            return Err(AdsError::UnexpectedDataLength {
+            Err(AdsError::UnexpectedDataLength {
                 expected: Self::PAYLOAD_SIZE,
                 got: payload.len(),
             })?;

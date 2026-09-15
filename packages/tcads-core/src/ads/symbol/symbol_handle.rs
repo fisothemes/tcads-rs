@@ -102,7 +102,6 @@ mod tests {
         assert_eq!(handle.to_bytes(), [0x78, 0x56, 0x34, 0x12]);
         assert_eq!(SymbolHandle::from_bytes([0x78, 0x56, 0x34, 0x12]), handle);
         assert_eq!(SymbolHandle::from(0x1234_5678), handle);
-        assert_eq!(SymbolHandle::from(handle), handle);
         assert_eq!(SymbolHandle::from([0x78, 0x56, 0x34, 0x12]), handle);
     }
 }

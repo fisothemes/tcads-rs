@@ -403,7 +403,7 @@ mod tests {
         let handle_bytes = [137, 0, 0, 84];
         buffer.extend_from_slice(&handle_bytes);
 
-        let reqs = vec![
+        let reqs = [
             SumReadWriteRequest::new(0xF003.into(), 0.into(), 4, b"BAD\0"),
             SumReadWriteRequest::new(0xF003.into(), 0.into(), 4, b"GOOD\0"),
         ];

@@ -3,7 +3,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
 // An exact-width representation of a TwinCAT signed integer.
-#[derive(Clone, Copy, Hash)]
+#[derive(Clone, Copy)]
 pub enum SignedInteger {
     /// An IEC 61131-3 `SINT` (8-bit signed integer).
     SInt(i8),
@@ -169,6 +169,12 @@ impl From<SignedInteger> for i8 {
             SignedInteger::DInt(n) => n as i8,
             SignedInteger::LInt(n) => n as i8,
         }
+    }
+}
+
+impl std::hash::Hash for SignedInteger {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        i64::from(*self).hash(state);
     }
 }
 

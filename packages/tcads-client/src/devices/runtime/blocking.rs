@@ -1033,6 +1033,7 @@ impl AdsRuntime {
     /// round-trips on cold starts.
     ///
     /// See [`resolve_symbol`](Self::resolve_symbol) for more details.
+    #[allow(clippy::type_complexity)]
     fn resolve_multi_symbols<S: AsRef<str>>(
         &self,
         paths: impl AsRef<[S]>,

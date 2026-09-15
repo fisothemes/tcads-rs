@@ -3,7 +3,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
 /// An exact-width representation of a TwinCAT unsigned integer.
-#[derive(Clone, Copy, Hash)]
+#[derive(Clone, Copy)]
 pub enum UnsignedInteger {
     /// An IEC 61131-3 `USINT` or `BYTE` (8-bit unsigned integer).
     Byte(u8),
@@ -157,6 +157,12 @@ impl From<UnsignedInteger> for u8 {
             UnsignedInteger::UDInt(n) => n as u8,
             UnsignedInteger::ULInt(n) => n as u8,
         }
+    }
+}
+
+impl std::hash::Hash for UnsignedInteger {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        u64::from(*self).hash(state);
     }
 }
 

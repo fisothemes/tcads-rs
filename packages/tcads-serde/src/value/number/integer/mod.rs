@@ -9,7 +9,7 @@ pub mod unsigned;
 pub use signed::SignedInteger;
 pub use unsigned::UnsignedInteger;
 
-#[derive(Clone, Copy, Hash)]
+#[derive(Clone, Copy)]
 pub enum Integer {
     Signed(SignedInteger),
     Unsigned(UnsignedInteger),
@@ -234,6 +234,16 @@ impl From<u32> for Integer {
 impl From<u64> for Integer {
     fn from(n: u64) -> Self {
         Integer::Unsigned(n.into())
+    }
+}
+
+impl std::hash::Hash for Integer {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        let canonical: i128 = match *self {
+            Integer::Signed(s) => i64::from(s) as i128,
+            Integer::Unsigned(u) => u64::from(u) as i128,
+        };
+        canonical.hash(state);
     }
 }
 

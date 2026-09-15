@@ -1091,7 +1091,7 @@ pub trait AdsSubsystem {
     /// Changes the ADS state (e.g. Run, Stop, Config) of the subsystem.
     fn write_control(&self, ads_state: AdsState, device_state: DeviceState) -> crate::Result<()> {
         self.device()
-            .write_control(self.target(), ads_state, device_state, &[])
+            .write_control(self.target(), ads_state, device_state, [])
     }
 }
 

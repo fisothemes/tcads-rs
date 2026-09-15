@@ -94,7 +94,7 @@ impl TryFrom<&AmsFrame> for AdsReadStateRequest {
         let (header, data) = parse_ads_frame(value, AdsCommand::AdsReadState, true)?;
 
         if !data.is_empty() {
-            return Err(AdsError::UnexpectedDataLength {
+            Err(AdsError::UnexpectedDataLength {
                 expected: 0,
                 got: data.len(),
             })?;
@@ -244,7 +244,7 @@ impl AdsReadStateResponse {
         payload: &[u8],
     ) -> Result<(AdsReturnCode, AdsState, DeviceState), ProtocolError> {
         if payload.len() != Self::PAYLOAD_SIZE {
-            return Err(AdsError::UnexpectedDataLength {
+            Err(AdsError::UnexpectedDataLength {
                 expected: Self::PAYLOAD_SIZE,
                 got: payload.len(),
             })?;

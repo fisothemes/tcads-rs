@@ -1003,7 +1003,7 @@ impl AdsDevice {
 
         for (handle, result) in handles.into_iter().zip(resp.iter()) {
             if result.is_ok() {
-                let _ = self.inner.ads_notifs.remove(*handle.borrow());
+                let _ = self.inner.ads_notifs.remove(*handle.borrow()).await;
             }
         }
 
