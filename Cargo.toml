@@ -20,6 +20,8 @@ categories = ["api-bindings", "network-programming"]
 version = "0.1.0-alpha.3"
 
 [workspace.dependencies]
+async-stream = "0.3"
+axum = "0.8"
 bitflags = "2"
 chrono = "0.4"
 encoding_rs = "0.8"
@@ -33,10 +35,10 @@ tcads-core = { path = "packages/tcads-core", version = "0.1.0-alpha.3" }
 tcads-io = { path = "packages/tcads-io", version = "0.1.0-alpha.3" }
 tcads-serde = { path = "packages/tcads-serde", version = "0.1.0-alpha.3" }
 tcads-server = { path = "packages/tcads-server", version = "0.1.0-alpha.3" }
+tokio-stream = "0.1"
 tokio = "1"
 tokio-test = "0.4"
 thiserror = "2"
-
 
 [workspace.lints.clippy]
 await_holding_lock = "deny"
