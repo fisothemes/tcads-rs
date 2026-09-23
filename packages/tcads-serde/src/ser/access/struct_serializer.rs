@@ -1,7 +1,7 @@
 use crate::TypeProvider;
 use crate::resolvers::ResolvedField;
 use crate::ser::AdsSerializer;
-use serde::ser::{SerializeStruct, SerializeTuple, SerializeTupleStruct};
+use serde::ser::{SerializeSeq, SerializeStruct, SerializeTuple, SerializeTupleStruct};
 use std::rc::Rc;
 
 /// Writes struct fields in declaration order rather than by name.
@@ -106,6 +106,22 @@ impl<'ser, P: TypeProvider> SerializeStruct for AdsStructSerializer<'ser, P> {
     type Error = crate::Error;
 
     fn serialize_field<T>(&mut self, _key: &'static str, value: &T) -> Result<(), Self::Error>
+    where
+        T: ?Sized + serde::Serialize,
+    {
+        self.serialize_next(value)
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        Ok(())
+    }
+}
+
+impl<'ser, P: TypeProvider> SerializeSeq for AdsStructSerializer<'ser, P> {
+    type Ok = ();
+    type Error = crate::Error;
+
+    fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
         T: ?Sized + serde::Serialize,
     {

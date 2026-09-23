@@ -4,9 +4,9 @@
 //! This example demonstrates how to invoke methods on a TwinCAT Function Block
 //! using the `rpc` method. It showcases the "0, 1, N" arity rule for inputs
 //! and outputs:
-//! - 0 parameters: Use the unit type `()`
-//! - 1 parameter: Use the bare type (e.g., `i32`)
-//! - N parameters: Use a tightly packed tuple (e.g., `(i32, i32)`)
+//! - 0 parameters: Use a unit type `()`
+//! - 1 parameter: Use a bare type (e.g., `i32`)
+//! - N parameters: Use a tuple `(i32, i32)`or any sequence (e.g.,`Vec<T>` and `[T; N]`)
 //!
 //! ## PREREQUISITE
 //!

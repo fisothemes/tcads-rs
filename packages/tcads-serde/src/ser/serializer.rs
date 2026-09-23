@@ -576,7 +576,7 @@ impl<'ser, P: TypeProvider> AdsRpcSerializer<'ser, P> {
 
     fn not_supported() -> crate::Error {
         crate::Error::InvalidRpcShape {
-            got: "a scalar, sequence, map, or named-struct value".into(),
+            got: "a scalar, map, or named-struct value".into(),
         }
     }
 }
@@ -585,9 +585,9 @@ impl<'ser, P: TypeProvider> Serializer for AdsRpcSerializer<'ser, P> {
     type Ok = ();
     type Error = crate::Error;
 
-    type SerializeSeq = Impossible<(), crate::Error>;
+    type SerializeSeq = AdsRpcFieldSerializer<'ser, P>;
     type SerializeTuple = AdsRpcFieldSerializer<'ser, P>;
-    type SerializeTupleStruct = Impossible<(), crate::Error>;
+    type SerializeTupleStruct = AdsRpcFieldSerializer<'ser, P>;
     type SerializeTupleVariant = Impossible<(), crate::Error>;
     type SerializeMap = Impossible<(), crate::Error>;
     type SerializeStruct = Impossible<(), crate::Error>;
@@ -614,6 +614,22 @@ impl<'ser, P: TypeProvider> Serializer for AdsRpcSerializer<'ser, P> {
         Err(Self::not_supported())
     }
 
+    fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
+        if let Some(len) = len {
+            if self.fields.len() != len {
+                return Err(crate::Error::ShapeMismatch {
+                    expected: self.fields.len(),
+                    got: len,
+                });
+            }
+        }
+        Ok(AdsRpcFieldSerializer::new(
+            self.fields,
+            self.output,
+            self.provider,
+        ))
+    }
+
     fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple, Self::Error> {
         if self.fields.len() != len {
             return Err(crate::Error::ShapeMismatch {
@@ -628,10 +644,17 @@ impl<'ser, P: TypeProvider> Serializer for AdsRpcSerializer<'ser, P> {
         ))
     }
 
+    fn serialize_tuple_struct(
+        self,
+        _name: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeTupleStruct, Self::Error> {
+        self.serialize_tuple(len)
+    }
+
     unsupported_serialize_methods! {
         Self::not_supported =>
         bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str bytes none some
-        unit_struct unit_variant newtype_variant seq
-        tuple_struct tuple_variant map r#struct struct_variant
+        unit_struct unit_variant newtype_variant tuple_variant map r#struct struct_variant
     }
 }
