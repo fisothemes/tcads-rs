@@ -2,11 +2,10 @@ use super::access::{
     AdsArraySerializer, AdsMapSerializer, AdsRpcFieldSerializer, AdsStructSerializer,
     AdsTupleSerializer, unsupported_serialize_methods,
 };
+use crate::Number;
 use crate::TypeProvider;
 use crate::resolvers::{ResolvedField, resolve_alias, resolve_fields};
-use crate::validators::{
-    validate_exact_size, validate_integer_type_id, validate_type_category, validate_type_id,
-};
+use crate::validators::{validate_exact_size, validate_type_category, validate_type_id};
 use serde::Serialize;
 use serde::ser::{Impossible, Serializer};
 use std::rc::Rc;
@@ -137,6 +136,65 @@ impl<'ser, P: TypeProvider> AdsSerializer<'ser, P> {
         self.output.copy_from_slice(value);
         Ok(())
     }
+
+    fn write_number(self, number: impl Into<Number>) -> Result<(), crate::Error> {
+        let ptr_size = self.provider.get_platform_ptr_size();
+        let type_info = resolve_alias(self.type_info, self.provider, ptr_size)?;
+        let number = number.into();
+
+        let type_id = match AdsTypeCategory::determine(type_info, ptr_size) {
+            AdsTypeCategory::Pointer | AdsTypeCategory::Reference | AdsTypeCategory::Interface => {
+                match ptr_size {
+                    2 => AdsTypeId::UInt16,
+                    4 => AdsTypeId::UInt32,
+                    8 => AdsTypeId::UInt64,
+                    n => {
+                        return Err(crate::Error::TypeMismatch {
+                            expected: format!(
+                                "a 4- or 8-byte pointer, but the platform uses {n}-byte pointers"
+                            ),
+                        });
+                    }
+                }
+            }
+            _ => type_info.type_id(),
+        };
+
+        match type_id {
+            AdsTypeId::Int8 => Self::write_bytes(self.output, i8::try_from(number)?.to_le_bytes()),
+            AdsTypeId::Int16 => {
+                Self::write_bytes(self.output, i16::try_from(number)?.to_le_bytes())
+            }
+            AdsTypeId::Int32 => {
+                Self::write_bytes(self.output, i32::try_from(number)?.to_le_bytes())
+            }
+            AdsTypeId::Int64 => {
+                Self::write_bytes(self.output, i64::try_from(number)?.to_le_bytes())
+            }
+            AdsTypeId::UInt8 => Self::write_bytes(self.output, u8::try_from(number)?.to_le_bytes()),
+            AdsTypeId::UInt16 => {
+                Self::write_bytes(self.output, u16::try_from(number)?.to_le_bytes())
+            }
+            AdsTypeId::UInt32 => {
+                Self::write_bytes(self.output, u32::try_from(number)?.to_le_bytes())
+            }
+            AdsTypeId::UInt64 => {
+                Self::write_bytes(self.output, u64::try_from(number)?.to_le_bytes())
+            }
+            AdsTypeId::Real32 => {
+                Self::write_bytes(self.output, f32::try_from(number)?.to_le_bytes())
+            }
+            AdsTypeId::Real64 => {
+                Self::write_bytes(self.output, f64::try_from(number)?.to_le_bytes())
+            }
+            other => Err(crate::Error::TypeMismatch {
+                expected: format!(
+                    "a numeric PLC type, but '{}' is {other:?}",
+                    type_info.name()
+                ),
+            }),
+        }
+    }
 }
 
 impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
@@ -157,65 +215,43 @@ impl<'ser, P: TypeProvider> Serializer for AdsSerializer<'ser, P> {
     }
 
     fn serialize_i8(self, v: i8) -> Result<Self::Ok, Self::Error> {
-        validate_type_id(self.type_info, AdsTypeId::Int8)?;
-        Self::write_bytes(self.output, v.to_le_bytes())
+        self.write_number(v)
     }
 
     fn serialize_i16(self, v: i16) -> Result<Self::Ok, Self::Error> {
-        validate_type_id(self.type_info, AdsTypeId::Int16)?;
-        Self::write_bytes(self.output, v.to_le_bytes())
+        self.write_number(v)
     }
 
     fn serialize_i32(self, v: i32) -> Result<Self::Ok, Self::Error> {
-        validate_type_id(self.type_info, AdsTypeId::Int32)?;
-        Self::write_bytes(self.output, v.to_le_bytes())
+        self.write_number(v)
     }
 
     fn serialize_i64(self, v: i64) -> Result<Self::Ok, Self::Error> {
-        validate_type_id(self.type_info, AdsTypeId::Int64)?;
-        Self::write_bytes(self.output, v.to_le_bytes())
+        self.write_number(v)
     }
 
     fn serialize_u8(self, v: u8) -> Result<Self::Ok, Self::Error> {
-        validate_type_id(self.type_info, AdsTypeId::UInt8)?;
-        Self::write_bytes(self.output, v.to_le_bytes())
+        self.write_number(v)
     }
 
     fn serialize_u16(self, v: u16) -> Result<Self::Ok, Self::Error> {
-        validate_integer_type_id::<2>(
-            self.type_info,
-            AdsTypeId::UInt16,
-            self.provider.get_platform_ptr_size(),
-        )?;
-        Self::write_bytes(self.output, v.to_le_bytes())
+        self.write_number(v)
     }
 
     fn serialize_u32(self, v: u32) -> Result<Self::Ok, Self::Error> {
-        validate_integer_type_id::<4>(
-            self.type_info,
-            AdsTypeId::UInt32,
-            self.provider.get_platform_ptr_size(),
-        )?;
-        Self::write_bytes(self.output, v.to_le_bytes())
+        self.write_number(v)
     }
 
     fn serialize_u64(self, v: u64) -> Result<Self::Ok, Self::Error> {
-        validate_integer_type_id::<8>(
-            self.type_info,
-            AdsTypeId::UInt64,
-            self.provider.get_platform_ptr_size(),
-        )?;
-        Self::write_bytes(self.output, v.to_le_bytes())
+        self.write_number(v)
     }
 
     fn serialize_f32(self, v: f32) -> Result<Self::Ok, Self::Error> {
-        validate_type_id(self.type_info, AdsTypeId::Real32)?;
-        Self::write_bytes(self.output, v.to_le_bytes())
+        self.write_number(v)
     }
 
     fn serialize_f64(self, v: f64) -> Result<Self::Ok, Self::Error> {
-        validate_type_id(self.type_info, AdsTypeId::Real64)?;
-        Self::write_bytes(self.output, v.to_le_bytes())
+        self.write_number(v)
     }
 
     fn serialize_char(self, v: char) -> Result<Self::Ok, Self::Error> {
