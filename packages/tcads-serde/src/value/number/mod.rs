@@ -4,6 +4,7 @@ use super::visitors::{
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 
+pub mod convert;
 pub mod float;
 pub mod integer;
 

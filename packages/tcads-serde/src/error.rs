@@ -39,6 +39,8 @@ pub enum Error {
     TypeInfo(#[from] AdsTypeInfoError),
     #[error(transparent)]
     SymbolInfo(#[from] AdsSymbolInfoError),
+    #[error("Cannot losslessly convert {from} to {to}")]
+    LossyConversion { from: String, to: &'static str },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

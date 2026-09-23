@@ -127,39 +127,6 @@ impl From<UnsignedInteger> for u64 {
     }
 }
 
-impl From<UnsignedInteger> for u32 {
-    fn from(val: UnsignedInteger) -> u32 {
-        match val {
-            UnsignedInteger::Byte(n) => n as u32,
-            UnsignedInteger::UInt(n) => n as u32,
-            UnsignedInteger::UDInt(n) => n,
-            UnsignedInteger::ULInt(n) => n as u32,
-        }
-    }
-}
-
-impl From<UnsignedInteger> for u16 {
-    fn from(val: UnsignedInteger) -> u16 {
-        match val {
-            UnsignedInteger::Byte(n) => n as u16,
-            UnsignedInteger::UInt(n) => n,
-            UnsignedInteger::UDInt(n) => n as u16,
-            UnsignedInteger::ULInt(n) => n as u16,
-        }
-    }
-}
-
-impl From<UnsignedInteger> for u8 {
-    fn from(val: UnsignedInteger) -> u8 {
-        match val {
-            UnsignedInteger::Byte(n) => n,
-            UnsignedInteger::UInt(n) => n as u8,
-            UnsignedInteger::UDInt(n) => n as u8,
-            UnsignedInteger::ULInt(n) => n as u8,
-        }
-    }
-}
-
 impl std::hash::Hash for UnsignedInteger {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         u64::from(*self).hash(state);

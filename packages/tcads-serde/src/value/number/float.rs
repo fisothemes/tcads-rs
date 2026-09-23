@@ -104,15 +104,6 @@ impl From<Float> for f64 {
     }
 }
 
-impl From<Float> for f32 {
-    fn from(val: Float) -> f32 {
-        match val {
-            Float::Real(n) => n,
-            Float::LReal(n) => n as f32,
-        }
-    }
-}
-
 impl PartialEq for Float {
     fn eq(&self, other: &Self) -> bool {
         f64::from(*self) == f64::from(*other)
