@@ -2,10 +2,8 @@ use super::access::{
     AdsArrayAccess, AdsEnumAccess, AdsMapAccess, AdsRpcFieldAccess, AdsStructAccess,
 };
 use crate::resolvers::{ResolvedField, resolve_alias, resolve_fields};
-use crate::validators::{
-    validate_exact_size, validate_integer_type_id, validate_type_category, validate_type_id,
-};
-use crate::{Integer, TypeProvider};
+use crate::validators::{validate_exact_size, validate_type_category, validate_type_id};
+use crate::{Integer, Number, TypeProvider};
 use serde::de::{Deserializer, Visitor};
 use std::borrow::Cow;
 use std::rc::Rc;
@@ -94,6 +92,61 @@ impl<'de, P: TypeProvider> AdsDeserializer<'de, P> {
         }
         encoding_rs::UTF_16LE.decode(&input[..null_pos]).0
     }
+
+    fn read_number(&self) -> Result<Number, crate::Error> {
+        let ptr_size = self.provider.get_platform_ptr_size();
+        let type_info = resolve_alias(self.type_info, self.provider, ptr_size)?;
+
+        let type_id = match AdsTypeCategory::determine(type_info, ptr_size) {
+            AdsTypeCategory::Pointer | AdsTypeCategory::Reference | AdsTypeCategory::Interface => {
+                match ptr_size {
+                    2 => AdsTypeId::UInt16,
+                    4 => AdsTypeId::UInt32,
+                    8 => AdsTypeId::UInt64,
+                    n => {
+                        return Err(crate::Error::TypeMismatch {
+                            expected: format!(
+                                "a 4- or 8-byte pointer, but the platform uses {n}-byte pointers"
+                            ),
+                        });
+                    }
+                }
+            }
+            _ => type_info.type_id(),
+        };
+
+        Ok(match type_id {
+            AdsTypeId::Int8 => Number::from(i8::from_le_bytes(Self::read_bytes(self.input)?)),
+            AdsTypeId::Int16 => Number::from(i16::from_le_bytes(Self::read_bytes(self.input)?)),
+            AdsTypeId::Int32 => Number::from(i32::from_le_bytes(Self::read_bytes(self.input)?)),
+            AdsTypeId::Int64 => Number::from(i64::from_le_bytes(Self::read_bytes(self.input)?)),
+            AdsTypeId::UInt8 => Number::from(u8::from_le_bytes(Self::read_bytes(self.input)?)),
+            AdsTypeId::UInt16 => Number::from(u16::from_le_bytes(Self::read_bytes(self.input)?)),
+            AdsTypeId::UInt32 => Number::from(u32::from_le_bytes(Self::read_bytes(self.input)?)),
+            AdsTypeId::UInt64 => Number::from(u64::from_le_bytes(Self::read_bytes(self.input)?)),
+            AdsTypeId::Real32 => Number::from(f32::from_le_bytes(Self::read_bytes(self.input)?)),
+            AdsTypeId::Real64 => Number::from(f64::from_le_bytes(Self::read_bytes(self.input)?)),
+            other => {
+                return Err(crate::Error::TypeMismatch {
+                    expected: format!(
+                        "a numeric PLC type, but '{}' is {other:?}",
+                        type_info.name()
+                    ),
+                });
+            }
+        })
+    }
+}
+
+macro_rules! deserialize_numeric {
+    ($($method:ident: $visit:ident($ty:ty),)*) => {$(
+        fn $method<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: Visitor<'de>,
+        {
+            visitor.$visit(<$ty>::try_from(self.read_number()?)?)
+        }
+    )*};
 }
 
 impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
@@ -158,116 +211,17 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsDeserializer<'de, P> {
         visitor.visit_bool(byte != 0)
     }
 
-    fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        validate_type_id(self.type_info, AdsTypeId::Int8)?;
-        let bytes = Self::read_bytes::<1>(self.input)?;
-
-        visitor.visit_i8(i8::from_le_bytes(bytes))
-    }
-
-    fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        validate_type_id(self.type_info, AdsTypeId::Int16)?;
-        let bytes = Self::read_bytes::<2>(self.input)?;
-
-        visitor.visit_i16(i16::from_le_bytes(bytes))
-    }
-
-    fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        validate_type_id(self.type_info, AdsTypeId::Int32)?;
-        let bytes = Self::read_bytes::<4>(self.input)?;
-
-        visitor.visit_i32(i32::from_le_bytes(bytes))
-    }
-
-    fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        validate_type_id(self.type_info, AdsTypeId::Int64)?;
-        let bytes = Self::read_bytes::<8>(self.input)?;
-
-        visitor.visit_i64(i64::from_le_bytes(bytes))
-    }
-
-    fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        validate_type_id(self.type_info, AdsTypeId::UInt8)?;
-        let bytes = Self::read_bytes::<1>(self.input)?;
-
-        visitor.visit_u8(u8::from_le_bytes(bytes))
-    }
-
-    fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        validate_integer_type_id::<2>(
-            self.type_info,
-            AdsTypeId::UInt16,
-            self.provider.get_platform_ptr_size(),
-        )?;
-        let bytes = Self::read_bytes::<2>(self.input)?;
-
-        visitor.visit_u16(u16::from_le_bytes(bytes))
-    }
-
-    fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        validate_integer_type_id::<4>(
-            self.type_info,
-            AdsTypeId::UInt32,
-            self.provider.get_platform_ptr_size(),
-        )?;
-        let bytes = Self::read_bytes::<4>(self.input)?;
-
-        visitor.visit_u32(u32::from_le_bytes(bytes))
-    }
-
-    fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        validate_integer_type_id::<8>(
-            self.type_info,
-            AdsTypeId::UInt64,
-            self.provider.get_platform_ptr_size(),
-        )?;
-        let bytes = Self::read_bytes::<8>(self.input)?;
-
-        visitor.visit_u64(u64::from_le_bytes(bytes))
-    }
-
-    fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        validate_type_id(self.type_info, AdsTypeId::Real32)?;
-        let bytes = Self::read_bytes::<{ size_of::<f32>() }>(self.input)?;
-
-        visitor.visit_f32(f32::from_le_bytes(bytes))
-    }
-
-    fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        validate_type_id(self.type_info, AdsTypeId::Real64)?;
-        let bytes = Self::read_bytes::<{ size_of::<f64>() }>(self.input)?;
-
-        visitor.visit_f64(f64::from_le_bytes(bytes))
+    deserialize_numeric! {
+        deserialize_i8:  visit_i8(i8),
+        deserialize_i16: visit_i16(i16),
+        deserialize_i32: visit_i32(i32),
+        deserialize_i64: visit_i64(i64),
+        deserialize_u8:  visit_u8(u8),
+        deserialize_u16: visit_u16(u16),
+        deserialize_u32: visit_u32(u32),
+        deserialize_u64: visit_u64(u64),
+        deserialize_f32: visit_f32(f32),
+        deserialize_f64: visit_f64(f64),
     }
 
     fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
