@@ -1,6 +1,6 @@
 use std::net::TcpStream;
 #[cfg(unix)]
-pub use std::os::unix::net::UnixStream;
+use std::os::unix::net::UnixStream;
 
 pub mod reader;
 pub mod stream;
