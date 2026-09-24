@@ -623,8 +623,8 @@ impl AdsRuntime {
     /// Provide values for all `VAR_INPUT` and `VAR_IN_OUT` parameters in their declared order.
     /// - **Zero Inputs:** Pass the unit type `()`.
     /// - **One Input:** Pass the value directly (e.g. `100i32`).
-    /// - **Multiple Inputs:** Pass a tuple or sequence containing the values (e.g. `(50i32, 25i32)`
-    ///   or `vec![50i32, 25i32]`).
+    /// - **Multiple Inputs:** Pass a tuple or sequence containing the values (e.g. `(50i32, 25i32)`,
+    ///   `[50i32, 25i32]` or `vec![50i32, 25i32]`).
     ///
     /// ### Outputs (`O` return type)
     ///
@@ -632,7 +632,7 @@ impl AdsRuntime {
     /// `VAR_IN_OUT` parameters in their declared order.
     /// - **Zero Outputs:** Use the unit type `()`.
     /// - **One Output:** Parses and returns the single value directly.
-    /// - **Multiple Outputs:** Returns a tuple.
+    /// - **Multiple Outputs:** Returns a tuple or sequence.
     ///
     /// *Note on `VAR_IN_OUT`:* These parameters appear on *both* sides of the transaction.
     /// You send their initial value in the `inputs` argument, and receive their updated

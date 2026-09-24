@@ -588,7 +588,7 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsRpcDeserializer<'de, P> {
         V: Visitor<'de>,
     {
         Err(crate::Error::InvalidRpcShape {
-            got: "a scalar, sequence, map, or named-struct value".into(),
+            got: "a scalar, map, or named-struct value".into(),
         })
     }
 
@@ -603,6 +603,17 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsRpcDeserializer<'de, P> {
             });
         }
         visitor.visit_unit()
+    }
+
+    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        visitor.visit_seq(AdsRpcFieldAccess::new(
+            self.fields,
+            self.input,
+            self.provider,
+        ))
     }
 
     fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
@@ -624,7 +635,7 @@ impl<'de, P: TypeProvider> Deserializer<'de> for AdsRpcDeserializer<'de, P> {
 
     serde::forward_to_deserialize_any! {
         bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str string bytes byte_buf
-        option unit_struct newtype_struct seq tuple_struct map struct
+        option unit_struct newtype_struct tuple_struct map struct
         enum identifier ignored_any
     }
 }
