@@ -174,7 +174,7 @@ the System Service after editing the file.
 ### The connection closes as soon as you send anything 
 
 Remote routers do not implement `PortConnect` and drop the connection if they receive one. Use 
-`connect_remote`, not `connect` or `connect_to`, and do not call `port_connect` by hand.
+`connect_remote`, not `connect`, `connect_tcp` or `connect_uds`, and do not call `port_connect` by hand.
 
 ### One route serves one client
 
