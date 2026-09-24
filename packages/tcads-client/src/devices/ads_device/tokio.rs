@@ -7,6 +7,8 @@ use std::borrow::Borrow;
 use std::fmt;
 use std::future::Future;
 use std::net::{SocketAddr, ToSocketAddrs};
+#[cfg(unix)]
+use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
@@ -28,6 +30,8 @@ use tcads_core::{
     SumReadResponseOwned, SumReadWriteRequest, SumReadWriteResponseOwned, SumWriteRequest,
     SumWriteResponse,
 };
+#[cfg(unix)]
+use tcads_io::tokio::UnixAmsStream;
 use tcads_io::tokio::{AmsReader, AmsWriter, TcpAmsStream};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::mpsc::UnboundedReceiver as Receiver;
@@ -68,9 +72,10 @@ pub struct AdsDeviceInner {
 ///
 /// ### 1. Connecting via a local router
 ///
-/// Use [`connect`](Self::connect) or [`connect_to`](Self::connect_to). The
-/// local router performs a `PortConnect` handshake and dynamically assigns
-/// a source address to the client.
+/// Use [`connect`](Self::connect) to auto-select the fastest available transport,
+/// or [`connect_tcp`](Self::connect_tcp) / [`connect_uds`](Self::connect_uds) to require a
+/// specific one. All three perform a [`PortConnect`](PortConnectRequest) handshake and receive a
+/// dynamically assigned source address.
 ///
 /// ```no_run
 /// use tcads_client::devices::tokio::AdsDevice;
@@ -78,11 +83,15 @@ pub struct AdsDeviceInner {
 ///
 /// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// // Connect to the local router at 127.0.0.1:48898
+/// // Connect to the local router at 127.0.0.1:48898 or "/run/ams/tcsyssrv.ams.sock"
 /// let device = AdsDevice::connect(Duration::from_secs(5)).await?;
 ///
-/// // Connect to a router at a specific address
-/// let device = AdsDevice::connect_to("192.168.1.50:48898", Duration::from_secs(5)).await?;
+/// // Connect to a router at a specific address using TCP
+/// let device = AdsDevice::connect_tcp("192.168.1.50:48898", Duration::from_secs(5)).await?;
+///
+/// // On RT Linux or Tc/BSD connect a router at a specified path using a Unix Domain Socket
+/// # #[cfg(unix)]
+/// let device = AdsDevice::connect_uds("/run/ams/tcsyssrv.ams.sock", None).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -127,7 +136,8 @@ pub struct AdsDevice {
 }
 
 impl AdsDevice {
-    /// Connects to the local AMS router at `127.0.0.1:48898`.
+    /// Connects to the local AMS router at `127.0.0.1:48898` or `/run/ams/tcsyssrv.ams.sock`
+    /// on Unix systems (Beckhoff RT Linux or Tc/BSD).
     ///
     /// Performs a [`PortConnect`](PortConnectRequest) handshake to obtain a
     /// dynamically assigned source address.
@@ -153,10 +163,17 @@ impl AdsDevice {
     /// # }
     /// ```
     pub async fn connect(timeout: impl Into<Option<Duration>>) -> crate::Result<Self> {
-        Self::connect_to("127.0.0.1:48898", timeout).await
+        let timeout = timeout.into();
+
+        #[cfg(unix)]
+        if let Ok(device) = Self::connect_uds("/run/ams/tcsyssrv.ams.sock", timeout).await {
+            return Ok(device);
+        }
+
+        Self::connect_tcp("127.0.0.1:48898", timeout).await
     }
 
-    /// Connects to an AMS router at `addr`.
+    /// Connects to an AMS router at `addr` over TCP.
     ///
     /// Performs a [`PortConnect`](PortConnectRequest) handshake to obtain a
     /// dynamically assigned source address.
@@ -168,13 +185,13 @@ impl AdsDevice {
     ///
     /// # #[tokio::main(flavor = "current_thread")]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// let device = AdsDevice::connect_to("192.168.1.50:48898", None).await?;
+    /// let device = AdsDevice::connect_tcp("192.168.1.50:48898", None).await?;
     /// println!("Source: {}", device.source());
     /// device.shutdown().await;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn connect_to(
+    pub async fn connect_tcp(
         addr: impl ToSocketAddrs,
         timeout: impl Into<Option<Duration>>,
     ) -> crate::Result<Self> {
@@ -191,6 +208,46 @@ impl AdsDevice {
                 .into_split(),
             None => TcpAmsStream::connect(addr).await?.into_split(),
         };
+        let mut device = Self::new(reader, writer, AmsAddr::default(), timeout);
+        device.source = device.port_connect().await?;
+        Ok(device)
+    }
+
+    /// Connects to a local AMS router over a Unix Domain Socket.
+    ///
+    /// Performs a [`PortConnect`](PortConnectRequest) handshake to obtain a
+    /// dynamically assigned source address.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use tcads_client::devices::tokio::AdsDevice;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let device = AdsDevice::connect_uds("/run/ams/tcsyssrv.ams.sock", None).await?;
+    /// println!("Source: {}", device.source());
+    /// device.shutdown().await;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Timeout
+    ///
+    /// Unlike the blocking variant, `timeout` here bounds **both** the socket
+    /// connect and every subsequent ADS command round-trip, because
+    /// [`AmsStream::connect_timeout`] is async.
+    #[cfg(unix)]
+    pub async fn connect_uds(
+        path: impl AsRef<Path>,
+        timeout: impl Into<Option<Duration>>,
+    ) -> crate::Result<Self> {
+        let timeout = timeout.into();
+        let stream = match timeout {
+            Some(duration) => UnixAmsStream::connect_timeout(path, duration).await?,
+            None => UnixAmsStream::connect(path).await?,
+        };
+        let (reader, writer) = stream.into_split();
         let mut device = Self::new(reader, writer, AmsAddr::default(), timeout);
         device.source = device.port_connect().await?;
         Ok(device)

@@ -7,6 +7,8 @@ use std::borrow::Borrow;
 use std::fmt;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, ToSocketAddrs};
+#[cfg(unix)]
+use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::{Receiver, TryRecvError};
@@ -29,6 +31,8 @@ use tcads_core::{
     SumReadResponseOwned, SumReadWriteRequest, SumReadWriteResponseOwned, SumWriteRequest,
     SumWriteResponse,
 };
+#[cfg(unix)]
+use tcads_io::blocking::UnixAmsStream;
 use tcads_io::blocking::{AmsReader, AmsWriter, TcpAmsStream};
 
 /// Shared state for an [`AdsDevice`] connection.
@@ -67,19 +71,24 @@ pub struct AdsDeviceInner {
 ///
 /// ### 1. Connecting via a local router
 ///
-/// Use [`connect`](Self::connect) or [`connect_to`](Self::connect_to). The
-/// local router performs a [`PortConnect`](PortConnectRequest) handshake and
-/// dynamically assigns a source address to the client.
+/// Use [`connect`](Self::connect) to auto-select the fastest available transport,
+/// or [`connect_tcp`](Self::connect_tcp) / [`connect_uds`](Self::connect_uds) to require a
+/// specific one. All three perform a [`PortConnect`](PortConnectRequest) handshake and receive a
+/// dynamically assigned source address.
 ///
 /// ```no_run
 /// use tcads_client::devices::blocking::AdsDevice;
 /// use std::time::Duration;
 ///
-/// // Connect to the local router at 127.0.0.1:48898
+/// // Connect to the local router at 127.0.0.1:48898 or "/run/ams/tcsyssrv.ams.sock"
 /// let device = AdsDevice::connect(Duration::from_secs(5))?;
 ///
-/// // Connect to a router at a specific address
-/// let device = AdsDevice::connect_to("192.168.1.50:48898", Duration::from_secs(5))?;
+/// // Connect to a router at a specific address using TCP
+/// let device = AdsDevice::connect_tcp("192.168.1.50:48898", Duration::from_secs(5))?;
+///
+/// // On RT Linux or Tc/BSD connect a router at a specified path using a Unix Domain Socket
+/// # #[cfg(unix)]
+/// let device = AdsDevice::connect_uds("/run/ams/tcsyssrv.ams.sock", Duration::from_secs(5))?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 ///
@@ -120,7 +129,8 @@ pub struct AdsDevice {
 }
 
 impl AdsDevice {
-    /// Connects to the local AMS router at `127.0.0.1:48898`.
+    /// Connects to the local AMS router at `127.0.0.1:48898` or `/run/ams/tcsyssrv.ams.sock`
+    /// on Unix systems (Beckhoff RT Linux or Tc/BSD).
     ///
     /// Performs a [`PortConnect`](PortConnectRequest) handshake to obtain a
     /// dynamically assigned source address.
@@ -143,10 +153,17 @@ impl AdsDevice {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn connect(timeout: impl Into<Option<Duration>>) -> crate::Result<Self> {
-        Self::connect_to("127.0.0.1:48898", timeout)
+        let timeout = timeout.into();
+
+        #[cfg(unix)]
+        if let Ok(device) = Self::connect_uds("/run/ams/tcsyssrv.ams.sock", timeout) {
+            return Ok(device);
+        }
+
+        Self::connect_tcp("127.0.0.1:48898", timeout)
     }
 
-    /// Connects to an AMS router at `addr`.
+    /// Connects to an AMS router at `addr` over TCP.
     ///
     /// Performs a [`PortConnect`](PortConnectRequest) handshake to obtain a
     /// dynamically assigned source address.
@@ -156,12 +173,12 @@ impl AdsDevice {
     /// ```no_run
     /// use tcads_client::devices::blocking::AdsDevice;
     ///
-    /// let device = AdsDevice::connect_to("192.168.1.100:48898", None)?;
+    /// let device = AdsDevice::connect_tcp("192.168.1.100:48898", None)?;
     /// println!("Source: {}", device.source());
     /// device.shutdown()?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn connect_to(
+    pub fn connect_tcp(
         addr: impl ToSocketAddrs,
         timeout: impl Into<Option<Duration>>,
     ) -> crate::Result<Self> {
@@ -178,6 +195,41 @@ impl AdsDevice {
             }
             None => TcpAmsStream::connect(addr)?.try_split()?,
         };
+        let mut device = Self::new(reader, writer, AmsAddr::default(), timeout);
+        device.source = device.port_connect()?;
+        Ok(device)
+    }
+
+    /// Connects to a local AMS router over a Unix Domain Socket.
+    ///
+    /// Performs a [`PortConnect`](PortConnectRequest) handshake to obtain a
+    /// dynamically assigned source address.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use tcads_client::devices::blocking::AdsDevice;
+    ///
+    /// let device = AdsDevice::connect_uds("/run/ams/tcsyssrv.ams.sock", None)?;
+    /// println!("Source: {}", device.source());
+    /// device.shutdown()?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Timeout
+    ///
+    /// [`std::os::unix::net::UnixStream::connect`] has no timeout parameter, so
+    /// the `timeout` here applies only to ADS command round-trips *after* the
+    /// socket is established, not to the connect itself. Use the Tokio variant if you
+    /// need a bounded connect.
+    #[cfg(unix)]
+    pub fn connect_uds(
+        path: impl AsRef<Path>,
+        timeout: impl Into<Option<Duration>>,
+    ) -> crate::Result<Self> {
+        let timeout = timeout.into();
+        let stream = UnixAmsStream::connect(path)?;
+        let (reader, writer) = stream.try_split()?;
         let mut device = Self::new(reader, writer, AmsAddr::default(), timeout);
         device.source = device.port_connect()?;
         Ok(device)
