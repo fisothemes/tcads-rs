@@ -9,7 +9,7 @@ use tcads::core::protocol::{
     PortConnectRequest, PortConnectResponse,
 };
 use tcads::core::{AdsReturnCode, AmsAddr, IndexGroup, IndexOffset};
-use tcads::io::blocking::AmsStream;
+use tcads::io::blocking::TcpAmsStream;
 
 type BoxError = Box<dyn std::error::Error>;
 type Result<T> = std::result::Result<T, BoxError>;
@@ -18,7 +18,7 @@ pub const ADSSRVID_READDEVICEINFO: IndexGroup = IndexGroup::new(0x01);
 pub const RTIME_CPU_SETTINGS: IndexOffset = IndexOffset::new(0xD);
 
 fn main() -> Result<()> {
-    let mut stream = AmsStream::connect("127.0.0.1:48898")?;
+    let mut stream = TcpAmsStream::connect("127.0.0.1:48898")?;
 
     // 1. Get our source Address
     stream.write_frame(&PortConnectRequest::default().into_frame())?;

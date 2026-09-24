@@ -28,7 +28,7 @@ use tcads_core::{
     SumReadResponseOwned, SumReadWriteRequest, SumReadWriteResponseOwned, SumWriteRequest,
     SumWriteResponse,
 };
-use tcads_io::tokio::{AmsReader, AmsStream, AmsWriter};
+use tcads_io::tokio::{AmsReader, AmsWriter, TcpAmsStream};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::mpsc::UnboundedReceiver as Receiver;
 use tokio::sync::mpsc::error::TryRecvError;
@@ -186,10 +186,10 @@ impl AdsDevice {
             )
         })?;
         let (reader, writer) = match timeout {
-            Some(duration) => AmsStream::connect_timeout(&addr, duration)
+            Some(duration) => TcpAmsStream::connect_timeout(&addr, duration)
                 .await?
                 .into_split(),
-            None => AmsStream::connect(addr).await?.into_split(),
+            None => TcpAmsStream::connect(addr).await?.into_split(),
         };
         let mut device = Self::new(reader, writer, AmsAddr::default(), timeout);
         device.source = device.port_connect().await?;
@@ -239,10 +239,10 @@ impl AdsDevice {
             )
         })?;
         let (reader, writer) = match timeout {
-            Some(duration) => AmsStream::connect_timeout(&addr, duration)
+            Some(duration) => TcpAmsStream::connect_timeout(&addr, duration)
                 .await?
                 .into_split(),
-            None => AmsStream::connect(addr).await?.into_split(),
+            None => TcpAmsStream::connect(addr).await?.into_split(),
         };
         Ok(Self::new(reader, writer, source.into(), timeout))
     }

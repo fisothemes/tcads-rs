@@ -2,14 +2,14 @@
 //! Run with: `cargo run --bin 02_basic_frame_async`
 
 use tcads::core::{AmsCommand, AmsFrame};
-use tcads::io::tokio::AmsStream;
+use tcads::io::tokio::TcpAmsStream;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // Connect to the local AMS Router
-    let mut stream = AmsStream::connect("127.0.0.1:48898").await?;
+    let mut stream = TcpAmsStream::connect("127.0.0.1:48898").await?;
 
     // Construct a raw Port Connect frame
     let port_connect_frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);

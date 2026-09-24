@@ -3,8 +3,16 @@ use super::traits::WriteAllVectored;
 use super::writer::AmsWriter;
 use std::io::IoSlice;
 use std::net::SocketAddr;
+#[cfg(unix)]
+use std::path::Path;
 use tcads_core::{AMS_FRAME_MAX_LEN, AmsFrame, AmsTcpHeader};
 use tokio::io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+#[cfg(unix)]
+use tokio::net::UnixStream;
+#[cfg(unix)]
+use tokio::net::unix::SocketAddr as TokioUnixSocketAddr;
+#[cfg(unix)]
+use tokio::net::unix::{OwnedReadHalf as UnixOwnedReadHalf, OwnedWriteHalf as UnixOwnedWriteHalf};
 use tokio::net::{self, TcpStream};
 use tokio::time::{self, Duration, timeout};
 
@@ -263,6 +271,84 @@ impl AmsStream<TcpStream> {
 
     /// Returns the socket address of the local half of this TCP connection.
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.stream.local_addr()
+    }
+
+    /// Shuts down the output stream, ensuring that the value can be dropped cleanly.
+    ///
+    /// See [`AsyncWriteExt::shutdown`] for more details.
+    pub async fn shutdown(&mut self) -> io::Result<()> {
+        self.stream.shutdown().await
+    }
+}
+
+#[cfg(unix)]
+impl AmsStream<UnixStream> {
+    /// Connects to an AMS router over a Unix Domain Socket.
+    ///
+    /// Beckhoff RT Linux or TwinCAT/BSD don't use TCP to communicate with the local AMS router.
+    /// They use UDS (Unix Domain Socket). Use this transport when running as a local client on
+    /// systems.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use tcads_io::tokio::AmsStream;
+    /// use tokio::net::UnixStream;
+    ///
+    /// # #[tokio::main(flavor = "current_thread")]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let stream = AmsStream::<UnixStream>::connect("/run/ams/tcsyssrv.ams.sock").await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn connect(path: impl AsRef<Path>) -> io::Result<Self> {
+        Ok(Self::new(UnixStream::connect(path).await?))
+    }
+
+    /// Connects to an AMS router at a specified path with a timeout.
+    ///
+    /// This wraps [`connect`](Self::connect) in [`tokio::time::timeout`], so
+    /// unlike the blocking variant, there is no "skip connect_timeout" caveat.
+    ///
+    /// It is an error to pass a zero [`Duration`] to this function.
+    ///
+    /// If the connection is not established before the timeout expires, the
+    /// connection future is cancelled and an [`io::ErrorKind::TimedOut`] error
+    /// is returned.
+    pub async fn connect_timeout(path: impl AsRef<Path>, timeout: Duration) -> io::Result<Self> {
+        if timeout.is_zero() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "cannot set a 0 duration timeout",
+            ));
+        }
+        time::timeout(timeout, Self::connect(path))
+            .await
+            .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "timeout"))?
+    }
+
+    /// Splits the connection into a reader and writer with zero overhead.
+    ///
+    /// Uses [`UnixStream::into_split`], matching the ergonomics of the `TcpStream` variant.
+    pub fn into_split(self) -> (AmsReader<UnixOwnedReadHalf>, AmsWriter<UnixOwnedWriteHalf>) {
+        let (reader, writer) = self.stream.into_split();
+        (AmsReader::new(reader), AmsWriter::new(writer))
+    }
+
+    /// Returns the address of the remote half of the connection.
+    ///
+    /// Returns a [`tokio::net::unix::SocketAddr`] (an enum that can represent
+    /// an unnamed socket), which is a **different type** from
+    /// [`std::net::SocketAddr`].
+    pub fn peer_addr(&self) -> io::Result<TokioUnixSocketAddr> {
+        self.stream.peer_addr()
+    }
+
+    /// Returns the address of the local half of the connection.
+    ///
+    /// See [`peer_addr`](Self::peer_addr) for the type caveat.
+    pub fn local_addr(&self) -> io::Result<TokioUnixSocketAddr> {
         self.stream.local_addr()
     }
 

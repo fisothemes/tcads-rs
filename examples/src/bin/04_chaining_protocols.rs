@@ -9,12 +9,12 @@ use tcads::core::protocol::{
     GetLocalNetIdResponse, PortConnectRequest, PortConnectResponse,
 };
 use tcads::core::{AmsAddr, InvokeId};
-use tcads::io::blocking::AmsStream;
+use tcads::io::blocking::TcpAmsStream;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 fn main() -> Result<()> {
-    let mut stream = AmsStream::connect("127.0.0.1:48898")?;
+    let mut stream = TcpAmsStream::connect("127.0.0.1:48898")?;
 
     // 1. Request a source AMS Address from the router
     stream.write_frame(&PortConnectRequest::default().into_frame())?;

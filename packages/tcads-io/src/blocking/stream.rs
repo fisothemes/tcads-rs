@@ -3,6 +3,12 @@ use super::traits::WriteAllVectored;
 use super::writer::AmsWriter;
 use std::io::{self, IoSlice, Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpStream};
+#[cfg(unix)]
+use std::os::unix::net::SocketAddr as UnixSocketAddr;
+#[cfg(unix)]
+use std::os::unix::net::UnixStream;
+#[cfg(unix)]
+use std::path::Path;
 use std::time::Duration;
 use tcads_core::{AMS_FRAME_MAX_LEN, AmsFrame, AmsTcpHeader};
 
@@ -206,6 +212,93 @@ impl AmsStream<TcpStream> {
     /// This function will cause all pending and future I/O on the specified
     /// portions to return immediately with an appropriate value
     /// (see documentation for [`Shutdown`]).
+    pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
+        self.stream.shutdown(how)
+    }
+}
+
+#[cfg(unix)]
+impl AmsStream<UnixStream> {
+    /// Connects to an AMS router over a Unix Domain Socket.
+    ///
+    /// Beckhoff RT Linux or TwinCAT/BSD don't use TCP to communicate with the local AMS router.
+    /// They use UDS (Unix Domain Socket). Use this transport when running as a local client on
+    /// systems.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use tcads_io::blocking::AmsStream;
+    /// use std::os::unix::net::UnixStream;
+    ///
+    /// let stream = AmsStream::<UnixStream>::connect("/run/ams/tcsyssrv.ams.sock")?;
+    /// # Ok::<(), std::io::Error>(())
+    /// ```
+    ///
+    /// # Note
+    ///
+    /// There is no `connect_timeout` variant. `UnixStream`'s blocking
+    /// `connect` has no timeout parameter, and emulating one requires a
+    /// non-blocking connect plus `poll`. If you need a bounded connect,
+    /// either use the Tokio variant (whose `connect` is async and easily
+    /// wrapped in [`tokio::time::timeout`]) or drive the socket yourself.
+    pub fn connect(path: impl AsRef<Path>) -> io::Result<Self> {
+        Ok(Self::new(UnixStream::connect(path)?))
+    }
+
+    /// Splits the `UnixStream` into a buffered reader and writer.
+    ///
+    /// Like `TcpStream`, `UnixStream` does not implement `Clone`, so the
+    /// generic [`split`](AmsStream::split) is unavailable, and this uses
+    /// [`UnixStream::try_clone`] instead.
+    pub fn try_split(self) -> io::Result<(AmsReader<UnixStream>, AmsWriter<UnixStream>)> {
+        Ok((
+            AmsReader::new(self.stream.try_clone()?),
+            AmsWriter::new(self.stream),
+        ))
+    }
+
+    /// Sets the read timeout for the underlying stream.
+    pub fn set_read_timeout(&self, dur: impl Into<Option<Duration>>) -> io::Result<()> {
+        self.stream.set_read_timeout(dur.into())
+    }
+
+    /// Returns the read timeout of the underlying stream.
+    ///
+    /// If the timeout is [`None`], then [`read_frame`](Self::read_frame) calls will block indefinitely
+    pub fn read_timeout(&self) -> io::Result<Option<Duration>> {
+        self.stream.read_timeout()
+    }
+
+    /// Sets the write timeout for the underlying stream.
+    pub fn set_write_timeout(&self, dur: impl Into<Option<Duration>>) -> io::Result<()> {
+        self.stream.set_write_timeout(dur.into())
+    }
+
+    /// Returns the write timeout of the underlying stream.
+    ///
+    /// If the timeout is [`None`], then [`write_frame`](Self::write_frame) calls will block indefinitely
+    pub fn write_timeout(&self) -> io::Result<Option<Duration>> {
+        self.stream.write_timeout()
+    }
+
+    /// Returns the address of the remote half of the connection.
+    ///
+    /// Returns [`std::os::unix::net::SocketAddr`], which is a **different
+    /// type** from the [`std::net::SocketAddr`] returned by
+    /// [`AmsStream::<TcpStream>::peer_addr`]. The two are not interchangeable.
+    pub fn peer_addr(&self) -> io::Result<UnixSocketAddr> {
+        self.stream.peer_addr()
+    }
+
+    /// Returns the address of the local half of the connection.
+    ///
+    /// See [`peer_addr`](Self::peer_addr) for the type caveat.
+    pub fn local_addr(&self) -> io::Result<UnixSocketAddr> {
+        self.stream.local_addr()
+    }
+
+    /// Shuts down the read, write, or both halves of the connection.
     pub fn shutdown(&self, how: Shutdown) -> io::Result<()> {
         self.stream.shutdown(how)
     }

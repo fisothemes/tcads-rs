@@ -2,13 +2,13 @@
 //! Run with: `cargo run --bin 01_basic_frame_sync`
 
 use tcads::core::{AmsCommand, AmsFrame};
-use tcads::io::blocking::AmsStream;
+use tcads::io::blocking::TcpAmsStream;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 fn main() -> Result<()> {
     // Connect to the local AMS Router
-    let mut stream = AmsStream::connect("127.0.0.1:48898")?;
+    let mut stream = TcpAmsStream::connect("127.0.0.1:48898")?;
 
     // Construct a raw Port Connect frame
     let port_connect_frame = AmsFrame::new(AmsCommand::PortConnect, [0x00, 0x00]);

@@ -29,7 +29,7 @@ use tcads_core::{
     SumReadResponseOwned, SumReadWriteRequest, SumReadWriteResponseOwned, SumWriteRequest,
     SumWriteResponse,
 };
-use tcads_io::blocking::{AmsReader, AmsStream, AmsWriter};
+use tcads_io::blocking::{AmsReader, AmsWriter, TcpAmsStream};
 
 /// Shared state for an [`AdsDevice`] connection.
 ///
@@ -174,9 +174,9 @@ impl AdsDevice {
                         "could not resolve address",
                     )
                 })?;
-                AmsStream::connect_timeout(&addr, duration)?.try_split()?
+                TcpAmsStream::connect_timeout(&addr, duration)?.try_split()?
             }
-            None => AmsStream::connect(addr)?.try_split()?,
+            None => TcpAmsStream::connect(addr)?.try_split()?,
         };
         let mut device = Self::new(reader, writer, AmsAddr::default(), timeout);
         device.source = device.port_connect()?;
@@ -225,9 +225,9 @@ impl AdsDevice {
                         "could not resolve address",
                     )
                 })?;
-                AmsStream::connect_timeout(&addr, duration)?.try_split()?
+                TcpAmsStream::connect_timeout(&addr, duration)?.try_split()?
             }
-            None => AmsStream::connect(addr)?.try_split()?,
+            None => TcpAmsStream::connect(addr)?.try_split()?,
         };
         Ok(Self::new(reader, writer, source.into(), timeout))
     }
