@@ -61,7 +61,7 @@ use tcads::client::devices::tokio::AdsRuntime;
 use tcads::core::{AdsReturnCode, AdsSymbolInfo, AdsTransMode, AmsAddr};
 use tcads::serde::{Error as SerdeError, Value as PlcValue};
 use tokio::net::TcpListener;
-use tokio_stream::Stream;
+use tokio_stream::{Stream, StreamExt};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -127,7 +127,7 @@ async fn subscribe_symbol(
     State(device): State<AdsRuntime>,
 ) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, AppError> {
     let symbol_path = path.replace('/', ".");
-    let (mut rx, _handle) = device
+    let (rx, _handle) = device
         .subscribe_value::<PlcValue>(
             &symbol_path,
             AdsTransMode::ServerOnChange,
@@ -136,20 +136,15 @@ async fn subscribe_symbol(
         )
         .await?;
 
-    let stream = async_stream::stream! {
-        loop {
-            match rx.recv().await {
-                Ok(value) => match Event::default().json_data(&value) {
-                    Ok(event) => yield Ok(event),
-                    Err(_) => break,
-                },
-                Err(e) => {
-                    yield Ok(Event::default().event("error").data(e.to_string()));
-                    break;
-                }
-            }
-        }
-    };
+    let stream = rx.map(|result| {
+        let event = match result {
+            Ok(value) => Event::default()
+                .json_data(&value)
+                .unwrap_or_else(|e| Event::default().event("error").data(e.to_string())),
+            Err(e) => Event::default().event("error").data(e.to_string()),
+        };
+        Ok(event)
+    });
 
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()))
 }

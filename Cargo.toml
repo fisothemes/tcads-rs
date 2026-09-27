@@ -20,11 +20,11 @@ categories = ["api-bindings", "network-programming"]
 version = "0.1.0-alpha.5"
 
 [workspace.dependencies]
-async-stream = "0.3"
 axum = "0.8"
 bitflags = "2"
 chrono = "0.4"
 encoding_rs = "0.8"
+futures-core = "0.3"
 indexmap = "2"
 rand = "0.10.0"
 serde = "1"

@@ -3,14 +3,17 @@ use crate::tasks::tokio::{
     AdsNotificationDispatcher, AmsRequestDispatchKey, AmsRequestDispatcher, AmsRequestWriter,
     AmsResponseReader, RouterNotificationDispatcher,
 };
+use futures_core::Stream;
 use std::borrow::Borrow;
 use std::fmt;
 use std::future::Future;
 use std::net::{SocketAddr, ToSocketAddrs};
 #[cfg(unix)]
 use std::path::Path;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::task::{Context, Poll};
 use std::time::Duration;
 use tcads_core::protocol::utils::parse_ads_frame;
 use tcads_core::protocol::{
@@ -1144,6 +1147,19 @@ impl StateReceiver {
     /// Explicitly cancels the subscription.
     pub async fn unsubscribe(self) -> crate::Result<()> {
         self.guard.cancel().await
+    }
+}
+
+impl Stream for StateReceiver {
+    type Item = crate::Result<(AdsState, DeviceState)>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        match this.rx.poll_recv(cx) {
+            Poll::Ready(Some(sample)) => Poll::Ready(Some(Self::decode(sample))),
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Pending => Poll::Pending,
+        }
     }
 }
 

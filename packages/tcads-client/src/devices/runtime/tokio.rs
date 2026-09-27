@@ -2,11 +2,14 @@ use super::symbol_cache::{SymbolCache, SymbolEntry};
 use super::{multi, rpc};
 use crate::devices::tokio::{AdsDevice, AdsSubsystem};
 use crate::notif_guard::tokio::NotificationGuard;
+use futures_core::Stream;
 use std::collections::VecDeque;
 use std::marker::PhantomData;
 use std::net::ToSocketAddrs;
+use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
+use std::task::{Context, Poll};
 use std::time::Duration;
 use tcads_core::{
     AdsError, AdsNotificationAttrib, AdsNotificationSampleOwned, AdsSymbolInfo,
@@ -1295,6 +1298,19 @@ impl SymbolVersionReceiver {
     }
 }
 
+impl Stream for SymbolVersionReceiver {
+    type Item = crate::Result<u8>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        match this.rx.poll_recv(cx) {
+            Poll::Ready(Some(sample)) => Poll::Ready(Some(Self::decode(sample))),
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
 /// A receiver for decoded value-change notifications on a single symbol.
 ///
 /// Wraps the raw ADS notification channel and decodes each sample into `T` on
@@ -1384,6 +1400,22 @@ where
     /// when you want to know cancellation actually succeeded.
     pub async fn unsubscribe(self) -> crate::Result<()> {
         self.guard.cancel().await
+    }
+}
+
+impl<T> Stream for ValueReceiver<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    type Item = crate::Result<T>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        match this.rx.poll_recv(cx) {
+            Poll::Ready(Some(sample)) => Poll::Ready(Some(this.decode(sample))),
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Pending => Poll::Pending,
+        }
     }
 }
 

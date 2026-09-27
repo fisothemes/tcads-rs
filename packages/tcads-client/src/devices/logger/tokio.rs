@@ -1,6 +1,9 @@
 use crate::devices::tokio::{AdsDevice, AdsSubsystem};
 use crate::notif_guard::tokio::NotificationGuard;
+use futures_core::Stream;
 use std::net::ToSocketAddrs;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use std::time::Duration;
 use tcads_core::protocol::AdsLoggerWriteRequestOwned;
 use tcads_core::{
@@ -237,6 +240,21 @@ impl LogEntryReceiver {
     /// when you want to know cancellation actually succeeded.
     pub async fn unsubscribe(self) -> crate::Result<()> {
         self.guard.cancel().await
+    }
+}
+
+impl Stream for LogEntryReceiver {
+    type Item = crate::Result<LogEntry>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+        match this.rx.poll_recv(cx) {
+            Poll::Ready(Some(sample)) => {
+                Poll::Ready(Some(LogEntry::try_from(sample.data()).map_err(Into::into)))
+            }
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Pending => Poll::Pending,
+        }
     }
 }
 
