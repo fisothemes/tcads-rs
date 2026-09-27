@@ -1,6 +1,6 @@
 use super::symbol_cache::{SymbolCache, SymbolEntry};
 use super::{multi, rpc};
-use crate::devices::blocking::{AdsDevice, AdsSubsystem};
+use crate::devices::blocking::{AdsDevice, AdsDeviceExt};
 use crate::notif_guard::blocking::NotificationGuard;
 use std::collections::VecDeque;
 use std::hash::Hash;
@@ -1580,7 +1580,7 @@ impl<'a> WriteMultiValues<'a> {
     }
 }
 
-impl AdsSubsystem for AdsRuntime {
+impl AdsDeviceExt for AdsRuntime {
     fn device(&self) -> &AdsDevice {
         &self.device
     }

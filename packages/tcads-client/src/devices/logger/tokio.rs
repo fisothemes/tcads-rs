@@ -1,4 +1,4 @@
-use crate::devices::tokio::{AdsDevice, AdsSubsystem};
+use crate::devices::tokio::{AdsDevice, AdsDeviceExt};
 use crate::notif_guard::tokio::NotificationGuard;
 use futures_core::Stream;
 use std::net::ToSocketAddrs;
@@ -258,7 +258,7 @@ impl Stream for LogEntryReceiver {
     }
 }
 
-impl AdsSubsystem for AdsLogger {
+impl AdsDeviceExt for AdsLogger {
     fn device(&self) -> &AdsDevice {
         &self.device
     }

@@ -1,4 +1,4 @@
-use crate::devices::blocking::{AdsDevice, AdsSubsystem};
+use crate::devices::blocking::{AdsDevice, AdsDeviceExt};
 use crate::notif_guard::blocking::NotificationGuard;
 use std::net::ToSocketAddrs;
 use std::sync::mpsc::{Receiver, TryRecvError};
@@ -249,7 +249,7 @@ impl LogEntryReceiver {
     }
 }
 
-impl AdsSubsystem for AdsLogger {
+impl AdsDeviceExt for AdsLogger {
     fn device(&self) -> &AdsDevice {
         &self.device
     }

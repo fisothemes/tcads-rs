@@ -1,6 +1,6 @@
 use super::symbol_cache::{SymbolCache, SymbolEntry};
 use super::{multi, rpc};
-use crate::devices::tokio::{AdsDevice, AdsSubsystem};
+use crate::devices::tokio::{AdsDevice, AdsDeviceExt};
 use crate::notif_guard::tokio::NotificationGuard;
 use futures_core::Stream;
 use std::collections::VecDeque;
@@ -1658,7 +1658,7 @@ impl<'a> WriteMultiValues<'a> {
     }
 }
 
-impl AdsSubsystem for AdsRuntime {
+impl AdsDeviceExt for AdsRuntime {
     fn device(&self) -> &AdsDevice {
         &self.device
     }

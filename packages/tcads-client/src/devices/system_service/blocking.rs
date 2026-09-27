@@ -1,5 +1,5 @@
 use super::shared;
-use crate::devices::blocking::{AdsDevice, AdsSubsystem};
+use crate::devices::blocking::{AdsDevice, AdsDeviceExt};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use std::time::Duration;
 use tcads_core::{
@@ -567,7 +567,7 @@ impl AdsSystemService {
     }
 }
 
-impl AdsSubsystem for AdsSystemService {
+impl AdsDeviceExt for AdsSystemService {
     fn device(&self) -> &AdsDevice {
         &self.device
     }

@@ -1118,32 +1118,44 @@ impl StateReceiver {
 }
 
 /// A universal trait for high-level devices that represent a specific TwinCAT subsystem.
-pub trait AdsSubsystem {
+pub trait AdsDeviceExt {
     /// Returns a reference to the underlying transport device.
     fn device(&self) -> &AdsDevice;
 
-    /// Returns the target address for this specific subsystem.
+    /// Returns the target address for this device.
     fn target(&self) -> AmsAddr;
 
-    /// Reads the current execution state of this subsystem.
+    /// Returns the local AMS net id of the of this device.
+    ///
+    /// See [`AdsDevice::get_local_net_id`] for more details.
+    fn get_local_net_id(&self) -> crate::Result<AmsNetId> {
+        self.device().get_local_net_id()
+    }
+
+    /// Subscribes to AMS router state changes this device is connected to.
+    fn subscribe_router(&self) -> crate::Result<Receiver<RouterState>> {
+        self.device().subscribe_router()
+    }
+
+    /// Reads the current state of this device.
     fn read_state(&self) -> crate::Result<(AdsState, DeviceState)> {
         self.device().read_state(self.target())
     }
 
-    /// Reads the device info (version and name) of this subsystem.
+    /// Changes the ADS state (e.g. Run, Stop, Config) of this device.
+    fn write_control(&self, ads_state: AdsState, device_state: DeviceState) -> crate::Result<()> {
+        self.device()
+            .write_control(self.target(), ads_state, device_state, [])
+    }
+
+    /// Reads this device's info (version and name).
     fn read_device_info(&self) -> crate::Result<(AdsDeviceVersion, String)> {
         self.device().read_device_info(self.target())
     }
 
-    /// Subscribes to state changes for this subsystem.
+    /// Subscribes to state changes for this device.
     fn subscribe_state(&self) -> crate::Result<(StateReceiver, NotificationHandle)> {
         self.device().subscribe_state(self.target())
-    }
-
-    /// Changes the ADS state (e.g. Run, Stop, Config) of the subsystem.
-    fn write_control(&self, ads_state: AdsState, device_state: DeviceState) -> crate::Result<()> {
-        self.device()
-            .write_control(self.target(), ads_state, device_state, [])
     }
 }
 
