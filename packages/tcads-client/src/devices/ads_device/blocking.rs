@@ -300,7 +300,7 @@ impl AdsDevice {
     /// # Example
     ///
     /// ```no_run ignore
-    /// use tcads_core::io::blocking::{AmsReader, AmsWriter};
+    /// use tcads_io::blocking::{AmsReader, AmsWriter};
     /// use tcads_client::devices::blocking::AdsDevice;
     /// use std::time::Duration;
     ///

@@ -320,7 +320,7 @@ impl AdsDevice {
     /// # Example
     ///
     /// ```no_run ignore
-    /// use tcads_core::io::tokio::{AmsReader, AmsWriter};
+    /// use tcads_io::tokio::{AmsReader, AmsWriter};
     /// use tcads_client::devices::tokio::AdsDevice;
     /// use std::time::Duration;
     ///
