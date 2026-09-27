@@ -2,7 +2,19 @@ use super::error::AmsCommandError;
 
 /// AMS Router Command Identifiers.
 /// These identify the type of the packet at the TCP/router level.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Default,
+)]
 #[repr(u16)]
 pub enum AmsCommand {
     /// Standard ADS command (Read, Write, etc.) (`0x000`)

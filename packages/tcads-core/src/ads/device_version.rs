@@ -3,7 +3,9 @@ use std::fmt;
 use std::fmt::Debug;
 
 /// An ADS Device's version number.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
+)]
 pub struct AdsDeviceVersion {
     major: u8,
     minor: u8,

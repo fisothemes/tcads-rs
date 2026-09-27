@@ -15,7 +15,7 @@ use super::filetime::WindowsFileTime;
 /// | 16     | 8    | `modified_time`  |
 /// | 24     | 8    | `access_time`    |
 /// | 32     | 4    | `attributes`     |
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct AdsFileStatus {
     size: u64,
     creation_time: WindowsFileTime,

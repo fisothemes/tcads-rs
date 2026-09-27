@@ -1,7 +1,9 @@
 use super::error::AdsCommandError;
 
 /// ADS Command IDs used within the AMS Header.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
 pub enum AdsCommand {
     /// Invalid command ID
     Invalid,

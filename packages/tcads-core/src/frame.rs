@@ -6,7 +6,7 @@ pub const AMS_FRAME_MAX_LEN: usize = 4 * 1024 * 1024;
 /// A single AMS frame/packet consisting of a header and a payload.
 ///
 /// This struct is I/O-agnostic and simply holds the frame data.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AmsFrame {
     header: AmsTcpHeader,
     payload: Vec<u8>,

@@ -4,7 +4,9 @@ use super::error::AmsTcpHeaderError;
 /// The 6-byte prefix for TCP communication.
 ///
 /// See [Beckhoff ADS Specification (TE1000)](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/115846283.html?id=5591912318145837195).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash, Default,
+)]
 pub struct AmsTcpHeader {
     command: AmsCommand,
     length: u32,

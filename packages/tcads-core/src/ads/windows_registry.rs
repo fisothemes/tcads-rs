@@ -1,7 +1,9 @@
 use std::array::TryFromSliceError;
 
 /// Windows Registry Value Types.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
 pub enum WinRegistryValueType {
     /// No defined value type (REG_NONE) (0)
     None,

@@ -20,7 +20,7 @@ use super::system_state_flags::AdsSystemStateFlags;
 /// | 11     | 1    | `os_type`      | [`AdsOsType`]                                 |
 /// | 12     | 2    | `flags`        | [`AdsSystemStateFlags`]                       |
 /// | 14     | 2    | `reserved`     | Reserved, currently unused                    |
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct AdsSystemState {
     ads_state: AdsState,
     device_state: DeviceState,

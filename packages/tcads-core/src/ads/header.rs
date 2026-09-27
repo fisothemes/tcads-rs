@@ -15,7 +15,7 @@ use crate::ams::AmsAddr;
 /// [Beckhoff documentation refers to this structure as the **AMS Header**](https://infosys.beckhoff.com/content/1033/tc3_ads_intro/115847307.html?id=7738940192708835096).
 /// However, this library uses the term **ADS Header** to clearly distinguish it from the
 /// TCP-level header and to emphasise its role in the ADS protocol layer.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AdsHeader {
     target: AmsAddr,
     source: AmsAddr,
