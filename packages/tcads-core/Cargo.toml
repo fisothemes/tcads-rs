@@ -10,10 +10,13 @@ categories.workspace = true
 readme = "README.md"
 version.workspace = true
 
+[features]
+rand = ["dep:rand"]
+
 [dependencies]
 thiserror = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-rand = { workspace = true }
+rand = { workspace = true, optional = true }
 encoding_rs = { workspace = true }
 chrono = { workspace = true , features = ["default", "serde"]}
 bitflags = { workspace = true, features = ["serde"] }

@@ -29,6 +29,7 @@ impl Guid {
     /// Generates a random GUID using the `rand` crate.
     ///
     /// Tries to be RFC 4122 Version 4 (random) compliant.
+    #[cfg(feature = "rand")]
     pub fn random() -> Self {
         let mut bytes: [u8; 16] = rand::random();
 

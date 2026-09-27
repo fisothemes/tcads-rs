@@ -14,6 +14,7 @@ version.workspace = true
 default = ["blocking"]
 blocking = ["tcads-io/blocking", "tcads-client/blocking"]
 tokio = ["tcads-io/tokio", "tcads-client/tokio"]
+rand = ["tcads-core/rand"]
 
 [dependencies]
 tcads-core = { workspace = true }
