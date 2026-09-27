@@ -117,17 +117,9 @@ async fn invoke_method(
         .rsplit_once('/')
         .ok_or_else(|| AppError::new(StatusCode::BAD_REQUEST, "expected '<fb>/<method>'"))?;
 
-    let result: Result<PlcValue, _> = device.rpc(fb.replace('/', "."), method, &inputs).await;
-    match result {
-        Ok(value) => Ok(Json(serde_json::to_value(&value)?)),
-        Err(ClientError::Serde(SerdeError::InvalidRpcShape { .. })) => {
-            device
-                .rpc::<()>(fb.replace('/', "."), method, &inputs)
-                .await?;
-            Ok(Json(JsonValue::Null))
-        }
-        Err(e) => Err(e.into()),
-    }
+    let output: PlcValue = device.rpc(fb.replace('/', "."), method, &inputs).await?;
+
+    Ok(Json(serde_json::to_value(&output)?))
 }
 
 async fn subscribe_symbol(

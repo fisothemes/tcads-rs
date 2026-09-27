@@ -590,7 +590,7 @@ impl<'ser, P: TypeProvider> Serializer for AdsRpcSerializer<'ser, P> {
     type SerializeTupleStruct = AdsRpcFieldSerializer<'ser, P>;
     type SerializeTupleVariant = Impossible<(), crate::Error>;
     type SerializeMap = Impossible<(), crate::Error>;
-    type SerializeStruct = Impossible<(), crate::Error>;
+    type SerializeStruct = AdsRpcFieldSerializer<'ser, P>;
     type SerializeStructVariant = Impossible<(), crate::Error>;
 
     fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
@@ -652,9 +652,27 @@ impl<'ser, P: TypeProvider> Serializer for AdsRpcSerializer<'ser, P> {
         self.serialize_tuple(len)
     }
 
+    fn serialize_struct(
+        self,
+        _name: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeStruct, Self::Error> {
+        if self.fields.len() != len {
+            return Err(crate::Error::ShapeMismatch {
+                expected: self.fields.len(),
+                got: len,
+            });
+        }
+        Ok(AdsRpcFieldSerializer::new(
+            self.fields,
+            self.output,
+            self.provider,
+        ))
+    }
+
     unsupported_serialize_methods! {
         Self::not_supported =>
         bool i8 i16 i32 i64 u8 u16 u32 u64 f32 f64 char str bytes none some
-        unit_struct unit_variant newtype_variant tuple_variant map r#struct struct_variant
+        unit_struct unit_variant newtype_variant tuple_variant map struct_variant
     }
 }

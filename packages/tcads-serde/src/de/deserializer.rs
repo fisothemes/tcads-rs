@@ -583,13 +583,19 @@ impl<'de, P: TypeProvider> AdsRpcDeserializer<'de, P> {
 impl<'de, P: TypeProvider> Deserializer<'de> for AdsRpcDeserializer<'de, P> {
     type Error = crate::Error;
 
-    fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
-        Err(crate::Error::InvalidRpcShape {
-            got: "a scalar, map, or named-struct value".into(),
-        })
+        if self.fields.is_empty() {
+            visitor.visit_unit()
+        } else {
+            visitor.visit_seq(AdsRpcFieldAccess::new(
+                self.fields,
+                self.input,
+                self.provider,
+            ))
+        }
     }
 
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>

@@ -94,4 +94,11 @@ impl<'de> Visitor<'de> for ValueVisitor {
         variant.unit_variant()?;
         Ok(Value::Enum(name))
     }
+
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        Ok(Value::Array(Vec::new()))
+    }
 }

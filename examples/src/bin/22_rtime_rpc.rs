@@ -6,7 +6,8 @@
 //! and outputs:
 //! - 0 parameters: Use a unit type `()`
 //! - 1 parameter: Use a bare type (e.g., `i32`)
-//! - N parameters: Use a tuple `(i32, i32)`or any sequence (e.g.,`Vec<T>` and `[T; N]`)
+//! - N parameters: Use a tuple `(i32, i32)` or any type that serializes as a fixed-length
+//!   sequence: a tuple struct, a named struct, `Vec<T>`, `[T; N]`, or a dynamic `PlcValue::Array`.
 //!
 //! ## PREREQUISITE
 //!

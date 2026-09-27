@@ -614,66 +614,119 @@ impl AdsRuntime {
     ///
     /// # Parameter Mapping
     ///
-    /// TwinCAT RPC methods are composed of `VAR_INPUT`, `VAR_OUTPUT`, `VAR_IN_OUT`, and a `RETURN`
-    /// value. This function automatically maps these to Rust types based on the number of
-    /// parameters relevant to each side:
+    /// TwinCAT RPC methods are composed of `VAR_INPUT`, `VAR_OUTPUT`, `VAR_IN_OUT`, and a
+    /// `RETURN` value. This function maps them to Rust types based on the number of
+    /// parameters on each side.
     ///
-    /// ### Inputs (`inputs` argument)
+    /// ## Inputs (`inputs` argument)
     ///
-    /// Provide values for all `VAR_INPUT` and `VAR_IN_OUT` parameters in their declared order.
-    /// - **Zero Inputs:** Pass the unit type `()`.
-    /// - **One Input:** Pass the value directly (e.g. `100i32`).
-    /// - **Multiple Inputs:** Pass a tuple or sequence containing the values (e.g. `(50i32, 25i32)`,
-    ///   `[50i32, 25i32]` or `vec![50i32, 25i32]`).
+    /// Provide values for all `VAR_INPUT` and `VAR_IN_OUT` parameters in their declared
+    /// order:
     ///
-    /// ### Outputs (`O` return type)
+    /// - **Zero Inputs:** pass the unit type `()`.
+    /// - **One Input:** pass the value directly (e.g. `100i32`). Do **not** wrap it in a
+    ///   one-element tuple or array. The single-field path treats a sequence as the value
+    ///   of the parameter itself, so `[100]` would be interpreted as an array-typed
+    ///   argument.
+    /// - **Multiple Inputs:** pass any type that serializes as a fixed-length sequence such
+    ///   as a tuple `(50i32, 25i32)`, tuple struct, named struct, `Vec<T>`, `[T; N]`, or
+    ///   a dynamic [`PlcValue::Array`](tcads_serde::Value::Array).
+    ///
+    /// Inputs are matched to the PLC parameters **by position**, in declaration order.
+    /// Field names on a struct are ignored: `#[serde(rename)]` has no effect, and
+    /// `#[serde(skip)]` shifts all subsequent fields one position earlier. Each element is
+    /// coerced to the PLC parameter at its index, so element types may differ:
+    ///
+    /// ```rust,no_run
+    /// # use tcads_client::devices::blocking::AdsRuntime;
+    /// # use tcads_core::AmsAddr;
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let device = AdsRuntime::connect(AmsAddr::from_local(851), None)?;
+    /// // VAR_INPUT fSpeed : LREAL; bEnabled : BOOL; sLabel : STRING(16); END_VAR
+    /// device.rpc::<()>("MAIN.fbMotor", "Configure", (12.5f64, true, "MAIN.fbMotor"))?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// ## Outputs (`O` return type)
     ///
     /// Captures the `RETURN` value (if one exists), followed by all `VAR_OUTPUT` and
     /// `VAR_IN_OUT` parameters in their declared order.
-    /// - **Zero Outputs:** Use the unit type `()`.
-    /// - **One Output:** Parses and returns the single value directly.
-    /// - **Multiple Outputs:** Returns a tuple or sequence.
     ///
-    /// *Note on `VAR_IN_OUT`:* These parameters appear on *both* sides of the transaction.
-    /// You send their initial value in the `inputs` argument, and receive their updated
-    /// value back in the `O` return type, located at their respective positions.
+    /// - **Zero Outputs:** use `()` for a typed call, or a dynamic type such as
+    ///   [`PlcValue`](tcads_serde::Value), which receives an empty `Value::Array`.
+    /// - **One Output:** parse directly into the bare type (e.g. `u32`, `[f64; 3]`,
+    ///   `MyStruct`). Dynamic types also work: `PlcValue` receives the bare deserialized
+    ///   value.
+    /// - **Multiple Outputs:** use a concrete Rust tuple whose arity matches the PLC's
+    ///   output count, or any dynamic type. `Vec<T>` and `PlcValue` receive an array of
+    ///   length N in declaration order. A named struct also works, with its fields matched
+    ///   to the outputs positionally, same rule as the input side.
+    ///
+    /// The distinction between typed and dynamic outputs is only about what the caller
+    /// knows at compile time. Typed tuples give you one variant per arity, so the arity
+    /// must be known when you write the call. Dynamic types route through
+    /// `deserialize_any` and accept any arity at runtime.
+    ///
+    /// > [!NOTE]
+    /// > On `VAR_IN_OUT`, these parameters appear on *both* sides of the transaction.
+    /// > You send their initial value in the `inputs` argument, and receive their updated
+    /// > value back in the `O` return type, located at their respective positions.
     ///
     /// # Type Inference
     ///
-    /// Because the input type is inferred dynamically, you only need to specify the return
-    /// type `O` when using the turbofish syntax (e.g. `.rpc::<()>(...)`). If the return type
-    /// can be inferred from the surrounding code, the turbofish can be omitted entirely.
+    /// The input type is inferred from the value you pass. Only the return type `O` needs
+    /// to be named with the turbofish when it cannot be inferred from surrounding code.
     ///
     /// # Examples
     ///
     /// ```no_run
     /// # use tcads_client::devices::blocking::AdsRuntime;
     /// # use tcads_core::AmsAddr;
+    /// # use tcads_serde::Value as PlcValue;
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// # let device = AdsRuntime::connect(AmsAddr::from_local(851), None)?;
     /// let fb_path = "MAIN.fbMath";
     ///
     /// // 1. Zero Inputs, Zero Outputs
-    /// // Both sides use the unit type `()`
     /// device.rpc::<()>(fb_path, "Reset", ())?;
     ///
-    /// // 2. One Input, Zero Outputs
-    /// // Pass `100` directly instead of wrapping it in a tuple
+    /// // 2. One Input, Zero Outputs. Pass `100` directly, not `(100,)`.
     /// device.rpc::<()>(fb_path, "SetValue", 100i32)?;
     ///
     /// // 3. Zero Inputs, One Output
-    /// // Parses the return value directly into an `i32`
     /// let value: i32 = device.rpc(fb_path, "GetValue", ())?;
     ///
     /// // 4. Multiple Inputs, One Output
-    /// // Pass a tuple `(50, 25)` and get an `i32` back
     /// let sum: i32 = device.rpc(fb_path, "SumValues", (50i32, 25i32))?;
     ///
-    /// // 5. Multiple Inputs, Multiple Outputs
-    /// // Passes a tuple and returns a tuple. The output tuple ALWAYS starts
-    /// // with the RETURN value, followed by VAR_OUTPUT and VAR_IN_OUT.
+    /// // 4a. Same call, dynamic inputs (`Vec` reaches the same positional writer)
+    /// let sum: i32 = device.rpc(fb_path, "SumValues", vec![50i32, 25i32])?;
+    ///
+    /// // 4b. Same call, dynamic output
+    /// let sum: PlcValue = device.rpc(fb_path, "SumValues", (50i32, 25i32))?;
+    ///
+    /// // 5. Multiple Inputs, Multiple Outputs.
+    /// // The output tuple ALWAYS starts with the RETURN value, followed by
+    /// // VAR_OUTPUT and VAR_IN_OUT.
     /// let (quotient, remainder): (i32, i32) =
     ///     device.rpc(fb_path, "DivideValues", (100i32, 3i32))?;
+    ///
+    /// // 5a. Same call, dynamic output. Yields a 2-element `Value::Array`.
+    /// let pair: PlcValue = device.rpc(fb_path, "DivideValues", (100i32, 3i32))?;
+    ///
+    /// // 5b. Named structs work on both sides; fields are matched positionally.
+    /// #[derive(serde::Serialize)]
+    /// struct Args { numerator: i32, denominator: i32 }
+    ///
+    /// #[derive(serde::Deserialize)]
+    /// struct DivideResult { quotient: i32, remainder: i32 }
+    ///
+    /// let r: DivideResult = device.rpc(
+    ///     fb_path,
+    ///     "DivideValues",
+    ///     Args { numerator: 100, denominator: 3 },
+    /// )?;
     /// # Ok(())
     /// # }
     /// ```
