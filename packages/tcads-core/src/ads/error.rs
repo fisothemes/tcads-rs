@@ -67,6 +67,15 @@ pub enum AdsError {
     InvalidGuid(#[from] GuidParseError),
     #[error("Invalid SumUp command: {0}")]
     InvalidSumUpCommand(#[from] SumError),
+    /// Invalid license online info format or content.
+    #[error("Invalid license online info: {0}")]
+    InvalidAdsLicenseOnlineInfo(#[from] AdsLicenseOnlineInfoError),
+    /// Invalid Ring 0 real-time CPU settings format or content.
+    #[error("Invalid Ring 0 real-time CPU settings: {0}")]
+    InvalidAdsR0CpuSettings(#[from] AdsR0CpuSettingsError),
+    /// Invalid Ring 0 real-time CPU latency format or content.
+    #[error("Invalid Ring 0 real-time CPU latency: {0}")]
+    InvalidAdsR0CpuLatency(#[from] AdsR0CpuLatencyError),
     /// Invalid ADS data length format or content (not header or return code).
     #[error("Unexpected data length: expected {expected} bytes, got {got} bytes")]
     UnexpectedDataLength { expected: usize, got: usize },
@@ -255,4 +264,22 @@ pub enum AdsSystemStateError {
 pub enum AdsProductVersionError {
     #[error("Payload too short: expected at least {expected} bytes, got {got}")]
     TooShort { expected: usize, got: usize },
+}
+
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum AdsLicenseOnlineInfoError {
+    #[error("Unexpected length: expected {expected} bytes, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
+}
+
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum AdsR0CpuSettingsError {
+    #[error("Unexpected length: expected {expected} bytes, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
+}
+
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum AdsR0CpuLatencyError {
+    #[error("Unexpected length: expected {expected} bytes, got {got}")]
+    UnexpectedLength { expected: usize, got: usize },
 }

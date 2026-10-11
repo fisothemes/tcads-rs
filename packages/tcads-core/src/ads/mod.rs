@@ -33,8 +33,9 @@ pub use device_state::{AdsState, DeviceState};
 pub use device_version::AdsDeviceVersion;
 pub use error::{
     AdsCommandError, AdsDeviceVersionError, AdsError, AdsFileHandleError, AdsFileStatusError,
-    AdsHeaderError, AdsNotificationAttribError, AdsNotificationHandleError, AdsProductVersionError,
-    AdsReturnCodeError, AdsStateError, AdsStringError, AdsSymbolInfoError,
+    AdsHeaderError, AdsLicenseOnlineInfoError, AdsNotificationAttribError,
+    AdsNotificationHandleError, AdsProductVersionError, AdsR0CpuLatencyError,
+    AdsR0CpuSettingsError, AdsReturnCodeError, AdsStateError, AdsStringError, AdsSymbolInfoError,
     AdsSymbolUploadInfoError, AdsSystemStateError, AdsTransModeError, AdsTypeInfoError,
     GuidParseError, LogEntryError, LogMessageTypeError, StateFlagError, SumError,
     WindowsFileTimeError,
