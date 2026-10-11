@@ -82,3 +82,27 @@ impl<S: AsyncRead + AsyncWrite + Unpin> AmsStream<S> {
         &mut self.stream
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures::executor::block_on;
+    use futures::io::Cursor;
+    use tcads_core::AmsCommand;
+
+    #[test]
+    fn test_stream_read_write_roundtrip() {
+        let mut buffer = Vec::new();
+        {
+            let mut stream = AmsStream::new(Cursor::new(&mut buffer));
+            let frame = AmsFrame::new(AmsCommand::PortConnect, [0x01, 0x01]);
+            block_on(stream.write_frame(&frame)).unwrap();
+        }
+
+        let mut stream = AmsStream::new(Cursor::new(buffer));
+        let received = block_on(stream.read_frame()).expect("Read should succeed");
+
+        assert_eq!(received.header().command(), AmsCommand::PortConnect);
+        assert_eq!(received.payload(), &[0x01, 0x01]);
+    }
+}

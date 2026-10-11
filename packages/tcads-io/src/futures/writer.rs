@@ -58,3 +58,41 @@ impl<W: AsyncWrite + Unpin> AmsWriter<W> {
         self.writer.get_mut()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures::executor::block_on;
+    use futures::io::Cursor;
+    use tcads_core::AmsCommand;
+
+    #[test]
+    fn test_write_frame_simple() {
+        let mut buffer = Vec::new();
+        {
+            let mut writer = AmsWriter::new(Cursor::new(&mut buffer));
+            let frame = AmsFrame::new(AmsCommand::AdsCommand, [0xAA, 0xBB]);
+            block_on(writer.write_frame(&frame)).expect("Write failed");
+        }
+
+        let expected = [
+            0x00, 0x00, // AdsCommand
+            0x02, 0x00, 0x00, 0x00, // length 2
+            0xAA, 0xBB,
+        ];
+        assert_eq!(buffer, expected);
+    }
+
+    #[test]
+    fn test_write_large_frame() {
+        let mut buffer = Vec::new();
+        {
+            let mut writer = AmsWriter::new(Cursor::new(&mut buffer));
+            let payload = vec![0x11; 10_000];
+            let frame = AmsFrame::new(AmsCommand::PortConnect, payload.clone());
+            block_on(writer.write_frame(&frame)).expect("Write failed");
+        }
+
+        assert_eq!(&buffer[6..], &vec![0x11; 10_000][..]);
+    }
+}

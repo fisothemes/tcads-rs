@@ -85,3 +85,74 @@ impl<R: AsyncRead + Unpin> AmsReader<R> {
         self.reader.get_mut()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures::executor::block_on;
+    use futures::io::Cursor;
+    use tcads_core::AmsCommand;
+
+    #[test]
+    fn read_frame_reads_one_frame() {
+        let data = AmsFrame::new(AmsCommand::PortConnect, [0x01, 0x02]).to_vec();
+        let mut reader = AmsReader::new(Cursor::new(data));
+
+        let frame = block_on(reader.read_frame()).expect("Should read valid frame");
+
+        assert_eq!(frame.header().command(), AmsCommand::PortConnect);
+        assert_eq!(frame.header().length(), 2);
+        assert_eq!(frame.payload(), &[0x01, 0x02]);
+    }
+
+    #[test]
+    fn test_clean_eof() {
+        let mut reader = AmsReader::new(Cursor::new(Vec::<u8>::new()));
+
+        let err = block_on(reader.read_frame()).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::UnexpectedEof);
+    }
+
+    #[test]
+    fn test_dirty_eof_in_header() {
+        // Only 2 bytes of a 6-byte header
+        let partial = vec![0x00, 0x10];
+        let mut reader = AmsReader::new(Cursor::new(partial));
+
+        let err = block_on(reader.read_frame()).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::UnexpectedEof);
+    }
+
+    #[test]
+    fn test_payload_too_large() {
+        let mut header = [0u8; AmsTcpHeader::LENGTH];
+        let bad_len = (AMS_FRAME_MAX_LEN as u32 + 1).to_le_bytes();
+        header[2..6].copy_from_slice(&bad_len);
+
+        let mut reader = AmsReader::new(Cursor::new(header.to_vec()));
+
+        let err = block_on(reader.read_frame()).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        assert!(err.to_string().contains("Payload too large"));
+    }
+
+    #[test]
+    fn read_multiple_frames() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&AmsFrame::new(AmsCommand::AdsCommand, [0xAA]).to_vec());
+        data.extend_from_slice(&AmsFrame::new(AmsCommand::GetLocalNetId, [0xBB, 0xCC]).to_vec());
+
+        let mut reader = AmsReader::new(Cursor::new(data));
+
+        let f1 = block_on(reader.read_frame()).unwrap();
+        assert_eq!(f1.header().command(), AmsCommand::AdsCommand);
+        assert_eq!(f1.payload(), &[0xAA]);
+
+        let f2 = block_on(reader.read_frame()).unwrap();
+        assert_eq!(f2.header().command(), AmsCommand::GetLocalNetId);
+        assert_eq!(f2.payload(), &[0xBB, 0xCC]);
+
+        let err = block_on(reader.read_frame()).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::UnexpectedEof);
+    }
+}
