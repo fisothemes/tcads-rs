@@ -19,7 +19,7 @@ impl<R: AsyncRead + Unpin> AmsReader<R> {
         }
     }
 
-    /// Creates a new AmsReader with a specific buffer capacity.
+    /// Creates a new [`AmsReader`] with a specific buffer capacity.
     pub fn with_capacity(reader: R, capacity: usize) -> Self {
         Self {
             reader: BufReader::with_capacity(capacity, reader),
@@ -63,7 +63,7 @@ impl<R: AsyncRead + Unpin> AmsReader<R> {
     ///
     /// # Note
     ///
-    /// Any leftover data in the internal buffer is lost.
+    /// Any leftover data in the internal buffer is discarded.
     pub fn into_inner(self) -> R {
         self.reader.into_inner()
     }
@@ -72,7 +72,7 @@ impl<R: AsyncRead + Unpin> AmsReader<R> {
     ///
     /// # Note
     ///
-    /// It is inadvisable to directly read from the underlying reader
+    /// It is not advisable to directly read from the underlying reader
     pub fn get_ref(&self) -> &R {
         self.reader.get_ref()
     }

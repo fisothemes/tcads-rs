@@ -63,3 +63,7 @@ pub mod blocking;
 /// Asynchronous I/O utilizing [`tokio::net`](::tokio::net) and [`tokio::io`](::tokio::io).
 #[cfg(feature = "tokio")]
 pub mod tokio;
+
+/// Runtime-agnostic asynchronous I/O utilizing [`futures::io`].
+#[cfg(feature = "futures")]
+pub mod futures;

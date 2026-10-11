@@ -49,7 +49,7 @@ pub struct AmsStream<S: AsyncRead + AsyncWrite + Unpin = TcpStream> {
 }
 
 impl<S: AsyncRead + AsyncWrite + Unpin> AmsStream<S> {
-    /// Creates a new instance of the AmsStream given a stream.
+    /// Creates a new instance of the [`AmsStream`] given a stream.
     pub fn new(stream: S) -> Self {
         Self {
             stream,

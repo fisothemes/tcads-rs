@@ -14,14 +14,14 @@ pub struct AmsWriter<W: AsyncWrite + Unpin = TcpStream> {
 }
 
 impl<W: AsyncWrite + Unpin> AmsWriter<W> {
-    /// Creates a new AmsWriter with [default buffering](BufWriter::new).
+    /// Creates a new [`AmsWriter`] with [default buffering](BufWriter::new).
     pub fn new(writer: W) -> Self {
         Self {
             writer: BufWriter::new(writer),
         }
     }
 
-    /// Creates a new AmsWriter with a specific buffer capacity.
+    /// Creates a new [`AmsWriter`] with a specific buffer capacity.
     pub fn with_capacity(writer: W, capacity: usize) -> Self {
         Self {
             writer: BufWriter::with_capacity(capacity, writer),
@@ -44,7 +44,7 @@ impl<W: AsyncWrite + Unpin> AmsWriter<W> {
     ///
     /// # Note
     ///
-    /// Any leftover data in the internal buffer is lost.
+    /// Any leftover data in the internal buffer is discarded.
     pub fn into_inner(self) -> W {
         self.writer.into_inner()
     }

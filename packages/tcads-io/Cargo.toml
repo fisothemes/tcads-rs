@@ -14,10 +14,12 @@ version.workspace = true
 default = ["blocking"]
 blocking = []
 tokio = ["dep:tokio"]
+futures = ["dep:futures"]
 
 [dependencies]
+futures = { version = "0.3", optional = true, features = ["std", "io-compat"] }
 tcads-core = { workspace = true }
-tokio = { workspace = true, features = ["net", "rt", "io-util", "sync", "time", "macros"], optional = true }
+tokio = { workspace = true, optional = true, features = ["net", "rt", "io-util", "sync", "time", "macros"],  }
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["full"] }
