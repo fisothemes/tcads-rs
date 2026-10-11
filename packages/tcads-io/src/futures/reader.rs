@@ -1,5 +1,7 @@
-use futures::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
-use std::io;
+use futures::io::{self, AsyncBufReadExt, AsyncRead, AsyncReadExt, BufReader};
+use futures::stream::Stream;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use tcads_core::{AMS_FRAME_MAX_LEN, AmsFrame, AmsTcpHeader};
 
 /// A buffered reader specialised for parsing AMS frames from an asynchronous byte stream.
@@ -86,9 +88,26 @@ impl<R: AsyncRead + Unpin> AmsReader<R> {
     }
 }
 
+impl<R: AsyncRead + Unpin> Stream for AmsReader<R> {
+    type Item = io::Result<AmsFrame>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let fut = self.read_frame();
+        futures::pin_mut!(fut);
+
+        match fut.poll(cx) {
+            Poll::Ready(Ok(frame)) => Poll::Ready(Some(Ok(frame))),
+            Poll::Ready(Err(e)) if e.kind() == io::ErrorKind::UnexpectedEof => Poll::Ready(None),
+            Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::StreamExt;
     use futures::executor::block_on;
     use futures::io::Cursor;
     use tcads_core::AmsCommand;
@@ -154,5 +173,22 @@ mod tests {
 
         let err = block_on(reader.read_frame()).unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::UnexpectedEof);
+    }
+
+    #[test]
+    fn stream_yields_frames_then_ends() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&AmsFrame::new(AmsCommand::AdsCommand, [0x01]).to_vec());
+        data.extend_from_slice(&AmsFrame::new(AmsCommand::PortConnect, [0x02, 0x03]).to_vec());
+
+        let mut reader = AmsReader::new(Cursor::new(data));
+
+        let f1 = block_on(reader.next()).unwrap().unwrap();
+        assert_eq!(f1.payload(), &[0x01]);
+
+        let f2 = block_on(reader.next()).unwrap().unwrap();
+        assert_eq!(f2.payload(), &[0x02, 0x03]);
+
+        assert!(block_on(reader.next()).is_none());
     }
 }
