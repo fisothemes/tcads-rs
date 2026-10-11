@@ -13,10 +13,11 @@ version.workspace = true
 [features]
 default = ["blocking"]
 blocking = ["tcads-io/blocking"]
-tokio = ["tcads-io/tokio", "dep:tokio", "dep:futures-core"]
+tokio = ["tcads-io/tokio", "dep:tokio", "dep:futures-core", "dep:futures"]
 
 [dependencies]
 chrono = { workspace = true }
+futures = { workspace = true, optional = true, features = ["io-compat"] }
 futures-core = { workspace = true, optional = true }
 indexmap = { workspace = true }
 serde = { workspace = true }

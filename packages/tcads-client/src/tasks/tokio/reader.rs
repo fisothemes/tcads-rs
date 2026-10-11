@@ -2,11 +2,12 @@ use super::{
     AdsNotificationDispatcher, AmsRequestDispatchKey, AmsRequestDispatcher,
     RouterNotificationDispatcher,
 };
+use futures::StreamExt;
 use std::sync::Arc;
 use tcads_core::protocol::{AdsDeviceNotification, RouterNotification};
 use tcads_core::{AdsCommand, AdsHeader, AmsCommand, RouterState};
 use tcads_io::tokio::AmsReader;
-use tokio::io::{self, AsyncRead};
+use tokio::io::AsyncRead;
 use tokio::task::JoinHandle;
 
 /// Spawns a dedicated reader task that routes incoming [`AmsFrame`](tcads_core::AmsFrame)s to the
@@ -58,10 +59,9 @@ async fn handle<R: AsyncRead + Unpin>(
     ads_notifs: &AdsNotificationDispatcher,
     router_notifs: &RouterNotificationDispatcher,
 ) -> crate::Result<()> {
-    loop {
-        let frame = match reader.read_frame().await {
+    while let Some(item) = reader.next().await {
+        let frame = match item {
             Ok(frame) => frame,
-            Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => break,
             Err(_) => continue,
         };
 
