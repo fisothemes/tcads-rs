@@ -595,7 +595,12 @@ impl AdsDevice {
         let (err_code, handle) = AdsAddDeviceNotificationResponse::parse_payload(payload)?;
         Self::check_result(err_code)?;
 
-        self.inner.ads_notifs.promote(invoke_id, handle)?;
+        // The reader task has already promoted the subscription under the
+        // response's source address, before it read any further frames.
+        // Remember that address so a delete sent to `target` finds it.
+        self.inner
+            .ads_notifs
+            .record_route(target, *header.source())?;
 
         Ok((rx, handle))
     }
@@ -623,7 +628,7 @@ impl AdsDevice {
         let err_code = AdsDeleteDeviceNotificationResponse::parse_payload(payload)?;
         Self::check_result(err_code)?;
 
-        self.inner.ads_notifs.remove(handle)?;
+        self.inner.ads_notifs.remove(target, handle)?;
 
         Ok(())
     }
@@ -968,7 +973,11 @@ impl AdsDevice {
 
         self.inner
             .ads_notifs
-            .promote_batch(invoke_id, &parsed_results)?;
+            .record_route(target, *header.source())?;
+
+        self.inner
+            .ads_notifs
+            .promote_batch(invoke_id, *header.source(), &parsed_results)?;
 
         let final_output = receivers
             .into_iter()
@@ -1019,7 +1028,7 @@ impl AdsDevice {
 
         for (handle, result) in handles.into_iter().zip(resp.iter()) {
             if result.is_ok() {
-                let _ = self.inner.ads_notifs.remove(*handle.borrow());
+                let _ = self.inner.ads_notifs.remove(target, *handle.borrow());
             }
         }
 

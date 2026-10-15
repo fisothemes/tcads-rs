@@ -634,7 +634,13 @@ impl AdsDevice {
         let (err_code, handle) = AdsAddDeviceNotificationResponse::parse_payload(payload)?;
         Self::check_result(err_code)?;
 
-        self.inner.ads_notifs.promote(invoke_id, handle).await;
+        // The reader task has already promoted the subscription under the
+        // response's source address, before it read any further frames.
+        // Remember that address so a delete sent to `target` finds it.
+        self.inner
+            .ads_notifs
+            .record_route(target, *header.source())
+            .await;
 
         Ok((rx, handle))
     }
@@ -661,7 +667,7 @@ impl AdsDevice {
         let err_code = AdsDeleteDeviceNotificationResponse::parse_payload(payload)?;
         Self::check_result(err_code)?;
 
-        self.inner.ads_notifs.remove(handle).await;
+        self.inner.ads_notifs.remove(target, handle).await;
 
         Ok(())
     }
@@ -1009,7 +1015,12 @@ impl AdsDevice {
 
         self.inner
             .ads_notifs
-            .promote_batch(invoke_id, &parsed_results)
+            .record_route(target, *header.source())
+            .await;
+
+        self.inner
+            .ads_notifs
+            .promote_batch(invoke_id, *header.source(), &parsed_results)
             .await?;
 
         let final_output = receivers
@@ -1063,7 +1074,7 @@ impl AdsDevice {
 
         for (handle, result) in handles.into_iter().zip(resp.iter()) {
             if result.is_ok() {
-                let _ = self.inner.ads_notifs.remove(*handle.borrow()).await;
+                let _ = self.inner.ads_notifs.remove(target, *handle.borrow()).await;
             }
         }
 
@@ -1235,5 +1246,112 @@ impl Eq for AdsDevice {}
 impl std::hash::Hash for AdsDevice {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         Arc::as_ptr(&self.inner).hash(state);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tcads_core::WindowsFileTime;
+    use tcads_core::protocol::{
+        AdsAddDeviceNotificationResponse, AdsDeleteDeviceNotificationResponse,
+        AdsDeviceNotificationOwned, AdsStampHeaderOwned,
+    };
+    use tcads_core::{AdsHeader, AdsReturnCode, IndexOffset};
+    use tcads_io::tokio::AmsStream;
+
+    /// Subscribes to `127.0.0.1.1.1:100` through a fake router that answers from
+    /// `device`, the way TwinCAT does, then deletes the subscription.
+    ///
+    /// Checks that the first sample (sent straight after the response) arrives, and
+    /// that the delete closes the receiver.
+    async fn loopback_round_trip(client: AmsAddr, device: AmsAddr) {
+        let handle = NotificationHandle::from(1u32);
+
+        let (client_io, router_io) = tokio::io::duplex(64 * 1024);
+        let (reader, writer) = AmsStream::new(client_io).split();
+        let ads = AdsDevice::new(reader, writer, client, Duration::from_secs(2));
+
+        let router = tokio::spawn(async move {
+            let (mut rx, mut tx) = AmsStream::new(router_io).split();
+
+            // Add: respond, then send the first sample straight away.
+            let request = rx.read_frame().await.unwrap();
+            let (header, _) = AdsHeader::parse_prefix(request.payload()).unwrap();
+            let response = AdsAddDeviceNotificationResponse::new(
+                client,
+                device,
+                header.invoke_id(),
+                AdsReturnCode::Ok,
+                handle,
+            );
+            tx.write_frame(&response.into_frame()).await.unwrap();
+
+            let sample = AdsNotificationSampleOwned::new(handle, vec![0xAB; 4]);
+            let stamp = AdsStampHeaderOwned::new(WindowsFileTime::now(), vec![sample]);
+            let notification = AdsDeviceNotificationOwned::new(client, device, vec![stamp]);
+            tx.write_frame(&notification.into_frame()).await.unwrap();
+
+            // Delete.
+            let request = rx.read_frame().await.unwrap();
+            let (header, _) = AdsHeader::parse_prefix(request.payload()).unwrap();
+            let response = AdsDeleteDeviceNotificationResponse::new(
+                client,
+                device,
+                header.invoke_id(),
+                AdsReturnCode::Ok,
+            );
+            tx.write_frame(&response.into_frame()).await.unwrap();
+
+            // Keep the stream open until the test is done.
+            rx.read_frame().await.ok();
+        });
+
+        let target = AmsAddr::from_local(100u16);
+        let attrib = AdsNotificationAttrib::new(
+            4,
+            AdsTransMode::ServerOnChange,
+            Duration::ZERO,
+            Duration::ZERO,
+        );
+        let (mut samples, handle) = ads
+            .add_notification(
+                target,
+                IndexGroup::SYSTEM_LOGGER,
+                IndexOffset::new(0),
+                attrib,
+            )
+            .await
+            .unwrap();
+
+        let sample = tokio::time::timeout(Duration::from_secs(2), samples.recv())
+            .await
+            .expect("first sample was dropped")
+            .unwrap();
+        assert_eq!(sample.data(), &[0xAB; 4]);
+
+        ads.delete_notification(target, handle).await.unwrap();
+        let closed = tokio::time::timeout(Duration::from_secs(2), samples.recv())
+            .await
+            .expect("delete did not close the receiver");
+        assert!(closed.is_none());
+
+        router.abort();
+    }
+
+    /// Local router: the client and the device share the router's Net ID.
+    #[tokio::test]
+    async fn loopback_target_on_local_router() {
+        let net_id: AmsNetId = "5.164.43.121.1.1".parse().unwrap();
+        loopback_round_trip(AmsAddr::new(net_id, 32800u16), AmsAddr::new(net_id, 100u16)).await;
+    }
+
+    /// Remote router (`connect_remote`): the client's route Net ID has nothing in
+    /// common with the device's, so it cannot stand in for `127.0.0.1.1.1`.
+    #[tokio::test]
+    async fn loopback_target_on_remote_router() {
+        let client: AmsAddr = "192.168.137.1.1.1:32777".parse().unwrap();
+        let device: AmsAddr = "39.139.122.3.1.1:100".parse().unwrap();
+        loopback_round_trip(client, device).await;
     }
 }

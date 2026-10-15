@@ -5,7 +5,9 @@ use super::{
 use std::io::Read;
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
-use tcads_core::protocol::{AdsDeviceNotification, RouterNotification};
+use tcads_core::protocol::{
+    AdsAddDeviceNotificationResponse, AdsDeviceNotification, RouterNotification,
+};
 use tcads_core::{AdsCommand, AdsHeader, AmsCommand, RouterState};
 use tcads_io::blocking::AmsReader;
 
@@ -71,7 +73,7 @@ fn handle<R: Read>(
                 ams_requests.complete(AmsRequestDispatchKey::GetLocalNetId, frame)?
             }
             AmsCommand::AdsCommand => {
-                let Ok((header, _)) = AdsHeader::parse_prefix(frame.payload()) else {
+                let Ok((header, data)) = AdsHeader::parse_prefix(frame.payload()) else {
                     continue;
                 };
 
@@ -81,9 +83,27 @@ fn handle<R: Read>(
                             continue;
                         };
 
+                        // Handles are only unique per device, so route on the sender too.
+                        let source = *header.source();
                         for (_, sample) in notif.iter_samples() {
-                            ads_notifs.dispatch(sample.handle(), sample.to_owned())?;
+                            ads_notifs.dispatch(source, sample.handle(), sample.to_owned())?;
                         }
+                    }
+                    // Promote here, before the next frame is read. TwinCAT sends the first
+                    // sample right after this response, and the caller waiting on the
+                    // response may not run before the reader dispatches that sample.
+                    AdsCommand::AdsAddDeviceNotification => {
+                        if header.error_code().is_success()
+                            && let Ok((code, handle)) =
+                                AdsAddDeviceNotificationResponse::parse_payload(data)
+                            && code.is_success()
+                        {
+                            ads_notifs.promote(header.invoke_id(), *header.source(), handle)?;
+                        }
+                        ams_requests.complete(
+                            AmsRequestDispatchKey::AdsCommand(header.invoke_id()),
+                            frame,
+                        )?
                     }
                     _ => ams_requests
                         .complete(AmsRequestDispatchKey::AdsCommand(header.invoke_id()), frame)?,
@@ -120,8 +140,8 @@ mod tests {
     use super::*;
     use std::io::Cursor;
     use std::sync::mpsc::{self, Receiver};
-    use tcads_core::AmsFrame;
     use tcads_core::ads::NotificationHandle;
+    use tcads_core::{AmsAddr, AmsFrame};
 
     fn make_dispatchers() -> (
         Arc<AmsRequestDispatcher>,
@@ -201,7 +221,9 @@ mod tests {
         // Register a notification subscription
         let handle = NotificationHandle::from(1u32);
         let notif_rx = ads_notifs.pre_register(1).unwrap();
-        ads_notifs.promote(1, handle).unwrap();
+        ads_notifs
+            .promote(1, AmsAddr::from_local(851u16), handle)
+            .unwrap();
 
         // Register a router subscriber
         let router_rx = router_notifs.subscribe().unwrap();
@@ -251,7 +273,9 @@ mod tests {
 
         let handle = NotificationHandle::from(1u32);
         let notif_rx = ads_notifs.pre_register(1).unwrap();
-        ads_notifs.promote(1, handle).unwrap();
+        ads_notifs
+            .promote(1, AmsAddr::from_local(851u16), handle)
+            .unwrap();
 
         let router_rx = router_notifs.subscribe().unwrap();
 

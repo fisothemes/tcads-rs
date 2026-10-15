@@ -4,7 +4,9 @@ use super::{
 };
 use futures::StreamExt;
 use std::sync::Arc;
-use tcads_core::protocol::{AdsDeviceNotification, RouterNotification};
+use tcads_core::protocol::{
+    AdsAddDeviceNotificationResponse, AdsDeviceNotification, RouterNotification,
+};
 use tcads_core::{AdsCommand, AdsHeader, AmsCommand, RouterState};
 use tcads_io::tokio::AmsReader;
 use tokio::io::AsyncRead;
@@ -77,7 +79,7 @@ async fn handle<R: AsyncRead + Unpin>(
                     .await?
             }
             AmsCommand::AdsCommand => {
-                let Ok((header, _)) = AdsHeader::parse_prefix(frame.payload()) else {
+                let Ok((header, data)) = AdsHeader::parse_prefix(frame.payload()) else {
                     continue;
                 };
 
@@ -87,11 +89,30 @@ async fn handle<R: AsyncRead + Unpin>(
                             continue;
                         };
 
+                        // Handles are only unique per device, so route on the sender too.
+                        let source = *header.source();
                         for (_, sample) in notif.iter_samples() {
                             ads_notifs
-                                .dispatch(sample.handle(), sample.to_owned())
+                                .dispatch(source, sample.handle(), sample.to_owned())
                                 .await;
                         }
+                    }
+                    // Promote here, before the next frame is read. TwinCAT sends the first
+                    // sample right after this response, and the caller waiting on the
+                    // response may not run before the reader dispatches that sample.
+                    AdsCommand::AdsAddDeviceNotification => {
+                        if header.error_code().is_success()
+                            && let Ok((code, handle)) =
+                                AdsAddDeviceNotificationResponse::parse_payload(data)
+                            && code.is_success()
+                        {
+                            ads_notifs
+                                .promote(header.invoke_id(), *header.source(), handle)
+                                .await;
+                        }
+                        ams_requests
+                            .complete(AmsRequestDispatchKey::AdsCommand(header.invoke_id()), frame)
+                            .await?
                     }
                     _ => {
                         ams_requests
@@ -129,8 +150,8 @@ async fn handle<R: AsyncRead + Unpin>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcads_core::AmsFrame;
     use tcads_core::ads::NotificationHandle;
+    use tcads_core::{AmsAddr, AmsFrame};
     use tokio::io::{AsyncWriteExt, duplex};
     use tokio::sync::mpsc;
 
@@ -222,7 +243,9 @@ mod tests {
 
         let handle = NotificationHandle::from(1u32);
         let mut notif_rx = ads_notifs.pre_register(1).await;
-        ads_notifs.promote(1, handle).await;
+        ads_notifs
+            .promote(1, AmsAddr::from_local(851u16), handle)
+            .await;
 
         let mut router_rx = router_notifs.subscribe().await;
 
@@ -276,7 +299,9 @@ mod tests {
 
         let handle = NotificationHandle::from(1u32);
         let mut notif_rx = ads_notifs.pre_register(1).await;
-        ads_notifs.promote(1, handle).await;
+        ads_notifs
+            .promote(1, AmsAddr::from_local(851u16), handle)
+            .await;
 
         let mut router_rx = router_notifs.subscribe().await;
 
@@ -312,5 +337,46 @@ mod tests {
 
         assert_eq!(router_rx.recv().await.unwrap(), RouterState::Stop);
         assert_eq!(router_rx.recv().await.unwrap(), RouterState::Start);
+    }
+
+    /// The PLC (851) and the logger (100) both hand out handle 1. Each
+    /// notification frame must reach only the subscriber on the port that sent it.
+    #[tokio::test]
+    async fn notifications_are_routed_by_source_and_handle() {
+        use tcads_core::WindowsFileTime;
+        use tcads_core::protocol::{
+            AdsDeviceNotificationOwned, AdsNotificationSampleOwned, AdsStampHeaderOwned,
+        };
+
+        let (requests, ads_notifs, router_notifs, _write_rx) = make_dispatchers();
+        let plc = AmsAddr::from_local(851u16);
+        let logger = AmsAddr::from_local(100u16);
+        let client = AmsAddr::from_local(32800u16);
+        let handle = NotificationHandle::from(1u32);
+
+        let mut plc_rx = ads_notifs.pre_register(1).await;
+        ads_notifs.promote(1, plc, handle).await;
+        let mut logger_rx = ads_notifs.pre_register(2).await;
+        ads_notifs.promote(2, logger, handle).await;
+
+        let frame = |source: AmsAddr, data: u8| {
+            let sample = AdsNotificationSampleOwned::new(handle, vec![data; 4]);
+            let stamp = AdsStampHeaderOwned::new(WindowsFileTime::now(), vec![sample]);
+            AdsDeviceNotificationOwned::new(client, source, vec![stamp]).into_frame()
+        };
+
+        run_handle(
+            vec![frame(logger, 0xBB), frame(plc, 0xAA)],
+            &requests,
+            &ads_notifs,
+            &router_notifs,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(plc_rx.recv().await.unwrap().data(), &[0xAA; 4]);
+        assert_eq!(logger_rx.recv().await.unwrap().data(), &[0xBB; 4]);
+        assert!(plc_rx.try_recv().is_err());
+        assert!(logger_rx.try_recv().is_err());
     }
 }
