@@ -35,6 +35,7 @@
 //!
 //! ```console
 //! curl -X POST http://127.0.0.1:9090/methods/MAIN/fbMath/SumValues -H 'content-type: application/json' -d '[50, 25]'
+//! curl -X POST http://127.0.0.1:9090/methods/MAIN/fbMath/DivideValues -H 'content-type: application/json' -d '[50, 25]'
 //! ```
 //!
 //! Subscribe to value changes (Server-Sent Events)
@@ -53,7 +54,6 @@ use axum::{
     },
     routing::get,
 };
-use serde_json::Value as JsonValue;
 use std::convert::Infallible;
 use std::time::Duration;
 use tcads::client::Error as ClientError;
@@ -86,15 +86,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn read_symbol(
     Path(path): Path<String>,
     State(device): State<AdsRuntime>,
-) -> Result<Json<JsonValue>, AppError> {
+) -> Result<Json<PlcValue>, AppError> {
     let value: PlcValue = device.read_value(path.replace('/', ".")).await?;
-    Ok(Json(serde_json::to_value(&value)?))
+    Ok(Json(value))
 }
 
 async fn write_symbol(
     Path(path): Path<String>,
     State(device): State<AdsRuntime>,
-    Json(payload): Json<JsonValue>,
+    Json(payload): Json<PlcValue>,
 ) -> Result<StatusCode, AppError> {
     device.write_value(path.replace('/', "."), payload).await?;
     Ok(StatusCode::NO_CONTENT)
@@ -111,15 +111,15 @@ async fn symbol_info(
 async fn invoke_method(
     Path(path): Path<String>,
     State(device): State<AdsRuntime>,
-    Json(inputs): Json<JsonValue>,
-) -> Result<Json<JsonValue>, AppError> {
+    Json(inputs): Json<PlcValue>,
+) -> Result<Json<PlcValue>, AppError> {
     let (fb, method) = path
         .rsplit_once('/')
         .ok_or_else(|| AppError::new(StatusCode::BAD_REQUEST, "expected '<fb>/<method>'"))?;
 
     let output: PlcValue = device.rpc(fb.replace('/', "."), method, &inputs).await?;
 
-    Ok(Json(serde_json::to_value(&output)?))
+    Ok(Json(output))
 }
 
 async fn subscribe_symbol(
@@ -213,11 +213,5 @@ impl From<SerdeError> for AppError {
             ),
             other => Self::new(StatusCode::UNPROCESSABLE_ENTITY, other.to_string()),
         }
-    }
-}
-
-impl From<serde_json::Error> for AppError {
-    fn from(err: serde_json::Error) -> Self {
-        Self::new(StatusCode::BAD_REQUEST, format!("invalid JSON: {err}"))
     }
 }
