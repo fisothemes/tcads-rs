@@ -205,7 +205,7 @@ mod tests {
     fn signed_to_int_lossless_widening() {
         assert_eq!(i32::try_from(SignedInteger::SInt(-7)).unwrap(), -7);
         assert_eq!(i32::try_from(SignedInteger::Int(-300)).unwrap(), -300);
-        assert_eq!(i64::try_from(SignedInteger::DInt(-1)).unwrap(), -1);
+        assert_eq!(i64::from(SignedInteger::DInt(-1)), -1);
         assert_eq!(u8::try_from(SignedInteger::SInt(127)).unwrap(), 127);
         assert_eq!(u64::try_from(SignedInteger::Int(32_767)).unwrap(), 32_767);
     }
@@ -244,10 +244,7 @@ mod tests {
             u32::try_from(UnsignedInteger::UInt(65_535)).unwrap(),
             65_535
         );
-        assert_eq!(
-            u64::try_from(UnsignedInteger::UDInt(u32::MAX)).unwrap(),
-            u32::MAX as u64
-        );
+        assert_eq!(u64::from(UnsignedInteger::UDInt(u32::MAX)), u32::MAX as u64);
         assert_eq!(i64::try_from(UnsignedInteger::Byte(0)).unwrap(), 0);
     }
 

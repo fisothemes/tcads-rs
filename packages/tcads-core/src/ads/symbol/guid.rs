@@ -121,7 +121,7 @@ impl FromStr for Guid {
         }
 
         let mut bytes = [0u8; 16];
-        for (i, chunk) in s.as_bytes().chunks_exact(2).enumerate() {
+        for (i, chunk) in s.as_bytes().as_chunks::<2>().0.iter().enumerate() {
             let byte = u8::from_str_radix(
                 std::str::from_utf8(chunk).map_err(|_| GuidParseError::InvalidHex)?,
                 16,

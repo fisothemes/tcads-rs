@@ -17,7 +17,9 @@ pub fn parse_online_info_entries(data: &[u8]) -> crate::Result<Vec<AdsLicenseOnl
         .into());
     }
 
-    data.chunks_exact(AdsLicenseOnlineInfo::LENGTH)
+    data.as_chunks::<{ AdsLicenseOnlineInfo::LENGTH }>()
+        .0
+        .iter()
         .map(|chunk| {
             AdsLicenseOnlineInfo::try_from_slice(chunk).map_err(|e| AdsError::from(e).into())
         })

@@ -615,13 +615,13 @@ impl<'ser, P: TypeProvider> Serializer for AdsRpcSerializer<'ser, P> {
     }
 
     fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
-        if let Some(len) = len {
-            if self.fields.len() != len {
-                return Err(crate::Error::ShapeMismatch {
-                    expected: self.fields.len(),
-                    got: len,
-                });
-            }
+        if let Some(len) = len
+            && self.fields.len() != len
+        {
+            return Err(crate::Error::ShapeMismatch {
+                expected: self.fields.len(),
+                got: len,
+            });
         }
         Ok(AdsRpcFieldSerializer::new(
             self.fields,

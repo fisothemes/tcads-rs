@@ -84,7 +84,7 @@ impl<'de, P: TypeProvider> AdsDeserializer<'de, P> {
     /// Decodes a `WSTRING`'s raw bytes (null-terminated UTF-16LE) to UTF-8.
     fn read_wstring(input: &'de [u8]) -> Cow<'de, str> {
         let mut null_pos = input.len();
-        for (i, chunk) in input.chunks_exact(2).enumerate() {
+        for (i, chunk) in input.as_chunks::<2>().0.iter().enumerate() {
             if chunk[0] == 0 && chunk[1] == 0 {
                 null_pos = i * 2;
                 break;
