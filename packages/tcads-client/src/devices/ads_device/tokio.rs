@@ -1175,7 +1175,6 @@ impl Stream for StateReceiver {
 }
 
 /// A universal trait for high-level devices that represent a specific TwinCAT subsystem.
-/// A universal trait for high-level devices that represent a specific TwinCAT subsystem.
 pub trait AdsDeviceExt: Send + Sync {
     /// Returns a reference to the underlying transport device.
     fn device(&self) -> &AdsDevice;
@@ -1224,6 +1223,69 @@ pub trait AdsDeviceExt: Send + Sync {
         &self,
     ) -> impl Future<Output = crate::Result<(StateReceiver, NotificationHandle)>> + Send + '_ {
         self.device().subscribe_state(self.target())
+    }
+
+    /// Reads `length` bytes from this device at the given index group/offset.
+    fn read(
+        &self,
+        index_group: IndexGroup,
+        index_offset: IndexOffset,
+        length: u32,
+    ) -> impl Future<Output = crate::Result<Vec<u8>>> + Send + '_ {
+        self.device()
+            .read(self.target(), index_group, index_offset, length)
+    }
+
+    /// Writes `data` to this device at the given index group/offset.
+    fn write(
+        &self,
+        index_group: IndexGroup,
+        index_offset: IndexOffset,
+        data: impl Into<Vec<u8>>,
+    ) -> impl Future<Output = crate::Result<()>> + Send + '_ {
+        self.device()
+            .write(self.target(), index_group, index_offset, data.into())
+    }
+
+    /// Combined read/write in a single round-trip on this device.
+    ///
+    /// Writes `write_data` then reads `read_length` bytes back.
+    fn read_write(
+        &self,
+        index_group: IndexGroup,
+        index_offset: IndexOffset,
+        read_length: u32,
+        write_data: impl Into<Vec<u8>>,
+    ) -> impl Future<Output = crate::Result<Vec<u8>>> + Send + '_ {
+        self.device().read_write(
+            self.target(),
+            index_group,
+            index_offset,
+            read_length,
+            write_data.into(),
+        )
+    }
+
+    /// Adds a device notification on this device.
+    fn add_notification(
+        &self,
+        index_group: IndexGroup,
+        index_offset: IndexOffset,
+        notif_attr: AdsNotificationAttrib,
+    ) -> impl Future<
+        Output = crate::Result<(Receiver<AdsNotificationSampleOwned>, NotificationHandle)>,
+    > + Send
+    + '_ {
+        self.device()
+            .add_notification(self.target(), index_group, index_offset, notif_attr)
+    }
+
+    /// Deletes a device notification on this device.
+    fn delete_notification(
+        &self,
+        handle: NotificationHandle,
+    ) -> impl Future<Output = crate::Result<()>> + Send + '_ {
+        self.device().delete_notification(self.target(), handle)
     }
 }
 

@@ -1166,6 +1166,63 @@ pub trait AdsDeviceExt {
     fn subscribe_state(&self) -> crate::Result<(StateReceiver, NotificationHandle)> {
         self.device().subscribe_state(self.target())
     }
+
+    /// Reads `length` bytes from this device at the given index group/offset.
+    fn read(
+        &self,
+        index_group: IndexGroup,
+        index_offset: IndexOffset,
+        length: u32,
+    ) -> crate::Result<Vec<u8>> {
+        self.device()
+            .read(self.target(), index_group, index_offset, length)
+    }
+
+    /// Writes `data` to this device at the given index group/offset.
+    fn write(
+        &self,
+        index_group: IndexGroup,
+        index_offset: IndexOffset,
+        data: impl Into<Vec<u8>>,
+    ) -> crate::Result<()> {
+        self.device()
+            .write(self.target(), index_group, index_offset, data)
+    }
+
+    /// Combined read/write in a single round-trip on this device.
+    ///
+    /// Writes `write_data` then reads `read_length` bytes back.
+    fn read_write(
+        &self,
+        index_group: IndexGroup,
+        index_offset: IndexOffset,
+        read_length: u32,
+        write_data: impl Into<Vec<u8>>,
+    ) -> crate::Result<Vec<u8>> {
+        self.device().read_write(
+            self.target(),
+            index_group,
+            index_offset,
+            read_length,
+            write_data,
+        )
+    }
+
+    /// Adds a device notification on this device.
+    fn add_notification(
+        &self,
+        index_group: IndexGroup,
+        index_offset: IndexOffset,
+        notif_attr: AdsNotificationAttrib,
+    ) -> crate::Result<(Receiver<AdsNotificationSampleOwned>, NotificationHandle)> {
+        self.device()
+            .add_notification(self.target(), index_group, index_offset, notif_attr)
+    }
+
+    /// Deletes a device notification on this device.
+    fn delete_notification(&self, handle: NotificationHandle) -> crate::Result<()> {
+        self.device().delete_notification(self.target(), handle)
+    }
 }
 
 impl fmt::Debug for AdsDevice {
