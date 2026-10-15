@@ -1,11 +1,15 @@
 # Connecting without a local AMS router
 
-Installing TwinCAT, either XAE (engineering) or XAR (runtime), installs an AMS router. It runs on
-the local machine and listens on TCP port 48898. Every ADS message goes through it, whether the
+Installing TwinCAT installs an AMS router. Every ADS message goes through it, whether the
 device on the other end is on the same machine or across the network. Your client talks to the
-local router, the local router talks to the target's router, and the routes you add through the
-TwinCAT tray icon tell it how. `AdsDevice::connect` opens a socket to `127.0.0.1:48898`, performs a
-`PortConnect` handshake, and the router hands back a source address to use.
+local router; the local router talks to the target's router.
+
+On **Windows** (XAE/XAR) the local router listens on TCP port 48898.
+`AdsDevice::connect` opens `127.0.0.1:48898`, performs a PortConnect handshake, and the router
+hands back a source address. On **Beckhoff RT Linux** and **TwinCAT/BSD** the local router is a
+Unix domain socket (`/run/ams/tcsyssrv.ams.sock`); see
+[Connecting over Unix Domain Sockets](unix-domain-sockets.md). Routes you add through the TwinCAT
+tray icon (or the target's static route file) still tell the router how to reach remote Net IDs.
 
 If your machine cannot run XAE or XAR, there is no local router to talk to. Instead you connect
 directly to the router on the target device, using `connect_remote`. There is no handshake and no

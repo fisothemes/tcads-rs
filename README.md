@@ -109,15 +109,21 @@ The project is organized as a Cargo workspace with the following crates:
 
 ## Connecting
 
-If you have XAE or XAR installed, you have an AMS router. It runs on the local machine on port
-48898, and every ADS message passes through it, local or remote. `AdsDevice::connect` opens a
-socket to `127.0.0.1:48898` and the router does the rest.
+If you have TwinCAT installed, you have an AMS router and every ADS message passes through it.
 
-If your machine cannot run XAE or XAR (a Linux or macOS development machine, a container, a bare
-Windows box), you connect directly to the router on the target instead, and it needs to know your
-source AMS Net ID in advance. See
-[Connecting without a local AMS router](docs/static-routes.md) for how to add that route, pick a
-source address, and read the failure modes.
+- **Windows (XAE/XAR):** the local router listens on TCP `127.0.0.1:48898`.
+  `AdsDevice::connect` opens that socket, performs a PortConnect handshake, and uses the
+  address the router assigns.
+- **Beckhoff RT Linux / TwinCAT/BSD:** the local router is a **Unix domain socket** at
+  `/run/ams/tcsyssrv.ams.sock`, not TCP loopback. On Unix, `AdsDevice::connect` tries that
+  path first and falls back to `127.0.0.1:48898` if the socket is absent. You can also call
+  `connect_uds` with an explicit path. See
+  [Connecting over Unix Domain Sockets](docs/unix-domain-sockets.md).
+
+If your machine cannot run TwinCAT at all (a typical Linux/macOS dev host, a container, a bare
+Windows box), there is no local router. Connect directly to the router on the target with
+`connect_remote`; the target must already know your source AMS Net ID as a static route. See
+[Connecting without a local AMS router](docs/static-routes.md).
 
 ## Getting Started: Examples
 

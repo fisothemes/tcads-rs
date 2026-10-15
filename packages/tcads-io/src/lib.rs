@@ -7,13 +7,15 @@
 //!
 //! ## Transport Agnostic
 //!
-//! While the default transport is TCP (`TcpStream`), the stream wrappers in this
-//! crate are generic over the underlying I/O traits (`Read + Write` for blocking,
+//! The usual transport on Windows is TCP (`TcpStream`). On Beckhoff RT Linux and
+//! TwinCAT/BSD the local AMS router is a **Unix domain socket**
+//! (`/run/ams/tcsyssrv.ams.sock`; see the `UnixAmsStream` type alias). The stream
+//! wrappers are generic over the underlying I/O traits (`Read + Write` for blocking,
 //! `AsyncRead + AsyncWrite` for Tokio).
 //!
-//! This means you are not locked into standard TCP. You can route ADS traffic
-//! over **TLS**, **Unix Domain Sockets**, **Serial Ports**, or even **in-memory buffers**
-//! for testing, simply by passing your custom stream into [`AmsStream::new()`](blocking::AmsStream::new).
+//! You can also route ADS traffic over **TLS**, **Serial Ports**, or **in-memory
+//! buffers** for testing by passing a custom stream into
+//! [`AmsStream::new()`](blocking::AmsStream::new).
 //!
 //! ## Runtimes
 //!
