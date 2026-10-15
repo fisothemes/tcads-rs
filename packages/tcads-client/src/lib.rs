@@ -4,8 +4,8 @@
 //!
 //! This crate takes the typed frames from `tcads-core`, pushes them over a `tcads-io` stream, and
 //! gives you back device clients you can call from anywhere in your program: read a PLC variable
-//! by name, subscribe to value changes, call a function block method, tail the TwinCAT log, or
-//! drive the system service on the target IPC.
+//! by name, subscribe to value changes, call a function block method, tail the TwinCAT log, query
+//! licenses, or drive the system service on the target IPC.
 //!
 //! ## Getting Around
 //!
@@ -14,13 +14,16 @@
 //!   - `AdsDevice` owns the connection and exposes the raw ADS command set: read, write,
 //!     read/write, read state, write control, device info, notifications, and the Sum (batch)
 //!     variants of each.
-//!   - `AdsRuntime` talks to a PLC runtime (ports 851, 801-899, 301-399). Symbols by name, values
+//!   - `AdsRuntime` talks to a PLC runtime (ports 851, 801–899, 301–399). Symbols by name, values
 //!     through `serde`, subscriptions, batch reads and writes, and RPC.
 //!   - `AdsLogger` reads and writes the TwinCAT system log on port 100.
+//!   - `AdsLicense` talks to the license server on port 30 (system ID, online license list, …).
 //!   - `AdsSystemService` drives the host machine on port 10000: TwinCAT mode, file I/O, host
 //!     processes, the Windows registry, and the system clock.
-//!   - `AdsSubsystem` is the trait the three subsystem clients share: `read_state`,
-//!     `read_device_info`, `subscribe_state`, and `write_control` against their own target.
+//!   - `AdsDeviceExt` is the trait every high-level device implements: `device` / `target`, plus
+//!     default methods such as `read_state`, `read_device_info`, `subscribe_state`,
+//!     `write_control`, `subscribe_router`, and target-free `read` / `write` / `read_write` /
+//!     notification helpers.
 //! - **[`notif_guard`]** - RAII guards that delete a notification on the router when dropped.
 //! - **[`tasks`]** - the reader, the writer, and the three dispatchers underneath `AdsDevice`.
 //!   Public so you can build your own device client on an existing connection.
@@ -38,19 +41,21 @@
 //!
 //! ## Connecting
 //!
-//! Every device client offers three ways in. `connect` and `connect_to` go through the local AMS
-//! router. Installing XAE or XAR installs that router; it listens on port 48898 and carries every
-//! ADS message, whether the target is on the same machine or across the network. `connect_local`
-//! does the same but asks the router for the local Net ID first, which is what you want when the
-//! TwinCAT target system is set to `<Local>`.
+//! Every high-level device offers three ways in through the local or remote AMS router:
 //!
-//! `connect_remote` skips the local router and connects straight to the router on the target. Use
-//! it on machines that cannot run XAE or XAR: a Linux or macOS development machine, a container,
-//! or a bare Windows box. Your source Net ID has to be registered on the target as a static route
-//! first. See [Connecting without a local AMS router][routes] for how to add the route and what to
-//! do when the connection drops.
+//! - **`connect` / `connect_local`** – through the local AMS router. Installing TwinCAT installs
+//!   that router; every ADS message passes through it. On **Windows** it listens on TCP
+//!   `127.0.0.1:48898`. On **Beckhoff RT Linux** and **TwinCAT/BSD** it is a Unix domain socket at
+//!   `/run/ams/tcsyssrv.ams.sock` (see [UDS][uds]); `AdsDevice::connect` tries that path first on
+//!   Unix and falls back to TCP. `connect_local` additionally asks the router for the local Net ID,
+//!   which is what you want when the TwinCAT target system is set to `<Local>`.
+//! - **`connect_remote`** – skips the local router and connects straight to the router on the
+//!   target. Use it on machines that cannot run TwinCAT: a typical Linux or macOS development host,
+//!   a container, or a bare Windows box. Your source Net ID has to be registered on the target as a
+//!   static route first. See [Connecting without a local AMS router][routes].
 //!
 //! [routes]: https://github.com/fisothemes/tcads-rs/blob/master/docs/static-routes.md
+//! [uds]: https://github.com/fisothemes/tcads-rs/blob/master/docs/unix-domain-sockets.md
 //!
 //! ## Getting Started
 //!
@@ -122,7 +127,9 @@
 //!
 //! ```rust,no_run
 //! use std::time::Duration;
-//! use tcads_client::devices::blocking::{AdsDevice, AdsLogger, AdsRuntime, AdsSystemService};
+//! use tcads_client::devices::blocking::{
+//!     AdsDevice, AdsLicense, AdsLogger, AdsRuntime, AdsSystemService,
+//! };
 //! use tcads_core::{AmsAddr, AmsNetId, LogMessageType};
 //!
 //! fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -131,9 +138,11 @@
 //!     let runtime = AdsRuntime::new(device.clone(), AmsAddr::from_local(851));
 //!     let logger = AdsLogger::new(device.clone(), AmsNetId::local());
 //!     let system = AdsSystemService::new(device.clone(), AmsNetId::local());
+//!     let license = AdsLicense::new(device.clone(), AmsNetId::local());
 //!
 //!     logger.write_log(LogMessageType::WARNING, "RustClient", "Starting up...")?;
 //!     println!("TwinCAT version: {}", system.get_product_version()?);
+//!     println!("System ID: {}", license.get_system_id()?);
 //!
 //!     // Dropping the last clone tears the connection down, or do it explicitly
 //!     device.shutdown()?;

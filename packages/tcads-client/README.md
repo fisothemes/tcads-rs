@@ -4,8 +4,8 @@ The high-level client layer for the **TwinCAT AMS/ADS** protocol.
 
 This crate takes the typed frames from `tcads-core`, pushes them over a `tcads-io` stream,
 and gives you back device clients you can call from anywhere in your program:
-read a PLC variable by name, subscribe to value changes, call a function block method, tail 
-the TwinCAT log, or drive the system service on the target IPC.
+read a PLC variable by name, subscribe to value changes, call a function block method, tail
+the TwinCAT log, query licenses, or drive the system service on the target IPC.
 
 ## Features
 
@@ -18,8 +18,9 @@ the TwinCAT log, or drive the system service on the target IPC.
   the router when the receiver drops, or explicitly through `unsubscribe`.
 - **RPC** - call methods on function blocks and interfaces with Rust tuples in and tuples out.
 - **Blocking and Tokio** - two implementations with the same shape, chosen with feature flags.
-- **Subsystem devices** - `AdsRuntime` (PLC ports 851, 801-899, 301-399), `AdsLogger` (port 100),
-  `AdsSystemService` (port 10000), and `AdsDevice` for any port you want to drive by hand.
+- **Subsystem devices** - `AdsRuntime` (PLC ports 851, 801–899, 301–399), `AdsLogger` (port 100),
+  `AdsSystemService` (port 10000), `AdsLicense` (port 30), and `AdsDevice` for any port you want
+  to drive by hand. All of them implement `AdsDeviceExt` for shared state/info/read/write helpers.
 
 ## Feature Flags
 
@@ -36,9 +37,10 @@ program to async is mostly a matter of adding `.await`.
 ```text
 tcads-client/
   ├── devices/
-  │     ├── ads_device/      # AdsDevice: the connection and the raw ADS command set
+  │     ├── ads_device/      # AdsDevice + AdsDeviceExt: connection and raw ADS commands
   │     ├── runtime/         # AdsRuntime: symbols, values, subscriptions, RPC
   │     ├── logger/          # AdsLogger: TwinCAT system log (port 100)
+  │     ├── license/         # AdsLicense: license server (port 30)
   │     └── system_service/  # AdsSystemService: host OS, files, processes (port 10000)
   ├── tasks/                 # Reader, writer, and the dispatchers that route frames
   ├── notif_guard.rs         # RAII guards that delete notifications on drop
@@ -57,7 +59,9 @@ use tcads_client::devices::blocking::AdsRuntime;
 use tcads_core::AmsAddr;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 1. Through the local AMS router at 127.0.0.1:48898.
+    // 1. Through the local AMS router (auto transport).
+    //    Windows: TCP 127.0.0.1:48898.
+    //    Beckhoff RT Linux / TwinCAT/BSD: UDS /run/ams/tcsyssrv.ams.sock (then TCP fallback).
     //    The router assigns the source address during the PortConnect handshake.
     let runtime = AdsRuntime::connect(AmsAddr::from_local(851), Duration::from_secs(5))?;
 
@@ -75,16 +79,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-The first two go through the local AMS router. Installing XAE or XAR installs that router; it
-listens on port `48898` and every ADS message passes through it, whether the target is on the same
-machine or across the network.
+The first two go through the local AMS router. Installing TwinCAT installs that router; every ADS
+message passes through it, whether the target is on the same machine or across the network.
+
+- **Windows (XAE/XAR):** the router listens on TCP `127.0.0.1:48898`. `AdsDevice::connect` (and
+  therefore `connect` / `connect_local` on the subsystem clients) opens that socket.
+- **Beckhoff RT Linux / TwinCAT/BSD:** the local router is a Unix domain socket at
+  `/run/ams/tcsyssrv.ams.sock`. On Unix, `AdsDevice::connect` tries that path first and falls back
+  to TCP if the socket is missing. You can force UDS with `AdsDevice::connect_uds`. See
+  [Connecting over Unix Domain Sockets](../../docs/unix-domain-sockets.md).
 
 On Windows, `127.0.0.1` needs the `EnableAmsTcpLoopback` registry key. It is set by default from
 TwinCAT 4024.5 onwards.
 
-The third form is for machines that cannot run XAE or XAR, and so have no local router: a Linux or
-MacOS development machine, a container, or a bare Windows box. You connect to the target's router
-directly, and your source Net ID has to be registered there first. See
+The third form is for machines that cannot run TwinCAT at all, and so have no local router: a
+typical Linux or macOS development host, a container, or a bare Windows box. You connect to the
+target's router directly, and your source Net ID has to be registered there first. See
 [Connecting without a local AMS router](../../docs/static-routes.md) for how to add the route and
 what to do when the connection drops.
 
@@ -95,7 +105,9 @@ the socket, the reader, and the writer.
 
 ```rust
 use std::time::Duration;
-use tcads_client::devices::blocking::{AdsDevice, AdsLogger, AdsRuntime, AdsSystemService};
+use tcads_client::devices::blocking::{
+    AdsDevice, AdsLicense, AdsLogger, AdsRuntime, AdsSystemService,
+};
 use tcads_core::{AmsAddr, AmsNetId};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -104,6 +116,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let runtime = AdsRuntime::new(device.clone(), AmsAddr::from_local(851));
     let logger = AdsLogger::new(device.clone(), AmsNetId::local());
     let system = AdsSystemService::new(device.clone(), AmsNetId::local());
+    let license = AdsLicense::new(device.clone(), AmsNetId::local());
 
     Ok(())
 }
