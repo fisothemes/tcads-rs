@@ -15,6 +15,7 @@ use tcads_core::{
     AdsSymbolInfoIteratorOwned, AdsSymbolUploadInfo, AdsSymbolUploadInfoV3, AdsTransMode,
     AdsTypeInfo, AdsTypeInfoIteratorOwned, AmsAddr, AmsPort, IndexGroup, IndexOffset,
     NotificationHandle, SumReadRequest, SumReadWriteRequest, SumWriteRequest, SymbolHandle,
+    WindowsFileTime,
 };
 
 /// A high-level client for interacting with a specific TwinCAT runtime.
@@ -1192,6 +1193,19 @@ impl SymbolVersionReceiver {
         Self::decode(self.rx.recv()?)
     }
 
+    /// Blocks until the symbol version changes, returning it together with the
+    /// PLC-side generation time of the underlying notification sample.
+    ///
+    /// See [`recv`](Self::recv) for the error semantics; this behaves identically.
+    /// `None` is returned for the timestamp only when the sample never passed through
+    /// the client reader with a parsed stamp, which does not happen for a live
+    /// subscription — see [`AdsNotificationSampleOwned::timestamp`].
+    pub fn recv_with_timestamp(&self) -> crate::Result<(Option<WindowsFileTime>, u8)> {
+        let sample = self.rx.recv()?;
+        let timestamp = sample.timestamp();
+        Ok((timestamp, Self::decode(sample)?))
+    }
+
     /// Blocks until the symbol version changes or `timeout` elapses.
     ///
     /// Returns [`Err(Error::Timeout)`](crate::Error::Timeout) if the timeout expires,
@@ -1210,6 +1224,20 @@ impl SymbolVersionReceiver {
     pub fn try_recv(&self) -> crate::Result<Option<u8>> {
         match self.rx.try_recv() {
             Ok(sample) => Ok(Some(Self::decode(sample)?)),
+            Err(TryRecvError::Empty) => Ok(None),
+            Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
+        }
+    }
+
+    /// Non-blocking variant of [`recv_with_timestamp`](Self::recv_with_timestamp).
+    ///
+    /// See [`try_recv`](Self::try_recv) for the error semantics; this behaves identically.
+    pub fn try_recv_with_timestamp(&self) -> crate::Result<Option<(Option<WindowsFileTime>, u8)>> {
+        match self.rx.try_recv() {
+            Ok(sample) => {
+                let timestamp = sample.timestamp();
+                Ok(Some((timestamp, Self::decode(sample)?)))
+            }
             Err(TryRecvError::Empty) => Ok(None),
             Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
         }
@@ -1301,6 +1329,19 @@ where
         self.decode(self.rx.recv()?)
     }
 
+    /// Blocks until the next value change, returning it together with the PLC-side
+    /// generation time of the notification.
+    ///
+    /// See [`recv`](Self::recv) for the error semantics; this behaves identically.
+    /// `None` is returned for the timestamp only when the sample never passed through
+    /// the client reader with a parsed stamp, which does not happen for a live
+    /// subscription — see [`AdsNotificationSampleOwned::timestamp`].
+    pub fn recv_with_timestamp(&self) -> crate::Result<(Option<WindowsFileTime>, T)> {
+        let sample = self.rx.recv()?;
+        let timestamp = sample.timestamp();
+        Ok((timestamp, self.decode(sample)?))
+    }
+
     /// Blocks until the next value change or `timeout` elapses.
     ///
     /// Returns [`Err(Error::Timeout)`](crate::Error::Timeout) if the timeout expires,
@@ -1320,6 +1361,20 @@ where
     pub fn try_recv(&self) -> crate::Result<Option<T>> {
         match self.rx.try_recv() {
             Ok(sample) => Ok(Some(self.decode(sample)?)),
+            Err(TryRecvError::Empty) => Ok(None),
+            Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
+        }
+    }
+
+    /// Non-blocking variant of [`recv_with_timestamp`](Self::recv_with_timestamp).
+    ///
+    /// See [`try_recv`](Self::try_recv) for the error semantics; this behaves identically.
+    pub fn try_recv_with_timestamp(&self) -> crate::Result<Option<(Option<WindowsFileTime>, T)>> {
+        match self.rx.try_recv() {
+            Ok(sample) => {
+                let timestamp = sample.timestamp();
+                Ok(Some((timestamp, self.decode(sample)?)))
+            }
             Err(TryRecvError::Empty) => Ok(None),
             Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
         }

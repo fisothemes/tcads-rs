@@ -91,10 +91,9 @@ async fn handle<R: AsyncRead + Unpin>(
 
                         // Handles are only unique per device, so route on the sender too.
                         let source = *header.source();
-                        for (_, sample) in notif.iter_samples() {
-                            ads_notifs
-                                .dispatch(source, sample.handle(), sample.to_owned())
-                                .await;
+                        for (timestamp, sample) in notif.iter_samples() {
+                            let sample = sample.to_owned().with_timestamp(timestamp);
+                            ads_notifs.dispatch(source, sample.handle(), sample).await;
                         }
                     }
                     // Promote here, before the next frame is read. TwinCAT sends the first
@@ -378,5 +377,49 @@ mod tests {
         assert_eq!(logger_rx.recv().await.unwrap().data(), &[0xBB; 4]);
         assert!(plc_rx.try_recv().is_err());
         assert!(logger_rx.try_recv().is_err());
+    }
+
+    /// Each dispatched sample must carry the timestamp of its own stamp group, not the
+    /// frame's first stamp or the time the reader happened to process it.
+    #[tokio::test]
+    async fn dispatched_samples_carry_their_stamp_timestamp() {
+        use tcads_core::WindowsFileTime;
+        use tcads_core::protocol::{
+            AdsDeviceNotificationOwned, AdsNotificationSampleOwned, AdsStampHeaderOwned,
+        };
+
+        let (requests, ads_notifs, router_notifs, _write_rx) = make_dispatchers();
+        let plc = AmsAddr::from_local(851u16);
+        let client = AmsAddr::from_local(32800u16);
+
+        let h1 = NotificationHandle::from(1u32);
+        let h2 = NotificationHandle::from(2u32);
+        let ts1 = WindowsFileTime::from_raw(133_503_504_000_000_000);
+        let ts2 = WindowsFileTime::from_raw(133_503_504_100_000_000); // 10s later
+
+        let mut rx1 = ads_notifs.pre_register(1).await;
+        ads_notifs.promote(1, plc, h1).await;
+        let mut rx2 = ads_notifs.pre_register(2).await;
+        ads_notifs.promote(2, plc, h2).await;
+
+        let stamp1 = AdsStampHeaderOwned::new(
+            ts1,
+            vec![AdsNotificationSampleOwned::new(h1, vec![0xAA; 4])],
+        );
+        let stamp2 = AdsStampHeaderOwned::new(
+            ts2,
+            vec![AdsNotificationSampleOwned::new(h2, vec![0xBB; 4])],
+        );
+        let frame = AdsDeviceNotificationOwned::new(client, plc, vec![stamp1, stamp2]).into_frame();
+
+        run_handle(vec![frame], &requests, &ads_notifs, &router_notifs)
+            .await
+            .unwrap();
+
+        let sample1 = rx1.recv().await.unwrap();
+        let sample2 = rx2.recv().await.unwrap();
+
+        assert_eq!(sample1.timestamp(), Some(ts1));
+        assert_eq!(sample2.timestamp(), Some(ts2));
     }
 }
