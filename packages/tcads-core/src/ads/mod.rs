@@ -55,7 +55,7 @@ pub use license_online_info::{AdsLicenseOnlineInfo, AdsLicenseStatus};
 pub use log_entry::LogEntry;
 pub use logger_message_type::LogMessageType;
 pub use notification_attrib::AdsNotificationAttrib;
-pub use notification_handle::NotificationHandle;
+pub use notification_handle::AdsNotificationHandle;
 pub use product_version::AdsProductVersion;
 pub use return_codes::AdsReturnCode;
 pub use state_flag::StateFlag;

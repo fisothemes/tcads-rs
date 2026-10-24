@@ -1,13 +1,13 @@
 use super::{ProtocolError, parse_ads_frame};
 use crate::AmsFrame;
 use crate::ads::{
-    AdsCommand, AdsError, AdsHeader, AdsReturnCode, InvokeId, NotificationHandle, StateFlag,
+    AdsCommand, AdsError, AdsHeader, AdsNotificationHandle, AdsReturnCode, InvokeId, StateFlag,
 };
 use crate::ams::{AmsAddr, AmsCommand};
 
 /// Represents an ADS Delete Device Notification Request (Command `0x0007`).
 ///
-/// Cancels an active notification subscription identified by a [`NotificationHandle`]
+/// Cancels an active notification subscription identified by a [`AdsNotificationHandle`]
 /// previously obtained from [`AdsAddDeviceNotificationResponse`](super::AdsAddDeviceNotificationResponse).
 ///
 /// # Usage
@@ -20,11 +20,11 @@ use crate::ams::{AmsAddr, AmsCommand};
 /// * **ADS Command:** [`AdsDeleteDeviceNotification`](AdsCommand::AdsDeleteDeviceNotification) (`0x0007`)
 /// * **ADS Payload Length:** 4 bytes
 /// * **ADS Payload Layout:**
-///   * **Notification Handle:** 4 bytes ([`NotificationHandle`])
+///   * **Notification Handle:** 4 bytes ([`AdsNotificationHandle`])
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AdsDeleteDeviceNotificationRequest {
     header: AdsHeader,
-    handle: NotificationHandle,
+    handle: AdsNotificationHandle,
 }
 
 impl AdsDeleteDeviceNotificationRequest {
@@ -36,7 +36,7 @@ impl AdsDeleteDeviceNotificationRequest {
         target: AmsAddr,
         source: AmsAddr,
         invoke_id: InvokeId,
-        handle: NotificationHandle,
+        handle: AdsNotificationHandle,
     ) -> Self {
         let header = AdsHeader::new(
             target,
@@ -71,13 +71,13 @@ impl AdsDeleteDeviceNotificationRequest {
         &self.header
     }
 
-    /// Returns the [`NotificationHandle`] to cancel.
-    pub fn handle(&self) -> NotificationHandle {
+    /// Returns the [`AdsNotificationHandle`] to cancel.
+    pub fn handle(&self) -> AdsNotificationHandle {
         self.handle
     }
 
     /// Parses only the ADS payload portion (4 bytes).
-    pub fn parse_payload(payload: &[u8]) -> Result<NotificationHandle, ProtocolError> {
+    pub fn parse_payload(payload: &[u8]) -> Result<AdsNotificationHandle, ProtocolError> {
         if payload.len() != Self::PAYLOAD_SIZE {
             Err(AdsError::UnexpectedDataLength {
                 expected: Self::PAYLOAD_SIZE,
@@ -85,7 +85,7 @@ impl AdsDeleteDeviceNotificationRequest {
             })?;
         }
 
-        Ok(NotificationHandle::try_from_slice(payload).map_err(AdsError::from)?)
+        Ok(AdsNotificationHandle::try_from_slice(payload).map_err(AdsError::from)?)
     }
 }
 
@@ -265,7 +265,7 @@ mod tests {
     #[test]
     fn test_request_roundtrip() {
         let (target, source) = make_addrs();
-        let handle = NotificationHandle::from(42_u32);
+        let handle = AdsNotificationHandle::from(42_u32);
 
         let request = AdsDeleteDeviceNotificationRequest::new(target, source, 0xDEAD, handle);
         let frame = request.to_frame();
@@ -279,7 +279,7 @@ mod tests {
     #[test]
     fn test_request_payload_size() {
         let (target, source) = make_addrs();
-        let handle = NotificationHandle::from(1_u32);
+        let handle = AdsNotificationHandle::from(1_u32);
 
         let request = AdsDeleteDeviceNotificationRequest::new(target, source, 1, handle);
         let frame = request.to_frame();
@@ -309,7 +309,7 @@ mod tests {
     fn test_full_delete_exchange() {
         // Simulate the complete delete notification exchange
         let (target, source) = make_addrs();
-        let handle = NotificationHandle::from(0x0000_001A_u32);
+        let handle = AdsNotificationHandle::from(0x0000_001A_u32);
         let invoke_id = 0xDEAD;
 
         let request = AdsDeleteDeviceNotificationRequest::new(target, source, invoke_id, handle);
@@ -335,7 +335,7 @@ mod tests {
     #[test]
     fn test_wrong_direction_rejected() {
         let (target, source) = make_addrs();
-        let handle = NotificationHandle::from(1_u32);
+        let handle = AdsNotificationHandle::from(1_u32);
 
         let request = AdsDeleteDeviceNotificationRequest::new(target, source, 1, handle);
         let frame = request.to_frame();

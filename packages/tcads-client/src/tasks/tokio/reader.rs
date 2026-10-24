@@ -150,7 +150,7 @@ async fn handle<R: AsyncRead + Unpin>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tcads_core::ads::NotificationHandle;
+    use tcads_core::ads::AdsNotificationHandle;
     use tcads_core::{AmsAddr, AmsFrame};
     use tokio::io::{AsyncWriteExt, duplex};
     use tokio::sync::mpsc;
@@ -241,7 +241,7 @@ mod tests {
     async fn router_stop_clears_ads_notifs_before_broadcasting() {
         let (requests, ads_notifs, router_notifs, _write_rx) = make_dispatchers();
 
-        let handle = NotificationHandle::from(1u32);
+        let handle = AdsNotificationHandle::from(1u32);
         let mut notif_rx = ads_notifs.pre_register(1).await;
         ads_notifs
             .promote(1, AmsAddr::from_local(851u16), handle)
@@ -297,7 +297,7 @@ mod tests {
     async fn router_start_is_broadcast_without_clearing() {
         let (requests, ads_notifs, router_notifs, _write_rx) = make_dispatchers();
 
-        let handle = NotificationHandle::from(1u32);
+        let handle = AdsNotificationHandle::from(1u32);
         let mut notif_rx = ads_notifs.pre_register(1).await;
         ads_notifs
             .promote(1, AmsAddr::from_local(851u16), handle)
@@ -352,7 +352,7 @@ mod tests {
         let plc = AmsAddr::from_local(851u16);
         let logger = AmsAddr::from_local(100u16);
         let client = AmsAddr::from_local(32800u16);
-        let handle = NotificationHandle::from(1u32);
+        let handle = AdsNotificationHandle::from(1u32);
 
         let mut plc_rx = ads_notifs.pre_register(1).await;
         ads_notifs.promote(1, plc, handle).await;

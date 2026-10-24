@@ -147,7 +147,7 @@ pub enum AdsStringError {
     Other(String),
 }
 
-/// Error returned when parsing an [NotificationHandle](super::NotificationHandle) fails.
+/// Error returned when parsing an [NotificationHandle](super::AdsNotificationHandle) fails.
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum AdsNotificationHandleError {
     #[error("unexpected length: expected {expected}, got {got}")]

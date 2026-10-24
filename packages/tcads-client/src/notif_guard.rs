@@ -1,10 +1,10 @@
 //! RAII notification handle guards.
 //!
 //! A [`NotificationGuard`](blocking::NotificationGuard) wraps a
-//! [`NotificationHandle`] and automatically calls [`delete_notification`](crate::devices::blocking::AdsDevice::delete_notification)
+//! [`AdsNotificationHandle`] and automatically calls [`delete_notification`](crate::devices::blocking::AdsDevice::delete_notification)
 //! when dropped, ensuring notification handles are always cleaned up on the router.
 
-use tcads_core::{AmsAddr, NotificationHandle};
+use tcads_core::{AdsNotificationHandle, AmsAddr};
 
 #[cfg(feature = "blocking")]
 pub mod blocking {
@@ -16,7 +16,7 @@ pub mod blocking {
     /// Calls [`delete_notification`](AdsDevice::delete_notification)
     /// synchronously when dropped.
     pub struct NotificationGuard {
-        handle: NotificationHandle,
+        handle: AdsNotificationHandle,
         target: AmsAddr,
         device: AdsDevice,
         cancelled: bool,
@@ -24,7 +24,7 @@ pub mod blocking {
 
     impl NotificationGuard {
         /// Creates a new instance of the [`NotificationGuard`]
-        pub fn new(handle: NotificationHandle, target: AmsAddr, device: AdsDevice) -> Self {
+        pub fn new(handle: AdsNotificationHandle, target: AmsAddr, device: AdsDevice) -> Self {
             Self {
                 handle,
                 target,
@@ -34,7 +34,7 @@ pub mod blocking {
         }
 
         /// Returns the notification handle.
-        pub fn handle(&self) -> NotificationHandle {
+        pub fn handle(&self) -> AdsNotificationHandle {
             self.handle
         }
 
@@ -82,7 +82,7 @@ pub mod tokio {
     /// is available, the clean-up is skipped and the router will clean up the handle
     /// when the connection closes.
     pub struct NotificationGuard {
-        handle: NotificationHandle,
+        handle: AdsNotificationHandle,
         target: AmsAddr,
         device: AdsDevice,
         cancelled: bool,
@@ -90,7 +90,7 @@ pub mod tokio {
 
     impl NotificationGuard {
         /// Creates a new instance of the [`NotificationGuard`]
-        pub fn new(handle: NotificationHandle, target: AmsAddr, device: AdsDevice) -> Self {
+        pub fn new(handle: AdsNotificationHandle, target: AmsAddr, device: AdsDevice) -> Self {
             Self {
                 handle,
                 target,
@@ -100,7 +100,7 @@ pub mod tokio {
         }
 
         /// Returns the notification handle.
-        pub fn handle(&self) -> NotificationHandle {
+        pub fn handle(&self) -> AdsNotificationHandle {
             self.handle
         }
 

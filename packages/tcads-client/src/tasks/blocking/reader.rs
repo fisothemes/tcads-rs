@@ -140,7 +140,7 @@ mod tests {
     use super::*;
     use std::io::Cursor;
     use std::sync::mpsc::{self, Receiver};
-    use tcads_core::ads::NotificationHandle;
+    use tcads_core::ads::AdsNotificationHandle;
     use tcads_core::{AmsAddr, AmsFrame};
 
     fn make_dispatchers() -> (
@@ -219,7 +219,7 @@ mod tests {
         let (requests, ads_notifs, router_notifs, _write_rx) = make_dispatchers();
 
         // Register a notification subscription
-        let handle = NotificationHandle::from(1u32);
+        let handle = AdsNotificationHandle::from(1u32);
         let notif_rx = ads_notifs.pre_register(1).unwrap();
         ads_notifs
             .promote(1, AmsAddr::from_local(851u16), handle)
@@ -271,7 +271,7 @@ mod tests {
     fn router_start_is_broadcast_without_clearing() {
         let (requests, ads_notifs, router_notifs, _write_rx) = make_dispatchers();
 
-        let handle = NotificationHandle::from(1u32);
+        let handle = AdsNotificationHandle::from(1u32);
         let notif_rx = ads_notifs.pre_register(1).unwrap();
         ads_notifs
             .promote(1, AmsAddr::from_local(851u16), handle)

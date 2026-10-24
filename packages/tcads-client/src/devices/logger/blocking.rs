@@ -5,8 +5,8 @@ use std::sync::mpsc::{Receiver, TryRecvError};
 use std::time::Duration;
 use tcads_core::protocol::AdsLoggerWriteRequestOwned;
 use tcads_core::{
-    AdsNotificationAttrib, AdsNotificationSampleOwned, AdsTransMode, AmsAddr, AmsNetId, AmsPort,
-    IndexGroup, IndexOffset, LogEntry, LogMessageType, NotificationHandle, WindowsFileTime,
+    AdsNotificationAttrib, AdsNotificationHandle, AdsNotificationSampleOwned, AdsTransMode,
+    AmsAddr, AmsNetId, AmsPort, IndexGroup, IndexOffset, LogEntry, LogMessageType, WindowsFileTime,
 };
 
 /// An [`AdsDevice`] client for the TwinCAT system logger on ADS port `100`.
@@ -150,7 +150,7 @@ impl AdsLogger {
     /// is dropped, or explicitly via [`unsubscribe`](Self::unsubscribe).
     ///
     /// Multiple subscriptions can be active simultaneously.
-    pub fn subscribe(&self) -> crate::Result<(LogEntryReceiver, NotificationHandle)> {
+    pub fn subscribe(&self) -> crate::Result<(LogEntryReceiver, AdsNotificationHandle)> {
         let (rx, handle) = self.device.add_notification(
             self.target,
             IndexGroup::SYSTEM_LOGGER,
@@ -172,7 +172,7 @@ impl AdsLogger {
     ///
     /// The [`LogEntryReceiver`] associated with this handle will return
     /// [`Err(Error::Disconnected)`](crate::Error::Disconnected) on its next call.
-    pub fn unsubscribe(&self, handle: NotificationHandle) -> crate::Result<()> {
+    pub fn unsubscribe(&self, handle: AdsNotificationHandle) -> crate::Result<()> {
         self.device.delete_notification(self.target, handle)
     }
 }
@@ -195,7 +195,7 @@ impl LogEntryReceiver {
     }
 
     /// Returns the notification handle for this subscription.
-    pub fn handle(&self) -> NotificationHandle {
+    pub fn handle(&self) -> AdsNotificationHandle {
         self.guard.handle()
     }
 

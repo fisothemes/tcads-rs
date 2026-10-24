@@ -24,12 +24,12 @@ use tcads_core::protocol::{
     GetLocalNetIdResponse, PortCloseRequest, PortConnectRequest, PortConnectResponse,
 };
 use tcads_core::{
-    AdsCommand, AdsDeviceVersion, AdsError, AdsHeader, AdsNotificationAttrib, AdsReturnCode,
-    AdsState, AdsTransMode, AmsAddr, AmsCommand, AmsFrame, AmsNetId, DeviceState, IndexGroup,
-    IndexOffset, InvokeId, NotificationHandle, RouterState, SumAddNotificationRequest,
-    SumAddNotificationResponse, SumDeleteNotificationResponse, SumReadRequest,
-    SumReadResponseOwned, SumReadWriteRequest, SumReadWriteResponseOwned, SumWriteRequest,
-    SumWriteResponse,
+    AdsCommand, AdsDeviceVersion, AdsError, AdsHeader, AdsNotificationAttrib,
+    AdsNotificationHandle, AdsReturnCode, AdsState, AdsTransMode, AmsAddr, AmsCommand, AmsFrame,
+    AmsNetId, DeviceState, IndexGroup, IndexOffset, InvokeId, RouterState,
+    SumAddNotificationRequest, SumAddNotificationResponse, SumDeleteNotificationResponse,
+    SumReadRequest, SumReadResponseOwned, SumReadWriteRequest, SumReadWriteResponseOwned,
+    SumWriteRequest, SumWriteResponse,
 };
 #[cfg(unix)]
 use tcads_io::blocking::UnixAmsStream;
@@ -556,7 +556,7 @@ impl AdsDevice {
 
     /// Registers a device notification on `target`.
     ///
-    /// Returns a [`Receiver`] for incoming samples and the [`NotificationHandle`]
+    /// Returns a [`Receiver`] for incoming samples and the [`AdsNotificationHandle`]
     /// assigned by the PLC.
     ///
     /// The receiver yields [`Err`] after [`delete_notification`](Self::delete_notification)
@@ -571,7 +571,7 @@ impl AdsDevice {
         index_group: IndexGroup,
         index_offset: IndexOffset,
         notif_attr: AdsNotificationAttrib,
-    ) -> crate::Result<(Receiver<AdsNotificationSampleOwned>, NotificationHandle)> {
+    ) -> crate::Result<(Receiver<AdsNotificationSampleOwned>, AdsNotificationHandle)> {
         let invoke_id = self.next_invoke_id();
 
         let rx = self.inner.ads_notifs.pre_register(invoke_id)?;
@@ -612,7 +612,7 @@ impl AdsDevice {
     pub fn delete_notification(
         &self,
         target: AmsAddr,
-        handle: NotificationHandle,
+        handle: AdsNotificationHandle,
     ) -> crate::Result<()> {
         let invoke_id = self.next_invoke_id();
 
@@ -915,7 +915,7 @@ impl AdsDevice {
         target: AmsAddr,
         requests: I,
     ) -> crate::Result<
-        Vec<Result<(NotificationHandle, Receiver<AdsNotificationSampleOwned>), AdsReturnCode>>,
+        Vec<Result<(AdsNotificationHandle, Receiver<AdsNotificationSampleOwned>), AdsReturnCode>>,
     >
     where
         I: IntoIterator<Item = R>,
@@ -968,7 +968,7 @@ impl AdsDevice {
         let response = SumAddNotificationResponse::new(data)
             .map_err(|e| crate::Error::from(AdsError::from(e)))?;
 
-        let parsed_results: Vec<Result<NotificationHandle, AdsReturnCode>> =
+        let parsed_results: Vec<Result<AdsNotificationHandle, AdsReturnCode>> =
             response.iter().collect();
 
         self.inner
@@ -1001,7 +1001,7 @@ impl AdsDevice {
     where
         I: IntoIterator<Item = R> + Clone,
         I::IntoIter: ExactSizeIterator,
-        R: Borrow<NotificationHandle>,
+        R: Borrow<AdsNotificationHandle>,
     {
         let handles_iter = handles.clone().into_iter();
         let n = handles_iter.len();
@@ -1042,7 +1042,7 @@ impl AdsDevice {
     pub fn subscribe_state(
         &self,
         target: AmsAddr,
-    ) -> crate::Result<(StateReceiver, NotificationHandle)> {
+    ) -> crate::Result<(StateReceiver, AdsNotificationHandle)> {
         let (rx, notif_handle) = self.add_notification(
             target,
             IndexGroup::DEVICE_DATA,
@@ -1073,7 +1073,7 @@ impl StateReceiver {
     }
 
     /// Returns the notification handle for this subscription.
-    pub fn handle(&self) -> NotificationHandle {
+    pub fn handle(&self) -> AdsNotificationHandle {
         self.guard.handle()
     }
 
@@ -1163,7 +1163,7 @@ pub trait AdsDeviceExt {
     }
 
     /// Subscribes to state changes for this device.
-    fn subscribe_state(&self) -> crate::Result<(StateReceiver, NotificationHandle)> {
+    fn subscribe_state(&self) -> crate::Result<(StateReceiver, AdsNotificationHandle)> {
         self.device().subscribe_state(self.target())
     }
 
@@ -1214,13 +1214,13 @@ pub trait AdsDeviceExt {
         index_group: IndexGroup,
         index_offset: IndexOffset,
         notif_attr: AdsNotificationAttrib,
-    ) -> crate::Result<(Receiver<AdsNotificationSampleOwned>, NotificationHandle)> {
+    ) -> crate::Result<(Receiver<AdsNotificationSampleOwned>, AdsNotificationHandle)> {
         self.device()
             .add_notification(self.target(), index_group, index_offset, notif_attr)
     }
 
     /// Deletes a device notification on this device.
-    fn delete_notification(&self, handle: NotificationHandle) -> crate::Result<()> {
+    fn delete_notification(&self, handle: AdsNotificationHandle) -> crate::Result<()> {
         self.device().delete_notification(self.target(), handle)
     }
 }

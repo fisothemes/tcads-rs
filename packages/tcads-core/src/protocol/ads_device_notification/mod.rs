@@ -28,7 +28,7 @@ use crate::ams::{AmsAddr, AmsCommand};
 ///
 /// # Usage
 /// * **Server:** Sends this when a watched variable meets its notification criteria.
-/// * **Client:** Receives this and dispatches samples by [`NotificationHandle`](crate::ads::NotificationHandle).
+/// * **Client:** Receives this and dispatches samples by [`NotificationHandle`](crate::ads::AdsNotificationHandle).
 ///
 /// # Protocol Details
 /// * **AMS Command:** [`AdsCommand`](AmsCommand::AdsCommand) (`0x0000`)
@@ -40,7 +40,7 @@ use crate::ams::{AmsAddr, AmsCommand};
 ///     * **Timestamp:** 8 bytes ([`WindowsFileTime`])
 ///     * **Samples:** 4 bytes (u32) - number of [`AdsNotificationSample`] entries.
 ///     * Per sample:
-///       * **Handle:** 4 bytes ([`NotificationHandle`](crate::ads::NotificationHandle))
+///       * **Handle:** 4 bytes ([`NotificationHandle`](crate::ads::AdsNotificationHandle))
 ///       * **Sample Size:** 4 bytes (u32)
 ///       * **Data:** n bytes
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -82,11 +82,11 @@ impl<'a> AdsDeviceNotification<'a> {
     /// ```no_run
     /// # use tcads_core::protocol::{AdsDeviceNotification, AdsStampHeader, AdsNotificationSample};
     /// # use tcads_core::ams::AmsCommand;
-    /// # use tcads_core::ads::NotificationHandle;
+    /// # use tcads_core::ads::AdsNotificationHandle;
     /// # use tcads_core::AmsFrame;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let ncount_notif_handle = NotificationHandle::from(1);
+    /// # let ncount_notif_handle = AdsNotificationHandle::from(1);
     /// # let frame = AmsFrame::new(AmsCommand::AdsCommand, vec![]);
     /// # let notif = AdsDeviceNotification::try_from_frame(&frame)?;
     /// for (timestamp, sample) in notif.iter_samples() {
@@ -331,7 +331,7 @@ impl<'a> From<&'a AdsDeviceNotificationOwned> for AdsDeviceNotification<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ads::NotificationHandle;
+    use crate::ads::AdsNotificationHandle;
     use crate::ams::AmsNetId;
 
     fn make_addrs() -> (AmsAddr, AmsAddr) {
@@ -340,8 +340,8 @@ mod tests {
         (target, source)
     }
 
-    fn make_handle(val: u32) -> NotificationHandle {
-        NotificationHandle::from(val)
+    fn make_handle(val: u32) -> AdsNotificationHandle {
+        AdsNotificationHandle::from(val)
     }
 
     fn make_timestamp() -> WindowsFileTime {

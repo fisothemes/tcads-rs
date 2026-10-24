@@ -1,8 +1,8 @@
 use super::{ProtocolError, parse_ads_frame};
 use crate::AmsFrame;
 use crate::ads::{
-    AdsCommand, AdsError, AdsHeader, AdsNotificationAttrib, AdsReturnCode, AdsTransMode,
-    IndexGroup, IndexOffset, InvokeId, NotificationHandle, StateFlag,
+    AdsCommand, AdsError, AdsHeader, AdsNotificationAttrib, AdsNotificationHandle, AdsReturnCode,
+    AdsTransMode, IndexGroup, IndexOffset, InvokeId, StateFlag,
 };
 use crate::ams::{AmsAddr, AmsCommand};
 
@@ -15,7 +15,7 @@ use crate::ams::{AmsAddr, AmsCommand};
 /// [`cycle_time`](Self::cycle_time).
 ///
 /// The server responds with [`AdsAddDeviceNotificationResponse`], which contains the
-/// [`NotificationHandle`] needed to identify incoming samples and to cancel the
+/// [`AdsNotificationHandle`] needed to identify incoming samples and to cancel the
 /// subscription via [`AdsDeleteDeviceNotification`](super::AdsDeleteDeviceNotificationRequest).
 ///
 /// # Usage
@@ -245,7 +245,7 @@ impl TryFrom<AmsFrame> for AdsAddDeviceNotificationRequest {
 /// Represents an ADS Add Device Notification Response (Command `0x0006`).
 ///
 /// Sent by the server in response to an [`AdsAddDeviceNotificationRequest`].
-/// On success, contains the [`NotificationHandle`] that identifies this subscription
+/// On success, contains the [`AdsNotificationHandle`] that identifies this subscription
 /// in all subsequent [`AdsDeviceNotification`](super::AdsDeviceNotification)
 /// samples and in the matching
 /// [`AdsDeleteDeviceNotification`](super::AdsDeleteDeviceNotificationRequest) request.
@@ -260,12 +260,12 @@ impl TryFrom<AmsFrame> for AdsAddDeviceNotificationRequest {
 /// * **ADS Payload Length:** 8 bytes
 /// * **ADS Payload Layout:**
 ///   * **Result Code:** 4 bytes ([`AdsReturnCode`])
-///   * **Notification Handle:** 4 bytes ([`NotificationHandle`])
+///   * **Notification Handle:** 4 bytes ([`AdsNotificationHandle`])
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AdsAddDeviceNotificationResponse {
     header: AdsHeader,
     result: AdsReturnCode,
-    handle: NotificationHandle,
+    handle: AdsNotificationHandle,
 }
 
 impl AdsAddDeviceNotificationResponse {
@@ -280,7 +280,7 @@ impl AdsAddDeviceNotificationResponse {
         source: AmsAddr,
         invoke_id: u32,
         result: AdsReturnCode,
-        handle: NotificationHandle,
+        handle: AdsNotificationHandle,
     ) -> Self {
         let header = AdsHeader::new(
             target,
@@ -324,20 +324,20 @@ impl AdsAddDeviceNotificationResponse {
         self.result
     }
 
-    /// Returns the [`NotificationHandle`] assigned by the server.
+    /// Returns the [`AdsNotificationHandle`] assigned by the server.
     ///
     /// Store this handle to correlate incoming notification samples and to
     /// cancel the subscription via [`AdsDeleteDeviceNotification`](super::AdsDeleteDeviceNotificationRequest).
-    pub fn handle(&self) -> NotificationHandle {
+    pub fn handle(&self) -> AdsNotificationHandle {
         self.handle
     }
 
     /// Parses only the ADS payload portion (8 bytes).
     ///
-    /// Returns the [ADS Return Code](AdsReturnCode) and [Notification Handle](NotificationHandle).
+    /// Returns the [ADS Return Code](AdsReturnCode) and [Notification Handle](AdsNotificationHandle).
     pub fn parse_payload(
         payload: &[u8],
-    ) -> Result<(AdsReturnCode, NotificationHandle), ProtocolError> {
+    ) -> Result<(AdsReturnCode, AdsNotificationHandle), ProtocolError> {
         if payload.len() != Self::PAYLOAD_SIZE {
             Err(AdsError::UnexpectedDataLength {
                 expected: Self::PAYLOAD_SIZE,
@@ -346,7 +346,8 @@ impl AdsAddDeviceNotificationResponse {
         }
 
         let result = AdsReturnCode::try_from_slice(&payload[0..4]).map_err(AdsError::from)?;
-        let handle = NotificationHandle::try_from_slice(&payload[4..8]).map_err(AdsError::from)?;
+        let handle =
+            AdsNotificationHandle::try_from_slice(&payload[4..8]).map_err(AdsError::from)?;
 
         Ok((result, handle))
     }
@@ -488,7 +489,7 @@ mod tests {
     #[test]
     fn test_response_roundtrip() {
         let (target, source) = make_addrs();
-        let handle = NotificationHandle::from(0x0000_001A_u32);
+        let handle = AdsNotificationHandle::from(0x0000_001A_u32);
 
         let response = AdsAddDeviceNotificationResponse::new(
             target,
@@ -527,7 +528,7 @@ mod tests {
             ),
         );
 
-        let assigned_handle = NotificationHandle::from(42_u32);
+        let assigned_handle = AdsNotificationHandle::from(42_u32);
 
         let response = AdsAddDeviceNotificationResponse::new(
             source, // the server replies from its own address

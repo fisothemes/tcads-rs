@@ -1,5 +1,5 @@
 use super::{AdsNotificationAttrib, IndexGroup, IndexOffset, SumError};
-use crate::{AdsReturnCode, NotificationHandle};
+use crate::{AdsNotificationHandle, AdsReturnCode};
 use std::fmt;
 
 /// A request to subscribe to a variable's changes via a batch Sum Command.
@@ -148,7 +148,7 @@ impl SumAddNotificationResponse {
     }
 
     /// Returns the return code at the given index.
-    pub fn get(&self, index: usize) -> Option<Result<NotificationHandle, AdsReturnCode>> {
+    pub fn get(&self, index: usize) -> Option<Result<AdsNotificationHandle, AdsReturnCode>> {
         if index >= self.len() {
             return None;
         }
@@ -160,7 +160,7 @@ impl SumAddNotificationResponse {
         let handle_val = u32::from_le_bytes([chunk[4], chunk[5], chunk[6], chunk[7]]);
 
         match AdsReturnCode::from(code) {
-            AdsReturnCode::Ok => Some(Ok(NotificationHandle::from(handle_val))),
+            AdsReturnCode::Ok => Some(Ok(AdsNotificationHandle::from(handle_val))),
             err => Some(Err(err)),
         }
     }
@@ -180,7 +180,7 @@ impl fmt::Debug for SumAddNotificationResponse {
 }
 
 impl<'a> IntoIterator for &'a SumAddNotificationResponse {
-    type Item = Result<NotificationHandle, AdsReturnCode>;
+    type Item = Result<AdsNotificationHandle, AdsReturnCode>;
     type IntoIter = SumAddNotificationIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -195,7 +195,7 @@ pub struct SumAddNotificationIter<'a> {
 }
 
 impl<'a> Iterator for SumAddNotificationIter<'a> {
-    type Item = Result<NotificationHandle, AdsReturnCode>;
+    type Item = Result<AdsNotificationHandle, AdsReturnCode>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let value = self.response.get(self.cursor);
@@ -250,7 +250,7 @@ mod tests {
         let resp = SumAddNotificationResponse::new(buffer).unwrap();
         let mut iter = resp.iter();
 
-        assert_eq!(iter.next(), Some(Ok(NotificationHandle::from(42))));
+        assert_eq!(iter.next(), Some(Ok(AdsNotificationHandle::from(42))));
         assert_eq!(
             iter.next(),
             Some(Err(AdsReturnCode::AdsErrDeviceSymbolNotFound))

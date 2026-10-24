@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use tcads_core::{
-    AdsNotificationSampleOwned, AdsReturnCode, AmsAddr, InvokeId, NotificationHandle,
+    AdsNotificationHandle, AdsNotificationSampleOwned, AdsReturnCode, AmsAddr, InvokeId,
 };
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::{self, UnboundedReceiver as Receiver, UnboundedSender as Sender};
@@ -9,8 +9,8 @@ use tokio::sync::mpsc::{self, UnboundedReceiver as Receiver, UnboundedSender as 
 ///
 /// Each ADS device assigns handles on its own, so two devices reached over the same
 /// connection (for example the PLC on port 851 and the logger on port 100) can return
-/// the same [`NotificationHandle`]. The handle is only unique together with its device.
-pub type SubscriptionKey = (AmsAddr, NotificationHandle);
+/// the same [`AdsNotificationHandle`]. The handle is only unique together with its device.
+pub type SubscriptionKey = (AmsAddr, AdsNotificationHandle);
 
 /// Manages ADS device notification subscriptions.
 ///
@@ -123,7 +123,7 @@ impl AdsNotificationDispatcher {
         &self,
         invoke_id: InvokeId,
         source: AmsAddr,
-        handle: NotificationHandle,
+        handle: AdsNotificationHandle,
     ) -> bool {
         let sender = self.pending.lock().await.remove(&invoke_id);
         match sender {
@@ -147,7 +147,7 @@ impl AdsNotificationDispatcher {
         &self,
         invoke_id: InvokeId,
         source: AmsAddr,
-        results: &[Result<NotificationHandle, AdsReturnCode>],
+        results: &[Result<AdsNotificationHandle, AdsReturnCode>],
     ) -> crate::Result<bool> {
         let pending_senders = self.pending_batches.lock().await.remove(&invoke_id);
 
@@ -180,7 +180,7 @@ impl AdsNotificationDispatcher {
     pub async fn dispatch(
         &self,
         source: AmsAddr,
-        handle: NotificationHandle,
+        handle: AdsNotificationHandle,
         sample: AdsNotificationSampleOwned,
     ) {
         let key = (source, handle);
@@ -195,7 +195,7 @@ impl AdsNotificationDispatcher {
     ///
     /// `target` is the address the delete request was sent to. It is resolved through
     /// [`record_route`](Self::record_route), so the loopback alias works here too.
-    pub async fn remove(&self, target: AmsAddr, handle: NotificationHandle) {
+    pub async fn remove(&self, target: AmsAddr, handle: AdsNotificationHandle) {
         let source = self.resolve(target).await;
         self.subscriptions.lock().await.remove(&(source, handle));
     }
@@ -227,14 +227,14 @@ mod tests {
         AmsAddr::from_local(port)
     }
 
-    fn make_sample(handle: NotificationHandle, data: u8) -> AdsNotificationSampleOwned {
+    fn make_sample(handle: AdsNotificationHandle, data: u8) -> AdsNotificationSampleOwned {
         AdsNotificationSampleOwned::new(handle, vec![data; 4])
     }
 
     #[tokio::test]
     async fn pre_register_and_promote_routes_samples() {
         let dispatcher = AdsNotificationDispatcher::new();
-        let handle = NotificationHandle::from(42u32);
+        let handle = AdsNotificationHandle::from(42u32);
 
         let mut rx = dispatcher.pre_register(1).await;
         assert!(dispatcher.promote(1, addr(PLC), handle).await);
@@ -248,7 +248,7 @@ mod tests {
     #[tokio::test]
     async fn dispatch_before_promote_is_dropped() {
         let dispatcher = AdsNotificationDispatcher::new();
-        let handle = NotificationHandle::from(42u32);
+        let handle = AdsNotificationHandle::from(42u32);
 
         dispatcher
             .dispatch(addr(PLC), handle, make_sample(handle, 1))
@@ -260,7 +260,7 @@ mod tests {
     #[tokio::test]
     async fn dispatch_from_other_source_is_dropped() {
         let dispatcher = AdsNotificationDispatcher::new();
-        let handle = NotificationHandle::from(1u32);
+        let handle = AdsNotificationHandle::from(1u32);
 
         let mut rx = dispatcher.pre_register(1).await;
         dispatcher.promote(1, addr(PLC), handle).await;
@@ -275,7 +275,7 @@ mod tests {
     #[tokio::test]
     async fn dispatch_prunes_dead_receiver() {
         let dispatcher = AdsNotificationDispatcher::new();
-        let handle = NotificationHandle::from(1u32);
+        let handle = AdsNotificationHandle::from(1u32);
 
         let rx = dispatcher.pre_register(1).await;
         dispatcher.promote(1, addr(PLC), handle).await;
@@ -292,7 +292,7 @@ mod tests {
     #[tokio::test]
     async fn remove_causes_receiver_to_return_none() {
         let dispatcher = AdsNotificationDispatcher::new();
-        let handle = NotificationHandle::from(1u32);
+        let handle = AdsNotificationHandle::from(1u32);
 
         let mut rx = dispatcher.pre_register(1).await;
         dispatcher.promote(1, addr(PLC), handle).await;
@@ -306,7 +306,7 @@ mod tests {
     #[tokio::test]
     async fn same_handle_on_two_devices_does_not_collide() {
         let dispatcher = AdsNotificationDispatcher::new();
-        let handle = NotificationHandle::from(1u32);
+        let handle = AdsNotificationHandle::from(1u32);
 
         let mut plc_rx = dispatcher.pre_register(1).await;
         dispatcher.promote(1, addr(PLC), handle).await;
@@ -340,8 +340,8 @@ mod tests {
     #[tokio::test]
     async fn promote_batch_keys_by_source() {
         let dispatcher = AdsNotificationDispatcher::new();
-        let h1 = NotificationHandle::from(1u32);
-        let h2 = NotificationHandle::from(2u32);
+        let h1 = AdsNotificationHandle::from(1u32);
+        let h2 = AdsNotificationHandle::from(2u32);
 
         let mut logger_rx = dispatcher.pre_register(1).await;
         dispatcher.promote(1, addr(LOGGER), h1).await;
@@ -367,8 +367,8 @@ mod tests {
     #[tokio::test]
     async fn clear_wakes_all_subscribers() {
         let dispatcher = AdsNotificationDispatcher::new();
-        let h1 = NotificationHandle::from(1u32);
-        let h2 = NotificationHandle::from(2u32);
+        let h1 = AdsNotificationHandle::from(1u32);
+        let h2 = AdsNotificationHandle::from(2u32);
 
         let mut rx1 = dispatcher.pre_register(1).await;
         let mut rx2 = dispatcher.pre_register(2).await;
@@ -386,7 +386,7 @@ mod tests {
     #[tokio::test]
     async fn promote_returns_false_for_unknown_invoke_id() {
         let dispatcher = AdsNotificationDispatcher::new();
-        let handle = NotificationHandle::from(1u32);
+        let handle = AdsNotificationHandle::from(1u32);
 
         assert!(!dispatcher.promote(999, addr(PLC), handle).await);
     }
@@ -394,7 +394,7 @@ mod tests {
     #[tokio::test]
     async fn remove_resolves_loopback_through_recorded_route() {
         let dispatcher = AdsNotificationDispatcher::new();
-        let handle = NotificationHandle::from(1u32);
+        let handle = AdsNotificationHandle::from(1u32);
         let real: AmsAddr = "39.139.122.3.1.1:100".parse().unwrap();
 
         let mut rx = dispatcher.pre_register(1).await;

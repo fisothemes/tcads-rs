@@ -16,7 +16,7 @@ It handles the heavy lifting of AMS/ADS frame construction, parsing, and seriali
   owned types (`AdsReadResponseOwned`, etc.) are available when you need
   to store or send across threads
 - **Type-safe primitives** - `AmsNetId`, `AmsAddr`, `AdsState`,
-  `AdsTransMode`, `NotificationHandle`, `WindowsFileTime`, `AdsString<N>`
+  `AdsTransMode`, `AdsNotificationHandle`, `WindowsFileTime`, `AdsString<N>`
 
 ## Documentation
 

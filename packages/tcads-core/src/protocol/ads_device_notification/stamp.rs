@@ -1,6 +1,6 @@
 use super::super::ProtocolError;
 use super::sample::{AdsNotificationSample, AdsNotificationSampleOwned};
-use crate::ads::{AdsError, NotificationHandle, WindowsFileTime};
+use crate::ads::{AdsError, AdsNotificationHandle, WindowsFileTime};
 
 /// A zero-copy view of an ADS stamp header.
 ///
@@ -35,7 +35,7 @@ impl<'a> AdsStampHeader<'a> {
     /// * Timestamp (8 bytes) - [`WindowsFileTime`]
     /// * Sample Count (4 bytes) - the number of samples that follow
     /// * Per sample:
-    ///   * Handle (4 bytes) - [`NotificationHandle`]
+    ///   * Handle (4 bytes) - [`AdsNotificationHandle`]
     ///   * Sample Size (4 bytes) - length of the data that follows
     ///   * Data (n bytes)
     pub fn parse(data: &'a [u8]) -> Result<(Self, &'a [u8]), ProtocolError> {
@@ -60,12 +60,12 @@ impl<'a> AdsStampHeader<'a> {
                 })?;
             }
 
-            let handle = NotificationHandle::try_from_slice(
-                &data[offset..offset + NotificationHandle::LENGTH],
+            let handle = AdsNotificationHandle::try_from_slice(
+                &data[offset..offset + AdsNotificationHandle::LENGTH],
             )
             .map_err(AdsError::from)?;
 
-            offset += NotificationHandle::LENGTH;
+            offset += AdsNotificationHandle::LENGTH;
 
             let sample_size =
                 u32::from_le_bytes(data[offset..offset + 4].try_into().unwrap()) as usize;
@@ -199,8 +199,8 @@ impl<'a> From<&'a AdsStampHeaderOwned> for AdsStampHeader<'a> {
 mod tests {
     use super::*;
 
-    fn make_handle(val: u32) -> NotificationHandle {
-        NotificationHandle::from(val)
+    fn make_handle(val: u32) -> AdsNotificationHandle {
+        AdsNotificationHandle::from(val)
     }
 
     fn make_timestamp() -> WindowsFileTime {
@@ -212,7 +212,7 @@ mod tests {
     /// Layout: Timestamp (8) + SampleCount (4) + [Handle (4) + Size (4) + Data (n)] * samples
     fn build_stamp_bytes(
         timestamp: WindowsFileTime,
-        samples: &[(NotificationHandle, &[u8])],
+        samples: &[(AdsNotificationHandle, &[u8])],
     ) -> Vec<u8> {
         let mut buf = Vec::new();
         buf.extend_from_slice(&timestamp.to_bytes());

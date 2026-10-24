@@ -17,9 +17,9 @@ use std::fmt;
 /// # Wire Format
 /// 4 bytes, little-endian `u32`.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct NotificationHandle([u8; Self::LENGTH]);
+pub struct AdsNotificationHandle([u8; Self::LENGTH]);
 
-impl NotificationHandle {
+impl AdsNotificationHandle {
     /// The length of a `NotificationHandle` on the wire.
     pub const LENGTH: usize = 4;
 
@@ -27,7 +27,7 @@ impl NotificationHandle {
         Self(handle.to_le_bytes())
     }
 
-    /// Creates a [`NotificationHandle`] from a 4-byte array (little-endian).
+    /// Creates a [`AdsNotificationHandle`] from a 4-byte array (little-endian).
     pub fn from_bytes(bytes: [u8; Self::LENGTH]) -> Self {
         Self(bytes)
     }
@@ -55,31 +55,31 @@ impl NotificationHandle {
     }
 }
 
-impl From<u32> for NotificationHandle {
+impl From<u32> for AdsNotificationHandle {
     fn from(value: u32) -> Self {
         Self(value.to_le_bytes())
     }
 }
 
-impl From<NotificationHandle> for u32 {
-    fn from(value: NotificationHandle) -> Self {
+impl From<AdsNotificationHandle> for u32 {
+    fn from(value: AdsNotificationHandle) -> Self {
         u32::from_le_bytes(value.0)
     }
 }
 
-impl From<[u8; NotificationHandle::LENGTH]> for NotificationHandle {
-    fn from(bytes: [u8; NotificationHandle::LENGTH]) -> Self {
+impl From<[u8; AdsNotificationHandle::LENGTH]> for AdsNotificationHandle {
+    fn from(bytes: [u8; AdsNotificationHandle::LENGTH]) -> Self {
         Self(bytes)
     }
 }
 
-impl From<NotificationHandle> for [u8; NotificationHandle::LENGTH] {
-    fn from(handle: NotificationHandle) -> Self {
+impl From<AdsNotificationHandle> for [u8; AdsNotificationHandle::LENGTH] {
+    fn from(handle: AdsNotificationHandle) -> Self {
         handle.0
     }
 }
 
-impl TryFrom<&[u8]> for NotificationHandle {
+impl TryFrom<&[u8]> for AdsNotificationHandle {
     type Error = AdsNotificationHandleError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
@@ -93,21 +93,21 @@ impl TryFrom<&[u8]> for NotificationHandle {
     }
 }
 
-impl fmt::Debug for NotificationHandle {
+impl fmt::Debug for AdsNotificationHandle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "NotificationHandle(0x{:08X})", self.as_u32())
     }
 }
 
-impl serde::Serialize for NotificationHandle {
+impl serde::Serialize for AdsNotificationHandle {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         s.serialize_u32(self.as_u32())
     }
 }
 
-impl<'de> serde::Deserialize<'de> for NotificationHandle {
+impl<'de> serde::Deserialize<'de> for AdsNotificationHandle {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        Ok(NotificationHandle::from(u32::deserialize(d)?))
+        Ok(AdsNotificationHandle::from(u32::deserialize(d)?))
     }
 }
 
@@ -117,7 +117,7 @@ mod tests {
 
     #[test]
     fn test_from_u32_roundtrip() {
-        let handle = NotificationHandle::from(0x0000_001A_u32);
+        let handle = AdsNotificationHandle::from(0x0000_001A_u32);
         assert_eq!(handle.as_u32(), 0x0000_001A);
         assert_eq!(u32::from(handle), 0x0000_001A);
     }
@@ -125,7 +125,7 @@ mod tests {
     #[test]
     fn test_from_bytes_roundtrip() {
         let bytes = [0x1A, 0x00, 0x00, 0x00];
-        let handle = NotificationHandle::from_bytes(bytes);
+        let handle = AdsNotificationHandle::from_bytes(bytes);
         assert_eq!(handle.to_bytes(), bytes);
         assert_eq!(handle.as_u32(), 0x0000_001A);
     }
@@ -133,14 +133,14 @@ mod tests {
     #[test]
     fn test_try_from_slice_valid() {
         let bytes = [0x01, 0x02, 0x03, 0x04];
-        let handle = NotificationHandle::try_from_slice(&bytes).unwrap();
+        let handle = AdsNotificationHandle::try_from_slice(&bytes).unwrap();
         assert_eq!(handle.as_u32(), 0x04030201);
     }
 
     #[test]
     fn test_try_from_slice_too_long() {
         let bytes = [0x01, 0x02, 0x03, 0x04, 0xFF, 0xFF];
-        let err = NotificationHandle::try_from_slice(&bytes).unwrap_err();
+        let err = AdsNotificationHandle::try_from_slice(&bytes).unwrap_err();
         assert!(matches!(
             err,
             AdsNotificationHandleError::UnexpectedLength {
@@ -152,7 +152,7 @@ mod tests {
 
     #[test]
     fn test_try_from_slice_too_short() {
-        let err = NotificationHandle::try_from_slice(&[0x01, 0x02, 0x03]).unwrap_err();
+        let err = AdsNotificationHandle::try_from_slice(&[0x01, 0x02, 0x03]).unwrap_err();
         assert!(matches!(
             err,
             AdsNotificationHandleError::UnexpectedLength {
@@ -166,9 +166,9 @@ mod tests {
     fn test_equality_and_hash() {
         use std::collections::HashMap;
 
-        let h1 = NotificationHandle::from(42_u32);
-        let h2 = NotificationHandle::from(42_u32);
-        let h3 = NotificationHandle::from(99_u32);
+        let h1 = AdsNotificationHandle::from(42_u32);
+        let h2 = AdsNotificationHandle::from(42_u32);
+        let h3 = AdsNotificationHandle::from(99_u32);
 
         assert_eq!(h1, h2);
         assert_ne!(h1, h3);
@@ -181,22 +181,22 @@ mod tests {
 
     #[test]
     fn test_serde_notification_handle_serialize() {
-        let handle = NotificationHandle::from(42_u32);
+        let handle = AdsNotificationHandle::from(42_u32);
         let s = serde_json::to_string(&handle).unwrap();
         assert_eq!(s, "42");
     }
 
     #[test]
     fn test_serde_notification_handle_deserialize() {
-        let handle: NotificationHandle = serde_json::from_str("42").unwrap();
-        assert_eq!(handle, NotificationHandle::from(42_u32));
+        let handle: AdsNotificationHandle = serde_json::from_str("42").unwrap();
+        assert_eq!(handle, AdsNotificationHandle::from(42_u32));
     }
 
     #[test]
     fn test_serde_notification_handle_roundtrip() {
-        let original = NotificationHandle::from(0x0000_001A_u32);
+        let original = AdsNotificationHandle::from(0x0000_001A_u32);
         let s = serde_json::to_string(&original).unwrap();
-        let back: NotificationHandle = serde_json::from_str(&s).unwrap();
+        let back: AdsNotificationHandle = serde_json::from_str(&s).unwrap();
         assert_eq!(original, back);
     }
 }

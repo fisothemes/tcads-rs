@@ -11,10 +11,10 @@ use std::sync::mpsc::{Receiver, TryRecvError};
 use std::sync::{Arc, OnceLock, RwLock};
 use std::time::Duration;
 use tcads_core::{
-    AdsError, AdsNotificationAttrib, AdsNotificationSampleOwned, AdsSymbolInfo,
-    AdsSymbolInfoIteratorOwned, AdsSymbolUploadInfo, AdsSymbolUploadInfoV3, AdsTransMode,
-    AdsTypeInfo, AdsTypeInfoIteratorOwned, AmsAddr, AmsPort, IndexGroup, IndexOffset,
-    NotificationHandle, SumReadRequest, SumReadWriteRequest, SumWriteRequest, SymbolHandle,
+    AdsError, AdsNotificationAttrib, AdsNotificationHandle, AdsNotificationSampleOwned,
+    AdsSymbolInfo, AdsSymbolInfoIteratorOwned, AdsSymbolUploadInfo, AdsSymbolUploadInfoV3,
+    AdsTransMode, AdsTypeInfo, AdsTypeInfoIteratorOwned, AmsAddr, AmsPort, IndexGroup, IndexOffset,
+    SumReadRequest, SumReadWriteRequest, SumWriteRequest, SymbolHandle,
 };
 
 /// A high-level client for interacting with a specific TwinCAT runtime.
@@ -165,7 +165,7 @@ impl AdsRuntime {
     /// dropped, or explicitly via [`SymbolVersionReceiver::unsubscribe`].
     pub fn subscribe_symbol_version(
         &self,
-    ) -> crate::Result<(SymbolVersionReceiver, NotificationHandle)> {
+    ) -> crate::Result<(SymbolVersionReceiver, AdsNotificationHandle)> {
         let (rx, notif_handle) = self.device.add_notification(
             self.target,
             IndexGroup::SYMBOL_VERSION,
@@ -441,7 +441,7 @@ impl AdsRuntime {
         trans_mode: AdsTransMode,
         max_delay: Duration,
         cycle_time: Duration,
-    ) -> crate::Result<(ValueReceiver<T>, NotificationHandle)>
+    ) -> crate::Result<(ValueReceiver<T>, AdsNotificationHandle)>
     where
         T: serde::de::DeserializeOwned,
     {
@@ -1005,7 +1005,7 @@ impl AdsRuntime {
     ///
     /// The receiver (i.e. [`ValueReceiver`] or [`SymbolVersionReceiver`]) associated with this
     /// handle will return [`Err(Error::Disconnected)`](crate::Error::Disconnected) on its next call.
-    pub fn unsubscribe_notification(&self, handle: NotificationHandle) -> crate::Result<()> {
+    pub fn unsubscribe_notification(&self, handle: AdsNotificationHandle) -> crate::Result<()> {
         self.device.delete_notification(self.target, handle)
     }
 
@@ -1169,7 +1169,7 @@ impl SymbolVersionReceiver {
     }
 
     /// Returns the notification handle for this subscription.
-    pub fn handle(&self) -> NotificationHandle {
+    pub fn handle(&self) -> AdsNotificationHandle {
         self.guard.handle()
     }
 
@@ -1272,7 +1272,7 @@ where
     }
 
     /// Returns the notification handle for this subscription.
-    pub fn handle(&self) -> NotificationHandle {
+    pub fn handle(&self) -> AdsNotificationHandle {
         self.guard.handle()
     }
 

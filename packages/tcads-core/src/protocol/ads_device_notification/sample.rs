@@ -1,9 +1,9 @@
-use crate::ads::NotificationHandle;
+use crate::ads::AdsNotificationHandle;
 
 /// A zero-copy view of a single ADS notification sample.
 ///
 /// Each sample represents the value of a watched variable at a point in time,
-/// identified by the [`NotificationHandle`] that was assigned when the subscription
+/// identified by the [`AdsNotificationHandle`] that was assigned when the subscription
 /// was created via `AdsAddDeviceNotification`.
 ///
 /// Samples are always parsed as part of an [`AdsStampHeader`](super::stamp::AdsStampHeader),
@@ -14,27 +14,27 @@ use crate::ads::NotificationHandle;
 /// via [`into_owned`](Self::into_owned) or [`to_owned`](Self::to_owned).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AdsNotificationSample<'a> {
-    handle: NotificationHandle,
+    handle: AdsNotificationHandle,
     data: &'a [u8],
 }
 
 impl<'a> AdsNotificationSample<'a> {
     /// The minimum number of bytes a sample occupies on the wire: Handle (4) + Sample Size (4).
-    pub const MIN_SAMPLE_SIZE: usize = NotificationHandle::LENGTH + 4;
+    pub const MIN_SAMPLE_SIZE: usize = AdsNotificationHandle::LENGTH + 4;
 
     /// Creates a new `AdsNotificationSample` from a handle and a data slice.
     ///
     /// The data slice must borrow from the frame that contains this sample.
-    pub fn new(handle: NotificationHandle, data: &'a [u8]) -> Self {
+    pub fn new(handle: AdsNotificationHandle, data: &'a [u8]) -> Self {
         Self { handle, data }
     }
 
-    /// Returns the [`NotificationHandle`] identifying the subscription this sample
+    /// Returns the [`AdsNotificationHandle`] identifying the subscription this sample
     /// belongs to.
     ///
     /// Use this to dispatch the sample to the correct handler, e.g. as a key into
     /// a `HashMap<NotificationHandle, _>`.
-    pub fn handle(&self) -> NotificationHandle {
+    pub fn handle(&self) -> AdsNotificationHandle {
         self.handle
     }
 
@@ -80,7 +80,7 @@ impl<'a> AdsNotificationSample<'a> {
 ///   after parsing.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AdsNotificationSampleOwned {
-    handle: NotificationHandle,
+    handle: AdsNotificationHandle,
     data: Vec<u8>,
 }
 
@@ -91,16 +91,16 @@ impl AdsNotificationSampleOwned {
     /// Creates a new owned notification sample.
     ///
     /// Use this on a **server** to construct notification samples to send to a client.
-    pub fn new(handle: NotificationHandle, data: impl Into<Vec<u8>>) -> Self {
+    pub fn new(handle: AdsNotificationHandle, data: impl Into<Vec<u8>>) -> Self {
         Self {
             handle,
             data: data.into(),
         }
     }
 
-    /// Returns the [`NotificationHandle`] identifying the subscription this sample
+    /// Returns the [`AdsNotificationHandle`] identifying the subscription this sample
     /// belongs to.
-    pub fn handle(&self) -> NotificationHandle {
+    pub fn handle(&self) -> AdsNotificationHandle {
         self.handle
     }
 
@@ -121,8 +121,8 @@ impl AdsNotificationSampleOwned {
         &self.data
     }
 
-    /// Splits the notification sample into a [`NotificationHandle`] and its [`data`](Vec<u8>) part.
-    pub fn into_parts(self) -> (NotificationHandle, Vec<u8>) {
+    /// Splits the notification sample into a [`AdsNotificationHandle`] and its [`data`](Vec<u8>) part.
+    pub fn into_parts(self) -> (AdsNotificationHandle, Vec<u8>) {
         (self.handle, self.data)
     }
 
@@ -158,8 +158,8 @@ impl<'a> From<&'a AdsNotificationSampleOwned> for AdsNotificationSample<'a> {
 mod tests {
     use super::*;
 
-    fn make_handle(val: u32) -> NotificationHandle {
-        NotificationHandle::from(val)
+    fn make_handle(val: u32) -> AdsNotificationHandle {
+        AdsNotificationHandle::from(val)
     }
 
     #[test]
@@ -284,7 +284,7 @@ mod tests {
         let s1 = AdsNotificationSampleOwned::new(h1, data.clone());
         let s2 = AdsNotificationSampleOwned::new(h2, data.clone());
 
-        let mut handlers: HashMap<NotificationHandle, &str> = HashMap::new();
+        let mut handlers: HashMap<AdsNotificationHandle, &str> = HashMap::new();
         handlers.insert(h1, "nCount handler");
         handlers.insert(h2, "bIncrement handler");
 

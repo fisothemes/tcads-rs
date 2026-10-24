@@ -15,8 +15,8 @@ use std::thread;
 use std::time::Duration;
 use tcads::client::devices::blocking::AdsDevice;
 use tcads::core::{
-    AdsNotificationAttrib, AdsNotificationSampleOwned, AdsTransMode, AmsAddr, IndexGroup,
-    IndexOffset, NotificationHandle,
+    AdsNotificationAttrib, AdsNotificationHandle, AdsNotificationSampleOwned, AdsTransMode,
+    AmsAddr, IndexGroup, IndexOffset,
 };
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -131,7 +131,7 @@ fn add_notification<T: Sized>(
     device: &AdsDevice,
     target: AmsAddr,
     handle: IndexOffset,
-) -> Result<(Receiver<AdsNotificationSampleOwned>, NotificationHandle)> {
+) -> Result<(Receiver<AdsNotificationSampleOwned>, AdsNotificationHandle)> {
     Ok(device.add_notification(
         target,
         IndexGroup::SYMBOL_VALUE_BY_HANDLE,
