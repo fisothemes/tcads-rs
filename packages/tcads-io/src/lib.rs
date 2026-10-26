@@ -69,3 +69,5 @@ pub mod tokio;
 /// Runtime-agnostic asynchronous I/O utilizing [`futures::io`].
 #[cfg(feature = "futures")]
 pub mod futures;
+
+pub use tcads_core as core;

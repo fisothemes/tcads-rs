@@ -235,6 +235,7 @@ pub use de::{from_bytes, from_rpc_fields};
 pub use error::{Error, Result};
 pub use ser::{to_bytes, to_rpc_fields, to_vec};
 pub use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
+pub use tcads_core as core;
 pub use type_cache::AdsTypeCache;
 pub use type_provider::TypeProvider;
 pub use value::{Float, Integer, Number, SignedInteger, UnsignedInteger, Value};
