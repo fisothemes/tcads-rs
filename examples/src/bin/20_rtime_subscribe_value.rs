@@ -41,8 +41,9 @@ async fn main() -> Result<()> {
     let task_handle = tokio::spawn(async move {
         for i in 1..=5 {
             match rx.recv().await {
-                Ok(value) => {
-                    println!("[Background] Event {i}: {sym_name} = {value:?}");
+                Ok(notif) => {
+                    let (timestamp, value) = notif.into_parts();
+                    println!("[Background] Event {i}: {sym_name} = {value:?} at {timestamp}");
                 }
                 Err(Error::HandleInvalidated(sym)) => {
                     eprintln!(
