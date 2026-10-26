@@ -91,10 +91,8 @@ async fn handle<R: AsyncRead + Unpin>(
 
                         // Handles are only unique per device, so route on the sender too.
                         let source = *header.source();
-                        for (_, sample) in notif.iter_samples() {
-                            ads_notifs
-                                .dispatch(source, sample.handle(), sample.to_owned())
-                                .await;
+                        for (timestamp, sample) in notif.iter_samples() {
+                            ads_notifs.dispatch(source, timestamp, sample).await;
                         }
                     }
                     // Promote here, before the next frame is read. TwinCAT sends the first
@@ -374,8 +372,8 @@ mod tests {
         .await
         .unwrap();
 
-        assert_eq!(plc_rx.recv().await.unwrap().data(), &[0xAA; 4]);
-        assert_eq!(logger_rx.recv().await.unwrap().data(), &[0xBB; 4]);
+        assert_eq!(plc_rx.recv().await.unwrap().value(), &[0xAA; 4]);
+        assert_eq!(logger_rx.recv().await.unwrap().value(), &[0xBB; 4]);
         assert!(plc_rx.try_recv().is_err());
         assert!(logger_rx.try_recv().is_err());
     }

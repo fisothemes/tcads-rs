@@ -356,8 +356,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    while let Ok(value) = rx.recv().await {
-        println!("MAIN.nCount = {value}");
+    while let Ok(n) = rx.recv().await {
+      println!("MAIN.nCount = {} at {}", n.value(), n.timestamp());
     }
 
     Ok(())

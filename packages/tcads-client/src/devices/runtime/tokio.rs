@@ -1,7 +1,8 @@
 use super::symbol_cache::{SymbolCache, SymbolEntry};
 use super::{multi, rpc};
 use crate::devices::tokio::{AdsDevice, AdsDeviceExt};
-use crate::notif_guard::tokio::NotificationGuard;
+use crate::notification::AdsNotification;
+use crate::notification::guard::tokio::NotificationGuard;
 use futures_core::Stream;
 use std::collections::VecDeque;
 use std::marker::PhantomData;
@@ -12,9 +13,9 @@ use std::sync::{Arc, RwLock};
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tcads_core::{
-    AdsError, AdsNotificationAttrib, AdsNotificationHandle, AdsNotificationSampleOwned,
-    AdsSymbolInfo, AdsSymbolInfoIteratorOwned, AdsSymbolUploadInfo, AdsSymbolUploadInfoV3,
-    AdsTransMode, AdsTypeInfo, AdsTypeInfoIteratorOwned, AmsAddr, AmsPort, IndexGroup, IndexOffset,
+    AdsError, AdsNotificationAttrib, AdsNotificationHandle, AdsSymbolInfo,
+    AdsSymbolInfoIteratorOwned, AdsSymbolUploadInfo, AdsSymbolUploadInfoV3, AdsTransMode,
+    AdsTypeInfo, AdsTypeInfoIteratorOwned, AmsAddr, AmsPort, IndexGroup, IndexOffset,
     SumReadRequest, SumReadWriteRequest, SumWriteRequest, SymbolHandle,
 };
 use tokio::sync::OnceCell;
@@ -166,8 +167,8 @@ impl AdsRuntime {
     /// were relying on) rather than assume nothing changed just because you didn't see a
     /// notification for it.
     ///
-    /// Returns a [`SymbolVersionReceiver`] that decodes each notification into the new
-    /// version byte. The subscription is cancelled automatically when the receiver is
+    /// Returns a [`SymbolVersionReceiver`] that decodes each notification into an
+    /// [`AdsNotification`] holding the new version byte and when the PLC reported it. The subscription is cancelled automatically when the receiver is
     /// dropped, or explicitly via [`SymbolVersionReceiver::unsubscribe`].
     pub async fn subscribe_symbol_version(
         &self,
@@ -444,7 +445,10 @@ impl AdsRuntime {
     /// fixed interval, useful for fast-changing values where on-change would
     /// flood the subscription.
     ///
-    /// Returns a [`ValueReceiver<T>`] that decodes each sample into `T`.
+    /// Returns a [`ValueReceiver<T>`] that decodes each sample into an
+    /// [`AdsNotification<T>`]: the value and the PLC time it was sampled at. With a
+    /// non-zero `max_delay` the PLC batches samples, so this timestamp, not the time
+    /// you receive the item, is when the value was true.
     ///
     /// # Handle invalidation
     ///
@@ -1231,18 +1235,18 @@ impl AdsRuntime {
 
 /// A receiver for decoded Symbol Version change notifications.
 ///
-/// Wraps the raw ADS notification channel and decodes each sample into the new version
-/// byte on demand. The subscription is cancelled automatically when this is dropped.
+/// Wraps the raw ADS notification channel and decodes each sample into an
+/// [`AdsNotification`] holding the new version byte, on demand. The subscription is cancelled automatically when this is dropped.
 ///
 /// Obtain one by calling [`AdsRuntime::subscribe_symbol_version`].
 pub struct SymbolVersionReceiver {
-    rx: Receiver<AdsNotificationSampleOwned>,
+    rx: Receiver<AdsNotification>,
     guard: NotificationGuard,
 }
 
 impl SymbolVersionReceiver {
     /// Creates a new instance of the [`SymbolVersionReceiver`].
-    pub fn new(rx: Receiver<AdsNotificationSampleOwned>, guard: NotificationGuard) -> Self {
+    pub fn new(rx: Receiver<AdsNotification>, guard: NotificationGuard) -> Self {
         Self { rx, guard }
     }
 
@@ -1251,16 +1255,15 @@ impl SymbolVersionReceiver {
         self.guard.handle()
     }
 
-    fn decode(sample: AdsNotificationSampleOwned) -> crate::Result<u8> {
-        let data = sample.data();
-        if data.len() != 1 {
-            return Err(AdsError::UnexpectedDataLength {
+    fn decode(notification: AdsNotification) -> crate::Result<AdsNotification<u8>> {
+        notification.try_map(|data| match data.as_slice() {
+            [version] => Ok(*version),
+            _ => Err(AdsError::UnexpectedDataLength {
                 expected: 1,
                 got: data.len(),
             }
-            .into());
-        }
-        Ok(data[0])
+            .into()),
+        })
     }
 
     /// Asynchronously awaits the next symbol version change.
@@ -1273,9 +1276,9 @@ impl SymbolVersionReceiver {
     /// Unlike the blocking [`recv`](super::blocking::SymbolVersionReceiver::recv), this
     /// method requires `&mut self` because Tokio's [`Receiver`] does not support
     /// shared references.
-    pub async fn recv(&mut self) -> crate::Result<u8> {
-        let sample = self.rx.recv().await.ok_or(crate::Error::Disconnected)?;
-        Self::decode(sample)
+    pub async fn recv(&mut self) -> crate::Result<AdsNotification<u8>> {
+        let notification = self.rx.recv().await.ok_or(crate::Error::Disconnected)?;
+        Self::decode(notification)
     }
 
     /// Returns the new symbol version if a change is immediately available, without
@@ -1284,9 +1287,9 @@ impl SymbolVersionReceiver {
     /// Returns `Ok(None)` if no sample is currently available,
     /// or [`Err(Error::Disconnected)`](crate::Error::Disconnected) if the
     /// subscription is cancelled or the connection is lost.
-    pub fn try_recv(&mut self) -> crate::Result<Option<u8>> {
+    pub fn try_recv(&mut self) -> crate::Result<Option<AdsNotification<u8>>> {
         match self.rx.try_recv() {
-            Ok(sample) => Ok(Some(Self::decode(sample)?)),
+            Ok(notification) => Ok(Some(Self::decode(notification)?)),
             Err(TryRecvError::Empty) => Ok(None),
             Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
         }
@@ -1302,12 +1305,12 @@ impl SymbolVersionReceiver {
 }
 
 impl Stream for SymbolVersionReceiver {
-    type Item = crate::Result<u8>;
+    type Item = crate::Result<AdsNotification<u8>>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
         match this.rx.poll_recv(cx) {
-            Poll::Ready(Some(sample)) => Poll::Ready(Some(Self::decode(sample))),
+            Poll::Ready(Some(notification)) => Poll::Ready(Some(Self::decode(notification))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
         }
@@ -1316,13 +1319,13 @@ impl Stream for SymbolVersionReceiver {
 
 /// A receiver for decoded value-change notifications on a single symbol.
 ///
-/// Wraps the raw ADS notification channel and decodes each sample into `T` on
-/// demand. The subscription is cancelled automatically when this is
+/// Wraps the raw ADS notification channel and decodes each sample into an
+/// [`AdsNotification<T>`] on demand. The subscription is cancelled automatically when this is
 /// dropped, or explicitly via [`unsubscribe`](Self::unsubscribe).
 ///
 /// Obtain one by calling [`AdsRuntime::subscribe_value`].
 pub struct ValueReceiver<T> {
-    rx: Receiver<AdsNotificationSampleOwned>,
+    rx: Receiver<AdsNotification>,
     guard: NotificationGuard,
     cache: Arc<SymbolCache>,
     path: Arc<str>,
@@ -1336,7 +1339,7 @@ where
 {
     /// Creates a new instance of the [`ValueReceiver`].
     pub fn new(
-        rx: Receiver<AdsNotificationSampleOwned>,
+        rx: Receiver<AdsNotification>,
         guard: NotificationGuard,
         cache: Arc<SymbolCache>,
         path: Arc<str>,
@@ -1362,13 +1365,15 @@ where
         &self.path
     }
 
-    fn decode(&self, sample: AdsNotificationSampleOwned) -> crate::Result<T> {
-        let data = sample.data();
-        if data.is_empty() {
-            self.cache.clear();
-            return Err(crate::Error::HandleInvalidated(self.path.clone()));
-        }
-        tcads_serde::from_bytes(data, &self.type_info, &*self.cache.types()?).map_err(Into::into)
+    fn decode(&self, notification: AdsNotification) -> crate::Result<AdsNotification<T>> {
+        notification.try_map(|data| {
+            if data.is_empty() {
+                self.cache.clear();
+                return Err(crate::Error::HandleInvalidated(self.path.clone()));
+            }
+            tcads_serde::from_bytes(&data, &self.type_info, &*self.cache.types()?)
+                .map_err(Into::into)
+        })
     }
 
     /// Asynchronously awaits the next value change.
@@ -1378,9 +1383,9 @@ where
     /// [`Err(Error::HandleInvalidated)`](crate::Error::HandleInvalidated) if an online change
     /// invalidated the handle backing this subscription (see
     /// [`subscribe_value`](AdsRuntime::subscribe_value)'s doc comment).
-    pub async fn recv(&mut self) -> crate::Result<T> {
-        let sample = self.rx.recv().await.ok_or(crate::Error::Disconnected)?;
-        self.decode(sample)
+    pub async fn recv(&mut self) -> crate::Result<AdsNotification<T>> {
+        let notification = self.rx.recv().await.ok_or(crate::Error::Disconnected)?;
+        self.decode(notification)
     }
 
     /// Returns the next value if a sample is immediately available, without awaiting.
@@ -1389,9 +1394,9 @@ where
     /// [`Err(Error::Disconnected)`](crate::Error::Disconnected) if the
     /// subscription is cancelled or the connection is lost, or
     /// [`Err(Error::HandleInvalidated)`](crate::Error::HandleInvalidated) per [`recv`](Self::recv).
-    pub fn try_recv(&mut self) -> crate::Result<Option<T>> {
+    pub fn try_recv(&mut self) -> crate::Result<Option<AdsNotification<T>>> {
         match self.rx.try_recv() {
-            Ok(sample) => Ok(Some(self.decode(sample)?)),
+            Ok(notification) => Ok(Some(self.decode(notification)?)),
             Err(TryRecvError::Empty) => Ok(None),
             Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
         }
@@ -1410,12 +1415,12 @@ impl<T> Stream for ValueReceiver<T>
 where
     T: serde::de::DeserializeOwned,
 {
-    type Item = crate::Result<T>;
+    type Item = crate::Result<AdsNotification<T>>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
         match this.rx.poll_recv(cx) {
-            Poll::Ready(Some(sample)) => Poll::Ready(Some(this.decode(sample))),
+            Poll::Ready(Some(notification)) => Poll::Ready(Some(this.decode(notification))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
         }

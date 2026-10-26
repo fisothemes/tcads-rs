@@ -1,5 +1,6 @@
 use crate::devices::tokio::{AdsDevice, AdsDeviceExt};
-use crate::notif_guard::tokio::NotificationGuard;
+use crate::notification::AdsNotification;
+use crate::notification::guard::tokio::NotificationGuard;
 use futures_core::Stream;
 use std::net::ToSocketAddrs;
 use std::pin::Pin;
@@ -7,8 +8,8 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 use tcads_core::protocol::AdsLoggerWriteRequestOwned;
 use tcads_core::{
-    AdsNotificationAttrib, AdsNotificationHandle, AdsNotificationSampleOwned, AdsTransMode,
-    AmsAddr, AmsNetId, AmsPort, IndexGroup, IndexOffset, LogEntry, LogMessageType, WindowsFileTime,
+    AdsNotificationAttrib, AdsNotificationHandle, AdsTransMode, AmsAddr, AmsNetId, AmsPort,
+    IndexGroup, IndexOffset, LogEntry, LogMessageType, WindowsFileTime,
 };
 use tokio::sync::mpsc::UnboundedReceiver as Receiver;
 use tokio::sync::mpsc::error::TryRecvError;
@@ -150,7 +151,8 @@ impl AdsLogger {
 
     /// Subscribes asynchronously to TwinCAT logger notifications.
     ///
-    /// Returns a [`LogEntryReceiver`] that yields decoded [`LogEntry`] values.
+    /// Returns a [`LogEntryReceiver`] that yields decoded [`LogEntry`] values wrapped in
+    /// [`AdsNotification`]s.
     /// The subscription is cancelled automatically when the [`LogEntryReceiver`] is dropped.
     ///
     /// Multiple subscriptions can be active simultaneously.
@@ -186,24 +188,33 @@ impl AdsLogger {
 
 /// An asynchronous receiver for decoded [`LogEntry`] values.
 ///
-/// Wraps the raw ADS notification channel and decodes each sample on demand.
-/// The subscription is cancelled automatically when this is dropped.
+/// Wraps the raw ADS notification channel and decodes each sample into an
+/// [`AdsNotification<LogEntry>`] on demand. The subscription is cancelled automatically
+/// when this is dropped.
+///
+/// The notification's [`timestamp`](AdsNotification::timestamp) is when the logger
+/// published the entry. The entry's own [`timestamp`](LogEntry::timestamp) is the time
+/// its writer gave it, and the two can differ.
 ///
 /// Obtain one by calling [`AdsLogger::subscribe`].
 pub struct LogEntryReceiver {
-    rx: Receiver<AdsNotificationSampleOwned>,
+    rx: Receiver<AdsNotification>,
     guard: NotificationGuard,
 }
 
 impl LogEntryReceiver {
     /// Creates a new instance of the [`LogEntryReceiver`].
-    pub fn new(rx: Receiver<AdsNotificationSampleOwned>, guard: NotificationGuard) -> Self {
+    pub fn new(rx: Receiver<AdsNotification>, guard: NotificationGuard) -> Self {
         Self { rx, guard }
     }
 
     /// Returns the notification handle for this subscription.
     pub fn handle(&self) -> AdsNotificationHandle {
         self.guard.handle()
+    }
+
+    fn decode(notification: AdsNotification) -> crate::Result<AdsNotification<LogEntry>> {
+        notification.try_map(|data| Ok(LogEntry::try_from(data.as_slice())?))
     }
 
     /// Asynchronously awaits the next log entry.
@@ -216,9 +227,9 @@ impl LogEntryReceiver {
     /// Unlike the blocking [`recv`](super::blocking::LogEntryReceiver::recv), this
     /// method requires `&mut self` because Tokio's [`Receiver`] does not support
     /// shared references.
-    pub async fn recv(&mut self) -> crate::Result<LogEntry> {
-        let sample = self.rx.recv().await.ok_or(crate::Error::Disconnected)?;
-        Ok(LogEntry::try_from(sample.data())?)
+    pub async fn recv(&mut self) -> crate::Result<AdsNotification<LogEntry>> {
+        let notification = self.rx.recv().await.ok_or(crate::Error::Disconnected)?;
+        Self::decode(notification)
     }
 
     /// Returns the next log entry if one is immediately available, without awaiting.
@@ -226,9 +237,9 @@ impl LogEntryReceiver {
     /// Returns `Ok(None)` if no sample is currently available,
     /// or [`Err(Error::Disconnected)`](crate::Error::Disconnected) if the
     /// subscription is cancelled or the connection is lost.
-    pub fn try_recv(&mut self) -> crate::Result<Option<LogEntry>> {
+    pub fn try_recv(&mut self) -> crate::Result<Option<AdsNotification<LogEntry>>> {
         match self.rx.try_recv() {
-            Ok(sample) => Ok(Some(LogEntry::try_from(sample.data())?)),
+            Ok(notification) => Ok(Some(Self::decode(notification)?)),
             Err(TryRecvError::Empty) => Ok(None),
             Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
         }
@@ -244,14 +255,12 @@ impl LogEntryReceiver {
 }
 
 impl Stream for LogEntryReceiver {
-    type Item = crate::Result<LogEntry>;
+    type Item = crate::Result<AdsNotification<LogEntry>>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
         match this.rx.poll_recv(cx) {
-            Poll::Ready(Some(sample)) => {
-                Poll::Ready(Some(LogEntry::try_from(sample.data()).map_err(Into::into)))
-            }
+            Poll::Ready(Some(notification)) => Poll::Ready(Some(Self::decode(notification))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
         }

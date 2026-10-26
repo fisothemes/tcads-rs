@@ -1,4 +1,5 @@
-use crate::notif_guard::tokio::NotificationGuard;
+use crate::notification::AdsNotification;
+use crate::notification::guard::tokio::NotificationGuard;
 use crate::tasks::tokio::{
     AdsNotificationDispatcher, AmsRequestDispatchKey, AmsRequestDispatcher, AmsRequestWriter,
     AmsResponseReader, RouterNotificationDispatcher,
@@ -19,11 +20,11 @@ use tcads_core::protocol::utils::parse_ads_frame;
 use tcads_core::protocol::{
     AdsAddDeviceNotificationRequest, AdsAddDeviceNotificationResponse,
     AdsDeleteDeviceNotificationRequest, AdsDeleteDeviceNotificationResponse,
-    AdsNotificationSampleOwned, AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse,
-    AdsReadRequest, AdsReadResponse, AdsReadStateRequest, AdsReadStateResponse,
-    AdsReadWriteRequestOwned, AdsReadWriteResponse, AdsWriteControlRequestOwned,
-    AdsWriteControlResponse, AdsWriteRequestOwned, AdsWriteResponse, GetLocalNetIdRequest,
-    GetLocalNetIdResponse, PortCloseRequest, PortConnectRequest, PortConnectResponse,
+    AdsReadDeviceInfoRequest, AdsReadDeviceInfoResponse, AdsReadRequest, AdsReadResponse,
+    AdsReadStateRequest, AdsReadStateResponse, AdsReadWriteRequestOwned, AdsReadWriteResponse,
+    AdsWriteControlRequestOwned, AdsWriteControlResponse, AdsWriteRequestOwned, AdsWriteResponse,
+    GetLocalNetIdRequest, GetLocalNetIdResponse, PortCloseRequest, PortConnectRequest,
+    PortConnectResponse,
 };
 use tcads_core::{
     AdsCommand, AdsDeviceVersion, AdsError, AdsHeader, AdsNotificationAttrib,
@@ -595,8 +596,9 @@ impl AdsDevice {
 
     /// Registers a device notification on `target`.
     ///
-    /// Returns a [`Receiver`] for incoming samples and the [`AdsNotificationHandle`]
-    /// assigned by the PLC.
+    /// Returns a [`Receiver`] and the [`AdsNotificationHandle`] assigned by the PLC. Each
+    /// incoming sample arrives as an [`AdsNotification`] holding the sample's bytes and the
+    /// timestamp the device stamped it with.
     ///
     /// The receiver returns [`None`] after [`delete_notification`](Self::delete_notification)
     /// is called, or when the router transitions to [`RouterState::Stop`] or [`RouterState::Removed`].
@@ -610,7 +612,7 @@ impl AdsDevice {
         index_group: IndexGroup,
         index_offset: IndexOffset,
         notif_attr: AdsNotificationAttrib,
-    ) -> crate::Result<(Receiver<AdsNotificationSampleOwned>, AdsNotificationHandle)> {
+    ) -> crate::Result<(Receiver<AdsNotification>, AdsNotificationHandle)> {
         let invoke_id = self.next_invoke_id();
 
         let rx = self.inner.ads_notifs.pre_register(invoke_id).await;
@@ -944,15 +946,15 @@ impl AdsDevice {
     /// # Returns
     ///
     /// A vector containing a `Result` for every request.
-    /// * **Success:** Yields the assigned `NotificationHandle` and a dedicated `Receiver` channel for that specific variable's data stream.
-    /// * **Failure:** Yields an `AdsReturnCode`. The internal channel is automatically dropped, preventing memory leaks.
+    /// * **Success:** Yields the assigned [`AdsNotificationHandle`] and a dedicated [`Receiver`]
+    ///   of [`AdsNotification`]s for that variable.
+    /// * **Failure:** Yields an `AdsReturnCode`. The internal channel is automatically dropped,
+    ///   preventing memory leaks.
     pub async fn add_multi_notification<I, R>(
         &self,
         target: AmsAddr,
         requests: I,
-    ) -> crate::Result<
-        Vec<Result<(AdsNotificationHandle, Receiver<AdsNotificationSampleOwned>), AdsReturnCode>>,
-    >
+    ) -> crate::Result<Vec<Result<(AdsNotificationHandle, Receiver<AdsNotification>), AdsReturnCode>>>
     where
         I: IntoIterator<Item = R>,
         I::IntoIter: ExactSizeIterator,
@@ -1084,7 +1086,8 @@ impl AdsDevice {
     /// Subscribes to ADS State and Device State change notifications.
     ///
     /// This notification fires whenever the target PLC transitions between
-    /// execution states (e.g. from `RUN` to `STOP` or `CONFIG`).
+    /// execution states (e.g. from `RUN` to `STOP` or `CONFIG`). Each change arrives
+    /// with the timestamp the device stamped it with.
     pub async fn subscribe_state(
         &self,
         target: AmsAddr,
@@ -1108,14 +1111,19 @@ impl AdsDevice {
     }
 }
 
+/// A receiver for [`AdsState`] change notifications.
+///
+/// Each item is an [`AdsNotification`] holding the new state and the time the device
+/// reported the change. The subscription is cancelled automatically when this is
+/// dropped, or explicitly via [`unsubscribe`](Self::unsubscribe).
 pub struct StateReceiver {
-    rx: Receiver<AdsNotificationSampleOwned>,
+    rx: Receiver<AdsNotification>,
     guard: NotificationGuard,
 }
 
 impl StateReceiver {
     /// Creates a new instance of the [`StateReceiver`].
-    pub fn new(rx: Receiver<AdsNotificationSampleOwned>, guard: NotificationGuard) -> Self {
+    pub fn new(rx: Receiver<AdsNotification>, guard: NotificationGuard) -> Self {
         Self { rx, guard }
     }
 
@@ -1124,32 +1132,35 @@ impl StateReceiver {
         self.guard.handle()
     }
 
-    fn decode(sample: AdsNotificationSampleOwned) -> crate::Result<(AdsState, DeviceState)> {
-        let data = sample.data();
-        if data.len() < 4 {
-            return Err(AdsError::UnexpectedDataLength {
-                expected: 4,
-                got: data.len(),
+    fn decode(
+        notification: AdsNotification,
+    ) -> crate::Result<AdsNotification<(AdsState, DeviceState)>> {
+        notification.try_map(|data| {
+            if data.len() < 4 {
+                return Err(AdsError::UnexpectedDataLength {
+                    expected: 4,
+                    got: data.len(),
+                }
+                .into());
             }
-            .into());
-        }
 
-        let ads_state = AdsState::from_bytes([data[0], data[1]]);
-        let device_state = DeviceState::from_le_bytes([data[2], data[3]]);
+            let ads_state = AdsState::from_bytes([data[0], data[1]]);
+            let device_state = DeviceState::from_le_bytes([data[2], data[3]]);
 
-        Ok((ads_state, device_state))
+            Ok((ads_state, device_state))
+        })
     }
 
     /// Await until state changes.
-    pub async fn recv(&mut self) -> crate::Result<(AdsState, DeviceState)> {
-        let sample = self.rx.recv().await.ok_or(crate::Error::Disconnected)?;
-        Self::decode(sample)
+    pub async fn recv(&mut self) -> crate::Result<AdsNotification<(AdsState, DeviceState)>> {
+        let notification = self.rx.recv().await.ok_or(crate::Error::Disconnected)?;
+        Self::decode(notification)
     }
 
     /// Returns the new state if a change is immediately available, without blocking.
-    pub fn try_recv(&mut self) -> crate::Result<Option<(AdsState, DeviceState)>> {
+    pub fn try_recv(&mut self) -> crate::Result<Option<AdsNotification<(AdsState, DeviceState)>>> {
         match self.rx.try_recv() {
-            Ok(sample) => Ok(Some(Self::decode(sample)?)),
+            Ok(notification) => Ok(Some(Self::decode(notification)?)),
             Err(TryRecvError::Empty) => Ok(None),
             Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
         }
@@ -1162,12 +1173,12 @@ impl StateReceiver {
 }
 
 impl Stream for StateReceiver {
-    type Item = crate::Result<(AdsState, DeviceState)>;
+    type Item = crate::Result<AdsNotification<(AdsState, DeviceState)>>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
         match this.rx.poll_recv(cx) {
-            Poll::Ready(Some(sample)) => Poll::Ready(Some(Self::decode(sample))),
+            Poll::Ready(Some(notification)) => Poll::Ready(Some(Self::decode(notification))),
             Poll::Ready(None) => Poll::Ready(None),
             Poll::Pending => Poll::Pending,
         }
@@ -1273,9 +1284,8 @@ pub trait AdsDeviceExt: Send + Sync {
         index_group: IndexGroup,
         index_offset: IndexOffset,
         notif_attr: AdsNotificationAttrib,
-    ) -> impl Future<
-        Output = crate::Result<(Receiver<AdsNotificationSampleOwned>, AdsNotificationHandle)>,
-    > + Send
+    ) -> impl Future<Output = crate::Result<(Receiver<AdsNotification>, AdsNotificationHandle)>>
+    + Send
     + '_ {
         self.device()
             .add_notification(self.target(), index_group, index_offset, notif_attr)
@@ -1318,7 +1328,7 @@ mod tests {
     use tcads_core::WindowsFileTime;
     use tcads_core::protocol::{
         AdsAddDeviceNotificationResponse, AdsDeleteDeviceNotificationResponse,
-        AdsDeviceNotificationOwned, AdsStampHeaderOwned,
+        AdsDeviceNotificationOwned, AdsNotificationSampleOwned, AdsStampHeaderOwned,
     };
     use tcads_core::{AdsHeader, AdsReturnCode, IndexOffset};
     use tcads_io::tokio::AmsStream;
@@ -1391,7 +1401,7 @@ mod tests {
             .await
             .expect("first sample was dropped")
             .unwrap();
-        assert_eq!(sample.data(), &[0xAB; 4]);
+        assert_eq!(sample.value(), &[0xAB; 4]);
 
         ads.delete_notification(target, handle).await.unwrap();
         let closed = tokio::time::timeout(Duration::from_secs(2), samples.recv())

@@ -1,7 +1,7 @@
+use crate::notification::AdsNotification;
 use std::collections::HashMap;
-use tcads_core::{
-    AdsNotificationHandle, AdsNotificationSampleOwned, AdsReturnCode, AmsAddr, InvokeId,
-};
+use tcads_core::protocol::AdsNotificationSample;
+use tcads_core::{AdsNotificationHandle, AdsReturnCode, AmsAddr, InvokeId, WindowsFileTime};
 use tokio::sync::Mutex;
 use tokio::sync::mpsc::{self, UnboundedReceiver as Receiver, UnboundedSender as Sender};
 
@@ -19,11 +19,11 @@ pub type SubscriptionKey = (AmsAddr, AdsNotificationHandle);
 /// difference is [`tokio::sync::Mutex`] and [`tokio::sync::mpsc`] channels.
 pub struct AdsNotificationDispatcher {
     /// Temporary storage keyed by invoke ID, waiting for handle assignment from the device.
-    pending: Mutex<HashMap<InvokeId, Sender<AdsNotificationSampleOwned>>>,
+    pending: Mutex<HashMap<InvokeId, Sender<AdsNotification>>>,
     /// Temporary storage for batch operations, where one invoke ID yields multiple handles.
-    pending_batches: Mutex<HashMap<InvokeId, Vec<Sender<AdsNotificationSampleOwned>>>>,
+    pending_batches: Mutex<HashMap<InvokeId, Vec<Sender<AdsNotification>>>>,
     /// Permanent storage keyed by [`SubscriptionKey`] once the device assigns a handle.
-    subscriptions: Mutex<HashMap<SubscriptionKey, Sender<AdsNotificationSampleOwned>>>,
+    subscriptions: Mutex<HashMap<SubscriptionKey, Sender<AdsNotification>>>,
     /// The address each requested target answered from, when the two differ.
     ///
     /// A request to `127.0.0.1.1.1` is answered, and its notifications sent, from the
@@ -72,9 +72,9 @@ impl AdsNotificationDispatcher {
     /// Must be called before dispatching the add notification request to the device,
     /// since the device may send an initial sample before the response is received.
     ///
-    /// Returns a [`Receiver`] that will yield incoming [`AdsNotificationSample`](AdsNotificationSampleOwned)s
-    /// for this subscription.
-    pub async fn pre_register(&self, invoke_id: InvokeId) -> Receiver<AdsNotificationSampleOwned> {
+    /// Returns a [`Receiver`] that will yield an [`AdsNotification`] for each incoming
+    /// sample on this subscription.
+    pub async fn pre_register(&self, invoke_id: InvokeId) -> Receiver<AdsNotification> {
         let (tx, rx) = mpsc::unbounded_channel();
         self.pending.lock().await.insert(invoke_id, tx);
         rx
@@ -87,13 +87,12 @@ impl AdsNotificationDispatcher {
     ///
     /// Used by Sum Commands where a single network round-trip subscribes to multiple variables.
     ///
-    /// Returns a collection of [`Receiver`]s that will yield incoming
-    /// [`AdsNotificationSample`](AdsNotificationSampleOwned)s for this subscription.
+    /// Returns one [`Receiver`] per requested subscription, in request order.
     pub async fn pre_register_batch(
         &self,
         invoke_id: InvokeId,
         count: usize,
-    ) -> Vec<Receiver<AdsNotificationSampleOwned>> {
+    ) -> Vec<Receiver<AdsNotification>> {
         let mut receivers = Vec::with_capacity(count);
         let mut senders = Vec::with_capacity(count);
 
@@ -168,24 +167,29 @@ impl AdsNotificationDispatcher {
         }
     }
 
-    /// Routes an incoming [`AdsNotificationSample`](AdsNotificationSampleOwned)
-    /// to the registered subscriber.
+    /// Routes an incoming [`AdsNotificationSample`] to the registered subscriber as an
+    /// [`AdsNotification`].
     ///
-    /// Called by the reader task for each sample in an incoming
-    /// [`AdsDeviceNotification`](tcads_core::protocol::AdsDeviceNotification) frame,
-    /// with `source` taken from the frame's AMS header.
+    /// Called by the reader task for each `(timestamp, sample)` pair yielded by
+    /// [`AdsDeviceNotification::iter_samples`](tcads_core::protocol::AdsDeviceNotification::iter_samples),
+    /// with `source` taken from the frame's AMS header. `timestamp` is the one from the
+    /// sample's enclosing stamp header.
     ///
-    /// If no subscriber is registered for `(source, handle)` the sample is dropped silently.
-    /// If the subscriber's receiver has been dropped the entry is pruned.
+    /// The sample's data is only copied when a subscriber is registered for
+    /// `(source, handle)`. Otherwise the sample is dropped silently. If the subscriber's
+    /// receiver has been dropped the entry is pruned.
     pub async fn dispatch(
         &self,
         source: AmsAddr,
-        handle: AdsNotificationHandle,
-        sample: AdsNotificationSampleOwned,
+        timestamp: WindowsFileTime,
+        sample: &AdsNotificationSample<'_>,
     ) {
-        let key = (source, handle);
+        let key = (source, sample.handle());
         let mut map = self.subscriptions.lock().await;
-        let dead = map.get(&key).is_some_and(|tx| tx.send(sample).is_err());
+        let dead = map.get(&key).is_some_and(|tx| {
+            tx.send(AdsNotification::new(timestamp, sample.data().to_vec()))
+                .is_err()
+        });
         if dead {
             map.remove(&key);
         }
@@ -222,13 +226,25 @@ mod tests {
 
     const PLC: u16 = 851;
     const LOGGER: u16 = 100;
+    const TS: WindowsFileTime = WindowsFileTime::from_raw(133_503_504_000_000_000);
 
     fn addr(port: u16) -> AmsAddr {
         AmsAddr::from_local(port)
     }
 
-    fn make_sample(handle: AdsNotificationHandle, data: u8) -> AdsNotificationSampleOwned {
-        AdsNotificationSampleOwned::new(handle, vec![data; 4])
+    /// Dispatches 4 bytes of `byte` on `handle` from `source`, and returns what the
+    /// subscriber should receive.
+    async fn send(
+        dispatcher: &AdsNotificationDispatcher,
+        source: AmsAddr,
+        handle: AdsNotificationHandle,
+        byte: u8,
+    ) -> AdsNotification {
+        let data = [byte; 4];
+        dispatcher
+            .dispatch(source, TS, &AdsNotificationSample::new(handle, &data))
+            .await;
+        AdsNotification::new(TS, data.to_vec())
     }
 
     #[tokio::test]
@@ -239,10 +255,27 @@ mod tests {
         let mut rx = dispatcher.pre_register(1).await;
         assert!(dispatcher.promote(1, addr(PLC), handle).await);
 
-        let sample = make_sample(handle, 1);
-        dispatcher.dispatch(addr(PLC), handle, sample.clone()).await;
+        let expected = send(&dispatcher, addr(PLC), handle, 1).await;
 
-        assert_eq!(rx.recv().await.unwrap(), sample);
+        assert_eq!(rx.recv().await.unwrap(), expected);
+    }
+
+    #[tokio::test]
+    async fn dispatch_carries_the_stamp_timestamp() {
+        let dispatcher = AdsNotificationDispatcher::new();
+        let handle = AdsNotificationHandle::from(42u32);
+        let ts = WindowsFileTime::from_raw(133_503_504_100_000_000);
+
+        let mut rx = dispatcher.pre_register(1).await;
+        dispatcher.promote(1, addr(PLC), handle).await;
+
+        dispatcher
+            .dispatch(addr(PLC), ts, &AdsNotificationSample::new(handle, &[7]))
+            .await;
+
+        let n = rx.recv().await.unwrap();
+        assert_eq!(n.timestamp(), ts);
+        assert_eq!(n.value(), &vec![7]);
     }
 
     #[tokio::test]
@@ -250,9 +283,7 @@ mod tests {
         let dispatcher = AdsNotificationDispatcher::new();
         let handle = AdsNotificationHandle::from(42u32);
 
-        dispatcher
-            .dispatch(addr(PLC), handle, make_sample(handle, 1))
-            .await;
+        send(&dispatcher, addr(PLC), handle, 1).await;
 
         assert!(dispatcher.subscriptions.lock().await.is_empty());
     }
@@ -265,9 +296,7 @@ mod tests {
         let mut rx = dispatcher.pre_register(1).await;
         dispatcher.promote(1, addr(PLC), handle).await;
 
-        dispatcher
-            .dispatch(addr(LOGGER), handle, make_sample(handle, 1))
-            .await;
+        send(&dispatcher, addr(LOGGER), handle, 1).await;
 
         assert!(rx.try_recv().is_err());
     }
@@ -282,9 +311,7 @@ mod tests {
 
         drop(rx);
 
-        dispatcher
-            .dispatch(addr(PLC), handle, make_sample(handle, 1))
-            .await;
+        send(&dispatcher, addr(PLC), handle, 1).await;
 
         assert!(dispatcher.subscriptions.lock().await.is_empty());
     }
@@ -314,27 +341,19 @@ mod tests {
         let mut logger_rx = dispatcher.pre_register(2).await;
         dispatcher.promote(2, addr(LOGGER), handle).await;
 
-        let plc_sample = make_sample(handle, 0xAA);
-        let logger_sample = make_sample(handle, 0xBB);
-        dispatcher
-            .dispatch(addr(PLC), handle, plc_sample.clone())
-            .await;
-        dispatcher
-            .dispatch(addr(LOGGER), handle, logger_sample.clone())
-            .await;
+        let plc_expected = send(&dispatcher, addr(PLC), handle, 0xAA).await;
+        let logger_expected = send(&dispatcher, addr(LOGGER), handle, 0xBB).await;
 
-        assert_eq!(plc_rx.recv().await.unwrap(), plc_sample);
-        assert_eq!(logger_rx.recv().await.unwrap(), logger_sample);
+        assert_eq!(plc_rx.recv().await.unwrap(), plc_expected);
+        assert_eq!(logger_rx.recv().await.unwrap(), logger_expected);
         assert!(plc_rx.try_recv().is_err());
         assert!(logger_rx.try_recv().is_err());
 
         dispatcher.remove(addr(PLC), handle).await;
 
         assert!(plc_rx.recv().await.is_none());
-        dispatcher
-            .dispatch(addr(LOGGER), handle, logger_sample.clone())
-            .await;
-        assert_eq!(logger_rx.recv().await.unwrap(), logger_sample);
+        let logger_expected = send(&dispatcher, addr(LOGGER), handle, 0xBB).await;
+        assert_eq!(logger_rx.recv().await.unwrap(), logger_expected);
     }
 
     #[tokio::test]
@@ -358,9 +377,8 @@ mod tests {
         // The failed entry's sender was dropped.
         assert!(batch[1].recv().await.is_none());
 
-        let sample = make_sample(h1, 0xAA);
-        dispatcher.dispatch(addr(PLC), h1, sample.clone()).await;
-        assert_eq!(batch[0].recv().await.unwrap(), sample);
+        let expected = send(&dispatcher, addr(PLC), h1, 0xAA).await;
+        assert_eq!(batch[0].recv().await.unwrap(), expected);
         assert!(logger_rx.try_recv().is_err());
     }
 

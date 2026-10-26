@@ -36,9 +36,10 @@ fn main() -> Result<()> {
     let (rx, logger_handle) = logger.subscribe()?;
 
     // Spawn a background thread to listen to TwinCAT logs
-    let thread_handle = thread::spawn(move || {
-        while let Ok(msg) = rx.recv() {
-            println!("[TcLog {:?}] {}", msg.message_type(), msg.message());
+    let thread_handle = thread::spawn(move || { 
+        while let Ok(notif) = rx.recv() {
+            let entry = notif.value();
+            println!("[TcLog {:?}] {}", entry.message_type(), entry.message());
         }
 
         println!("[TcLog] Logger thread exited.");

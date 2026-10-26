@@ -85,8 +85,8 @@ fn handle<R: Read>(
 
                         // Handles are only unique per device, so route on the sender too.
                         let source = *header.source();
-                        for (_, sample) in notif.iter_samples() {
-                            ads_notifs.dispatch(source, sample.handle(), sample.to_owned())?;
+                        for (timestamp, sample) in notif.iter_samples() {
+                            ads_notifs.dispatch(source, timestamp, sample)?;
                         }
                     }
                     // Promote here, before the next frame is read. TwinCAT sends the first

@@ -32,8 +32,9 @@ fn main() -> Result<()> {
     // 3. Subscribe to symbol version changes.
     let (recv, _notif_handle) = device.subscribe_symbol_version()?;
 
-    for version in recv.iter() {
-        println!("Symbol Version Changed: {}", version?);
+    for result in recv.iter() {
+        let (timestamp, version) = result?.into_parts();
+        println!("Symbol Version Changed at {}: {}", timestamp, version);
     }
 
     Ok(())

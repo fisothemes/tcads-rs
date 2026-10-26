@@ -1,12 +1,13 @@
 use crate::devices::blocking::{AdsDevice, AdsDeviceExt};
-use crate::notif_guard::blocking::NotificationGuard;
+use crate::notification::AdsNotification;
+use crate::notification::guard::blocking::NotificationGuard;
 use std::net::ToSocketAddrs;
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::time::Duration;
 use tcads_core::protocol::AdsLoggerWriteRequestOwned;
 use tcads_core::{
-    AdsNotificationAttrib, AdsNotificationHandle, AdsNotificationSampleOwned, AdsTransMode,
-    AmsAddr, AmsNetId, AmsPort, IndexGroup, IndexOffset, LogEntry, LogMessageType, WindowsFileTime,
+    AdsNotificationAttrib, AdsNotificationHandle, AdsTransMode, AmsAddr, AmsNetId, AmsPort,
+    IndexGroup, IndexOffset, LogEntry, LogMessageType, WindowsFileTime,
 };
 
 /// An [`AdsDevice`] client for the TwinCAT system logger on ADS port `100`.
@@ -143,9 +144,10 @@ impl AdsLogger {
         unsafe { self.device.write_frame_only(frame) }
     }
 
-    // Subscribes to logger notifications.
+    /// Subscribes to logger notifications.
     ///
-    /// Returns a [`LogEntryReceiver`] that yields decoded [`LogEntry`] values.
+    /// Returns a [`LogEntryReceiver`] that yields decoded [`LogEntry`] values wrapped in
+    /// [`AdsNotification`]s.
     /// The subscription is cancelled automatically when the [`LogEntryReceiver`]
     /// is dropped, or explicitly via [`unsubscribe`](Self::unsubscribe).
     ///
@@ -179,18 +181,23 @@ impl AdsLogger {
 
 /// A receiver for decoded [`LogEntry`] values.
 ///
-/// Wraps the raw ADS notification channel and decodes each sample on demand.
-/// The subscription is cancelled automatically when this is dropped.
+/// Wraps the raw ADS notification channel and decodes each sample into an
+/// [`AdsNotification<LogEntry>`] on demand. The subscription is cancelled automatically
+/// when this is dropped.
+///
+/// The notification's [`timestamp`](AdsNotification::timestamp) is when the logger
+/// published the entry. The entry's own [`timestamp`](LogEntry::timestamp) is the time
+/// its writer gave it, and the two can differ.
 ///
 /// Obtain one by calling [`AdsLogger::subscribe`].
 pub struct LogEntryReceiver {
-    rx: Receiver<AdsNotificationSampleOwned>,
+    rx: Receiver<AdsNotification>,
     guard: NotificationGuard,
 }
 
 impl LogEntryReceiver {
     /// Creates a new instance of the [`LogEntryReceiver`].
-    pub fn new(rx: Receiver<AdsNotificationSampleOwned>, guard: NotificationGuard) -> Self {
+    pub fn new(rx: Receiver<AdsNotification>, guard: NotificationGuard) -> Self {
         Self { rx, guard }
     }
 
@@ -199,13 +206,16 @@ impl LogEntryReceiver {
         self.guard.handle()
     }
 
+    fn decode(notification: AdsNotification) -> crate::Result<AdsNotification<LogEntry>> {
+        notification.try_map(|data| Ok(LogEntry::try_from(data.as_slice())?))
+    }
+
     /// Blocks until the next log entry arrives.
     ///
     /// Returns [`Err`] when the subscription is cancelled or the connection
     /// is lost.
-    pub fn recv(&self) -> crate::Result<LogEntry> {
-        let sample = self.rx.recv()?;
-        Ok(LogEntry::try_from(sample.data())?)
+    pub fn recv(&self) -> crate::Result<AdsNotification<LogEntry>> {
+        Self::decode(self.rx.recv()?)
     }
 
     /// Blocks until the next log entry arrives or `timeout` elapses.
@@ -213,9 +223,8 @@ impl LogEntryReceiver {
     /// Returns [`Err(Error::Timeout)`](crate::Error::Timeout) if the timeout expires,
     /// or [`Err(Error::Disconnected)`](crate::Error::Disconnected) if the subscription
     /// is cancelled or the connection is lost.
-    pub fn recv_timeout(&self, timeout: Duration) -> crate::Result<LogEntry> {
-        let sample = self.rx.recv_timeout(timeout)?;
-        Ok(LogEntry::try_from(sample.data())?)
+    pub fn recv_timeout(&self, timeout: Duration) -> crate::Result<AdsNotification<LogEntry>> {
+        Self::decode(self.rx.recv_timeout(timeout)?)
     }
 
     /// Returns the next log entry if one is immediately available, without blocking.
@@ -223,9 +232,9 @@ impl LogEntryReceiver {
     /// Returns `Ok(None)` if no sample is currently available,
     /// or [`Err(Error::Disconnected)`](crate::Error::Disconnected) if the
     /// subscription is cancelled or the connection is lost.
-    pub fn try_recv(&self) -> crate::Result<Option<LogEntry>> {
+    pub fn try_recv(&self) -> crate::Result<Option<AdsNotification<LogEntry>>> {
         match self.rx.try_recv() {
-            Ok(sample) => Ok(Some(LogEntry::try_from(sample.data())?)),
+            Ok(notification) => Ok(Some(Self::decode(notification)?)),
             Err(TryRecvError::Empty) => Ok(None),
             Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
         }
@@ -233,7 +242,7 @@ impl LogEntryReceiver {
 
     /// Returns an iterator that blocks on each call, yielding log entries
     /// until the subscription is cancelled or the connection is lost.
-    pub fn iter(&self) -> impl Iterator<Item = crate::Result<LogEntry>> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = crate::Result<AdsNotification<LogEntry>>> + '_ {
         std::iter::from_fn(move || match self.recv() {
             Err(crate::Error::Disconnected) => None,
             result => Some(result),

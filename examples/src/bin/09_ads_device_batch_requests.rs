@@ -90,8 +90,8 @@ fn main() -> Result<()> {
                 // Spawn a listener thread for each successful registration
                 let t = std::thread::spawn(move || {
                     // This loop will automatically break when the channel is dropped!
-                    while let Ok(sample) = rx.recv() {
-                        println!("[Thread {}] Data Received: {:?}", i, sample.data());
+                    while let Ok(notif) = rx.recv() {
+                        println!("[Thread {}] Data Received: {:?}", i, notif.value());
                     }
                     println!("[Thread {}] Channel closed. Thread exiting gracefully.", i);
                 });

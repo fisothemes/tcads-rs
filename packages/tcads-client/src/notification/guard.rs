@@ -15,6 +15,7 @@ pub mod blocking {
     ///
     /// Calls [`delete_notification`](AdsDevice::delete_notification)
     /// synchronously when dropped.
+    #[derive(Debug, Clone)]
     pub struct NotificationGuard {
         handle: AdsNotificationHandle,
         target: AmsAddr,
@@ -81,6 +82,7 @@ pub mod tokio {
     /// when dropped by spawning a task on the current tokio runtime. If no runtime
     /// is available, the clean-up is skipped and the router will clean up the handle
     /// when the connection closes.
+    #[derive(Debug, Clone)]
     pub struct NotificationGuard {
         handle: AdsNotificationHandle,
         target: AmsAddr,

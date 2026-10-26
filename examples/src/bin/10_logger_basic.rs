@@ -41,7 +41,7 @@ fn main() -> Result<()> {
     // 4. Listen for events using the blocking iterator
     // We will easily catch the message we just sent, plus any other system noise!
     for (i, result) in rx.iter().enumerate() {
-        let entry = result?;
+        let entry = result?.into_value();
 
         println!(
             "{}\t{} | '{}' ({}): {}",

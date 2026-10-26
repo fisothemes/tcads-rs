@@ -13,10 +13,10 @@
 use std::sync::mpsc::Receiver;
 use std::thread;
 use std::time::Duration;
+use tcads::client::AdsNotification;
 use tcads::client::devices::blocking::AdsDevice;
 use tcads::core::{
-    AdsNotificationAttrib, AdsNotificationHandle, AdsNotificationSampleOwned, AdsTransMode,
-    AmsAddr, IndexGroup, IndexOffset,
+    AdsNotificationAttrib, AdsNotificationHandle, AdsTransMode, AmsAddr, IndexGroup, IndexOffset,
 };
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -38,17 +38,17 @@ fn main() -> Result<()> {
     let (rx, notif_handle) = add_notification::<u32>(&device, plc_target, count_handle)?;
 
     // ADS `ServerOnChange` always fires one initial notification upon registration
-    let initial_sample = rx.recv_timeout(Duration::from_secs(2))?;
-    let initial_count = u32::from_le_bytes(initial_sample.data().try_into()?);
+    let initial_notif = rx.recv_timeout(Duration::from_secs(2))?;
+    let initial_count = u32::from_le_bytes(initial_notif.value().as_slice().try_into()?);
     println!("Initial `MAIN.nCount` value: {}\n", initial_count);
 
     // Notification Thread - Listens for the 5 changes we are about to trigger
     let notif_thread = thread::spawn(move || {
         for i in 1..=5 {
-            let sample = rx
+            let notif = rx
                 .recv_timeout(Duration::from_secs(2))
                 .expect("Notification timeout!");
-            let count = u32::from_le_bytes(sample.data().try_into().unwrap());
+            let count = u32::from_le_bytes(notif.value().as_slice().try_into().unwrap());
             println!(
                 "[Reader Thread] Notification {} received! nCount: {}",
                 i, count
@@ -131,7 +131,7 @@ fn add_notification<T: Sized>(
     device: &AdsDevice,
     target: AmsAddr,
     handle: IndexOffset,
-) -> Result<(Receiver<AdsNotificationSampleOwned>, AdsNotificationHandle)> {
+) -> Result<(Receiver<AdsNotification>, AdsNotificationHandle)> {
     Ok(device.add_notification(
         target,
         IndexGroup::SYMBOL_VALUE_BY_HANDLE,

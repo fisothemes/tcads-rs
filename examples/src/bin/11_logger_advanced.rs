@@ -37,7 +37,8 @@ fn main() -> Result<()> {
         s.spawn(move || {
             // Listen for 3 log events
             for (i, result) in logger_rx.iter().take(3).enumerate() {
-                if let Ok(entry) = result {
+                if let Ok(notif) = result {
+                    let entry = notif.value();
                     println!("[Logger] Event {}: {}", i + 1, entry.message());
                 }
             }

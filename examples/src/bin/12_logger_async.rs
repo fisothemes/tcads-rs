@@ -35,7 +35,7 @@ async fn main() -> Result<()> {
         println!("\nWaiting for logs to arrive...");
         println!("---------------------------------------------------");
 
-        while let Ok(entry) = rx.recv().await {
+        while let Ok(entry) = rx.recv().await.map(|n| n.into_value()) {
             println!(
                 "{}\t{} | '{}' ({}): {}",
                 entry.message_type(),

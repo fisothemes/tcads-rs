@@ -107,7 +107,7 @@
 //!
 //!     for result in rx.iter().take(5) {
 //!         match result {
-//!             Ok(value) => println!("MAIN.nCount = {value}"),
+//!             Ok(n) => println!("MAIN.nCount = {} at {}", n.value(), n.timestamp()),
 //!             // An online change invalidated the handle behind the subscription
 //!             Err(Error::HandleInvalidated(path)) => break,
 //!             Err(err) => return Err(err.into()),
@@ -211,7 +211,8 @@
 
 pub mod devices;
 pub mod error;
-pub mod notif_guard;
+pub mod notification;
 pub mod tasks;
 
 pub use error::{Error, Result};
+pub use notification::AdsNotification;
