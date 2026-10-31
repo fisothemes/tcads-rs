@@ -14,6 +14,7 @@ pub mod blocking {
         WriteMultiValues,
     };
     pub use super::system_service::blocking::AdsSystemService;
+    pub use crate::AdsNotification;
 }
 
 #[cfg(feature = "tokio")]
@@ -26,4 +27,5 @@ pub mod tokio {
         WriteMultiValues,
     };
     pub use super::system_service::tokio::AdsSystemService;
+    pub use crate::AdsNotification;
 }
