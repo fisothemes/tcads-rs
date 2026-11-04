@@ -875,6 +875,15 @@ dependencies = [
 [[package]]
 name = "tcads-server"
 version = "0.2.0-alpha.1"
+dependencies = [
+ "futures 0.3.34",
+ "futures-core",
+ "tcads-client",
+ "tcads-core",
+ "tcads-io",
+ "thiserror",
+ "tokio",
+]
 
 [[package]]
 name = "thiserror"
