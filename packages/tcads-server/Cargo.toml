@@ -10,7 +10,22 @@ categories.workspace = true
 readme = "README.md"
 version.workspace = true
 
+[features]
+default = ["blocking"]
+blocking = ["tcads-io/blocking"]
+tokio = ["tcads-io/tokio", "dep:tokio", "dep:futures-core", "dep:futures"]
+
+
 [dependencies]
+futures = { workspace = true, optional = true, features = ["io-compat"] }
+futures-core = { workspace = true, optional = true }
+tcads-core = { workspace = true }
+tcads-io = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["io-util", "net", "macros", "sync"], optional = true }
+
+[dev-dependencies]
+tcads-client = { workspace = true }
 
 [package.metadata.docs.rs]
 all-features = true
