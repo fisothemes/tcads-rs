@@ -1,18 +1,21 @@
+use crate::tasks::blocking::writer::AmsResponseWriter;
 use std::fmt;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, ToSocketAddrs};
 #[cfg(unix)]
 use std::path::Path;
-use std::sync::mpsc::Receiver;
+use std::sync::Arc;
+use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 use tcads_core::protocol::{PortConnectRequest, PortConnectResponse};
-use tcads_core::{AmsAddr, AmsNetId, AmsPort, RouterState};
+use tcads_core::{AmsAddr, AmsFrame, AmsNetId, AmsPort, RouterState};
 #[cfg(unix)]
 use tcads_io::blocking::UnixAmsStream;
 use tcads_io::blocking::{AmsReader, AmsWriter, TcpAmsStream};
 
 #[derive(Clone)]
 pub struct AdsDevice {
+    write_tx: Sender<AmsFrame>,
     source: AmsAddr,
 }
 
@@ -105,9 +108,10 @@ impl AdsDevice {
         R: Read + Send + 'static,
         W: Write + Send + 'static,
     {
-        Self {
-            source: source.into(),
-        }
+        let source = source.into();
+        let (write_tx, _) = AmsResponseWriter::spawn(writer);
+
+        Self { write_tx, source }
     }
 
     /// Gracefully shuts down device connection.
