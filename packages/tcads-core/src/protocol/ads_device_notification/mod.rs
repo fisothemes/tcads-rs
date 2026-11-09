@@ -236,7 +236,7 @@ impl AdsDeviceNotificationOwned {
             target,
             source,
             AdsCommand::AdsDeviceNotification,
-            StateFlag::tcp_ads_response(),
+            StateFlag::tcp_ads_request(),
             ads_payload_size as u32,
             AdsReturnCode::Ok,
             invoke_id,
@@ -375,7 +375,25 @@ mod tests {
         assert_eq!(view.stamps()[0].samples().len(), 1);
         assert_eq!(view.stamps()[0].samples()[0].handle(), handle);
         assert_eq!(view.stamps()[0].samples()[0].data(), data.as_slice());
+        assert!(view.header().state_flags().is_request());
+        assert_eq!(view.header().state_flags().as_raw(), 0x0004);
+    }
+
+    #[test]
+    fn test_parses_notification_with_response_flag() {
+        let (target, source) = make_addrs();
+        let sample = AdsNotificationSampleOwned::new(make_handle(7), vec![0xAA]);
+        let stamp = AdsStampHeaderOwned::new(make_timestamp(), vec![sample]);
+        let frame = make_owned_notification(target, source, vec![stamp]).to_frame();
+
+        // ADS header: target (8) + source (8) + command (2), then the state flags.
+        let mut payload = frame.payload().to_vec();
+        payload[18..20].copy_from_slice(&StateFlag::tcp_ads_response().to_bytes());
+        let frame = AmsFrame::new(AmsCommand::AdsCommand, payload);
+
+        let view = AdsDeviceNotification::try_from(&frame).expect("Should parse");
         assert!(view.header().state_flags().is_response());
+        assert_eq!(view.stamps()[0].samples()[0].data(), &[0xAA]);
     }
 
     #[test]
