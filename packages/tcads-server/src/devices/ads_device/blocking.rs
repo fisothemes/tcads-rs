@@ -1,14 +1,13 @@
 use crate::tasks::blocking::{AdsRequest, AmsRequestReader, AmsResponseWriter};
 use std::fmt;
 use std::io::{Read, Write};
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::ToSocketAddrs;
 #[cfg(unix)]
 use std::path::Path;
-use std::sync::Arc;
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::time::Duration;
-use tcads_core::protocol::{PortConnectRequest, PortConnectResponse};
-use tcads_core::{AmsAddr, AmsFrame, AmsNetId, AmsPort, RouterState};
+use tcads_core::protocol::{PortCloseRequest, PortConnectRequest, PortConnectResponse};
+use tcads_core::{AmsAddr, AmsFrame, AmsPort};
 #[cfg(unix)]
 use tcads_io::blocking::UnixAmsStream;
 use tcads_io::blocking::{AmsReader, AmsWriter, TcpAmsStream};
@@ -47,18 +46,7 @@ impl AdsDevice {
         timeout: impl Into<Option<Duration>>,
     ) -> crate::Result<Self> {
         let timeout = timeout.into();
-        let (mut reader, mut writer) = match timeout {
-            Some(duration) => {
-                let addr: SocketAddr = addr.to_socket_addrs()?.next().ok_or_else(|| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::InvalidInput,
-                        "could not resolve address",
-                    )
-                })?;
-                TcpAmsStream::connect_timeout(&addr, duration)?.try_split()?
-            }
-            None => TcpAmsStream::connect(addr)?.try_split()?,
-        };
+        let (mut reader, mut writer) = Self::connect_tcp(addr, timeout)?.try_split()?;
 
         reader.get_ref().set_read_timeout(timeout)?;
         let addr = Self::handshake(&mut reader, &mut writer, port)?;
@@ -75,9 +63,11 @@ impl AdsDevice {
     ) -> crate::Result<Self> {
         let stream = UnixAmsStream::connect(path)?;
         let (mut reader, mut writer) = stream.try_split()?;
+
         reader.get_ref().set_read_timeout(timeout.into())?;
         let addr = Self::handshake(&mut reader, &mut writer, port)?;
         reader.get_ref().set_read_timeout(None)?;
+
         Ok(Self::new(reader, writer, addr))
     }
 
@@ -86,19 +76,12 @@ impl AdsDevice {
         source: impl Into<AmsAddr>,
         timeout: impl Into<Option<Duration>>,
     ) -> crate::Result<Self> {
-        let timeout = timeout.into();
-        let (reader, writer) = match timeout {
-            Some(duration) => {
-                let addr: SocketAddr = addr.to_socket_addrs()?.next().ok_or_else(|| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::InvalidInput,
-                        "could not resolve address",
-                    )
-                })?;
-                TcpAmsStream::connect_timeout(&addr, duration)?.try_split()?
-            }
-            None => TcpAmsStream::connect(addr)?.try_split()?,
-        };
+        let source = source.into();
+        if source.port() == AmsPort::new(0) {
+            return Err(crate::Error::InvalidSource(source));
+        }
+
+        let (reader, writer) = Self::connect_tcp(addr, timeout.into())?.try_split()?;
         Ok(Self::new(reader, writer, source))
     }
 
@@ -120,8 +103,11 @@ impl AdsDevice {
     }
 
     /// Gracefully shuts down device connection.
-    pub fn shutdown(&self) -> crate::Result<()> {
-        todo!()
+    pub fn shutdown(self) -> crate::Result<()> {
+        let port = self.source.port();
+        Ok(self
+            .write_tx
+            .send(PortCloseRequest::new(port).into_frame())?)
     }
 
     /// Returns the source address of the device.
@@ -129,18 +115,24 @@ impl AdsDevice {
         self.source
     }
 
-    /// Queries the local AMS router's Net ID.
-    pub fn get_local_net_id(&self) -> crate::Result<AmsNetId> {
-        todo!()
+    pub fn recv(&self) -> crate::Result<AdsRequest> {
+        Ok(self.request_rx.recv()?)
     }
 
-    /// Subscribes to the AMS router's state changes.
-    pub fn subscribe_router(&self) -> crate::Result<Receiver<RouterState>> {
-        todo!()
+    pub fn recv_timeout(&self, timeout: Duration) -> crate::Result<AdsRequest> {
+        Ok(self.request_rx.recv_timeout(timeout)?)
+    }
+
+    pub fn try_recv(&self) -> crate::Result<Option<AdsRequest>> {
+        match self.request_rx.try_recv() {
+            Ok(request) => Ok(Some(request)),
+            Err(TryRecvError::Empty) => Ok(None),
+            Err(TryRecvError::Disconnected) => Err(crate::Error::Disconnected),
+        }
     }
 
     /// Returns an iterator over incoming ADS requests.
-    pub fn incoming(&self) -> crate::Result<Incoming> {
+    pub fn incoming(self) -> crate::Result<(Incoming, ShutdownToken)> {
         todo!();
     }
 
@@ -179,6 +171,31 @@ impl AdsDevice {
         }
         Ok(addr)
     }
+
+    /// Connects over TCP. With a timeout, tries every resolved address in turn, the
+    /// same as [`std::net::TcpStream::connect`] does without one.
+    fn connect_tcp(
+        addr: impl ToSocketAddrs,
+        timeout: Option<Duration>,
+    ) -> crate::Result<TcpAmsStream> {
+        let Some(timeout) = timeout else {
+            return Ok(TcpAmsStream::connect(addr)?);
+        };
+
+        let mut last_err = None;
+        for addr in addr.to_socket_addrs()? {
+            match TcpAmsStream::connect_timeout(&addr, timeout) {
+                Ok(stream) => return Ok(stream),
+                Err(e) => last_err = Some(e),
+            }
+        }
+        Err(crate::Error::from(last_err.unwrap_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "could not resolve address",
+            )
+        })))
+    }
 }
 
 impl fmt::Debug for AdsDevice {
@@ -189,6 +206,8 @@ impl fmt::Debug for AdsDevice {
     }
 }
 
+pub struct ShutdownToken;
+
 pub struct Incoming;
 
 impl Iterator for Incoming {
@@ -196,17 +215,4 @@ impl Iterator for Incoming {
     fn next(&mut self) -> Option<Self::Item> {
         todo!()
     }
-}
-
-/// Currently a placeholder for incoming ADS messages.
-#[non_exhaustive]
-pub enum AdsRequest {
-    ReadDeviceInfo,
-    Read,
-    Write,
-    ReadWrite,
-    ReadState,
-    WriteControl,
-    AddNotification,
-    DeleteNotification,
 }
