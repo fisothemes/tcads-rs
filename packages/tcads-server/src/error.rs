@@ -1,5 +1,6 @@
 use std::io;
 use std::sync::Arc;
+use std::sync::mpsc::{RecvError, RecvTimeoutError, SendError};
 use tcads_core::ams::{AddrError, NetIdError};
 use tcads_core::{AdsError, AdsReturnCode, AmsAddr, AmsError, AmsPort, ProtocolError};
 
@@ -31,6 +32,12 @@ pub enum Error {
         requested: AmsPort,
         assigned: AmsAddr,
     },
+    #[error("invalid source address {0}: the port must not be {port}", port = .0.port())]
+    InvalidSource(AmsAddr),
+    #[error("Disconnected")]
+    Disconnected,
+    #[error("Timed out")]
+    Timeout,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -38,5 +45,26 @@ pub type Result<T> = std::result::Result<T, Error>;
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
         Error::Io(Arc::new(err))
+    }
+}
+
+impl<T> From<SendError<T>> for Error {
+    fn from(_: SendError<T>) -> Self {
+        Error::Disconnected
+    }
+}
+
+impl From<RecvError> for Error {
+    fn from(_: RecvError) -> Self {
+        Error::Disconnected
+    }
+}
+
+impl From<RecvTimeoutError> for Error {
+    fn from(err: RecvTimeoutError) -> Self {
+        match err {
+            RecvTimeoutError::Timeout => Error::Timeout,
+            RecvTimeoutError::Disconnected => Error::Disconnected,
+        }
     }
 }
