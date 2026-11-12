@@ -3,6 +3,7 @@ use std::io::Read;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::{self, JoinHandle};
 use tcads_core::ads::StateFlag;
+use tcads_core::protocol::RouterNotification;
 use tcads_core::{AdsCommand, AdsHeader, AdsReturnCode, AmsCommand, AmsFrame};
 use tcads_io::blocking::AmsReader;
 pub struct AmsRequestReader;
@@ -19,7 +20,9 @@ impl AmsRequestReader {
 
                 match frame.header().command() {
                     AmsCommand::RouterNotification => {
-                        tx.send(AdsRequest::RouterState)?;
+                        if let Ok(notif) = RouterNotification::try_from_frame(&frame) {
+                            tx.send(AdsRequest::RouterState(notif.state()))?;
+                        }
                     }
                     AmsCommand::AdsCommand => {
                         let Ok((header, data)) = AdsHeader::parse_prefix(frame.payload()) else {

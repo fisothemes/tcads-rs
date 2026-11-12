@@ -1,7 +1,8 @@
-/// Currently a placeholder for incoming ADS messages.
+use tcads_core::protocol::RouterState;
+
 #[non_exhaustive]
 pub enum AdsRequest {
-    RouterState,
+    RouterState(RouterState),
     ReadDeviceInfo,
     Read,
     Write,
