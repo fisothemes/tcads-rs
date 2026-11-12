@@ -51,6 +51,25 @@ impl AdsHeader {
         }
     }
 
+    /// Consumes the current header and updates the source.
+    pub fn with_source(self, source: AmsAddr) -> Self {
+        Self { source, ..self }
+    }
+
+    /// Consumes the current header and updates the target.
+    pub fn with_target(self, target: AmsAddr) -> Self {
+        Self { target, ..self }
+    }
+
+    /// Consumes the current header and swaps the source and target addresses.
+    pub fn with_swapped_addrs(self) -> Self {
+        Self {
+            target: self.source,
+            source: self.target,
+            ..self
+        }
+    }
+
     /// The AMS address of the station, for which the packet is intended.
     pub fn target(&self) -> &AmsAddr {
         &self.target
