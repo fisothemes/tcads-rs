@@ -1,9 +1,10 @@
+use crate::tasks::blocking::responder::AdsReadDeviceInfoResponder;
 use tcads_core::protocol::RouterState;
 
 #[non_exhaustive]
 pub enum AdsRequest {
     RouterState(RouterState),
-    ReadDeviceInfo,
+    ReadDeviceInfo(AdsReadDeviceInfoResponder),
     Read,
     Write,
     ReadWrite,

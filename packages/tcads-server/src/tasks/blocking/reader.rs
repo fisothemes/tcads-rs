@@ -30,7 +30,11 @@ impl AmsRequestReader {
                         };
 
                         match header.command_id() {
-                            AdsCommand::AdsReadDeviceInfo => tx.send(AdsRequest::ReadDeviceInfo)?,
+                            AdsCommand::AdsReadDeviceInfo => {
+                                tx.send(AdsRequest::ReadDeviceInfo(
+                                    (header.with_swapped_addrs(), write_tx.clone()).into(),
+                                ))?
+                            }
                             AdsCommand::AdsRead => tx.send(AdsRequest::Read)?,
                             AdsCommand::AdsWrite => tx.send(AdsRequest::Write)?,
                             AdsCommand::AdsReadState => tx.send(AdsRequest::ReadState)?,
