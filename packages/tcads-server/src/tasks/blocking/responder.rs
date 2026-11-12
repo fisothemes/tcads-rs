@@ -41,7 +41,7 @@ impl AdsReadDeviceInfoResponder {
     }
 
     pub fn ok(
-        self,
+        mut self,
         version: impl Into<AdsDeviceVersion>,
         name: impl AsRef<str>,
     ) -> crate::Result<()> {
@@ -55,12 +55,13 @@ impl AdsReadDeviceInfoResponder {
         )?
         .to_frame();
 
+        self.answered = true;
         self.write_tx.send(frame)?;
 
         Ok(())
     }
 
-    pub fn err(self, code: AdsReturnCode) -> crate::Result<()> {
+    pub fn err(mut self, code: AdsReturnCode) -> crate::Result<()> {
         let code = if code == AdsReturnCode::Ok {
             AdsReturnCode::AdsErrDeviceError
         } else {
@@ -68,7 +69,7 @@ impl AdsReadDeviceInfoResponder {
         };
 
         let frame = self.header_only_resp_frame(code)?;
-
+        self.answered = true;
         self.write_tx.send(frame)?;
 
         Ok(())
